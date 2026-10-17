@@ -2,6 +2,10 @@
 
 Small single-page HTML games that run in a phone browser.
 
+Each game lives in its own folder on `main` (`<game>/index.html`), and [`index.html`](index.html)
+at the root is a home page linking to all of them. With GitHub Pages on, the home page is
+`https://pedrotung.github.io/EmilyGames/` and each game is at `/<game>/`.
+
 ## Colour Jump
 
 [`colour-jump/index.html`](colour-jump/index.html) is a one-button jump game drawn from a hand sketch.

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EmilyGames</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+  /* Layout: a short hand-lettered header, then one card per game in a wrapping grid. */
+  :root {
+    --bg: #FFF8E8; --ink: #2B2238; --muted: #6E6478; --card: #FFFFFF; --line: #EADFCB;
+    --font-hand: "Patrick Hand", "Comic Sans MS", cursive;
+    --font-ui: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1E1A24; --ink: #F4EFE6; --muted: #B3A9BC; --card: #2A2532; --line: #3A3344; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #1E1A24; --ink: #F4EFE6; --muted: #B3A9BC; --card: #2A2532; --line: #3A3344; color-scheme: dark; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font-ui);
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: calc(env(safe-area-inset-top, 0px) + 32px) calc(env(safe-area-inset-bottom, 0px) + 40px);
+  }
+  main { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+  h1 { margin: 0; font: 56px/1 var(--font-hand); text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--muted); }
+  .rainbow { display: flex; height: 6px; border-radius: 3px; overflow: hidden; max-width: 220px; margin-top: 14px; }
+  .rainbow i { flex: 1; }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+  .game {
+    display: grid; gap: 10px; padding: 16px; border-radius: 16px; background: var(--card);
+    border: 1px solid var(--line); color: inherit; text-decoration: none;
+    transition: transform 120ms;
+  }
+  .game:hover { transform: translateY(-3px); }
+  .game:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .thumb { aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; display: block; width: 100%; }
+  .game h2 { margin: 0; font: 30px/1 var(--font-hand); }
+  .game p { margin: 0; color: var(--muted); font-size: 14px; }
+  .play { justify-self: start; font-weight: 600; font-size: 14px; }
+  @media (prefers-reduced-motion: reduce) { .game { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>EmilyGames</h1>
+    <p>Little games for the phone browser. Tap one to play.</p>
+    <div class="rainbow" aria-hidden="true"><i style="background:#E5484D"></i><i style="background:#EE7D1F"></i><i style="background:#E8B90C"></i><i style="background:#36A852"></i><i style="background:#3B7DD8"></i><i style="background:#4A4FC4"></i><i style="background:#9B4FD0"></i></div>
+  </header>
+
+  <section class="games" aria-label="Games">
+    <a class="game" href="colour-jump/">
+      <svg class="thumb" viewBox="0 0 160 90" role="img" aria-label="A block about to jump a gap below the words Level 1">
+        <rect width="160" height="90" fill="#FCE3E3"/>
+        <ellipse cx="38" cy="22" rx="14" ry="6" fill="#FFFFFF"/><ellipse cx="46" cy="18" rx="9" ry="7" fill="#FFFFFF"/>
+        <ellipse cx="122" cy="30" rx="12" ry="5" fill="#FFFFFF"/><ellipse cx="128" cy="27" rx="7" ry="6" fill="#FFFFFF"/>
+        <text x="80" y="34" text-anchor="middle" font-family="Patrick Hand, cursive" font-size="16" fill="#F2B7B8">Level 1</text>
+        <rect x="0" y="64" width="86" height="26" fill="#7A1C22"/><rect x="104" y="64" width="56" height="26" fill="#7A1C22"/>
+        <rect x="60" y="56" width="8" height="8" fill="#7A1C22"/>
+        <rect x="30" y="54" width="10" height="10" rx="2" fill="#7A1C22"/><rect x="32" y="56" width="6" height="6" rx="1" fill="#E5484D"/>
+        <rect x="140" y="44" width="10" height="20" rx="1.5" fill="#EE7D1F"/>
+      </svg>
+      <h2>Colour Jump</h2>
+      <p>Seven rainbow levels. Your block runs on its own; tap JUMP to clear gaps and blocks, and walk through each coloured door.</p>
+      <span class="play">Play →</span>
+    </a>
+  </section>
+</main>
+</body>
+</html>
