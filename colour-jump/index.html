@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<style>html, body { margin: 0; } [hidden] { display: none !important; }</style>
+<title>Colour Jump</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+  /* Layout: one full-screen canvas; HUD on top edge, one big jump button bottom-right.
+     Single look by choice: every level paints its own palette, so no dark-mode blocks. */
+  :root {
+    --ink: #1F3F73;
+    --paper: #DCEBFA;
+    --chip: rgba(255, 255, 255, 0.72);
+    --font-hand: "Patrick Hand", "Comic Sans MS", "PingFang SC", "Microsoft YaHei", cursive;
+    --font-ui: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    pointer-events: none;
+  }
+  .chip {
+    background: var(--chip); color: var(--ink);
+    border-radius: 999px; padding: 6px 14px;
+    font: 600 14px/1.2 var(--font-ui);
+    font-variant-numeric: tabular-nums;
+  }
+  .hud button { pointer-events: auto; border: 0; cursor: pointer; }
+  .hud button:focus-visible, .jump:focus-visible, .panel button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .hud-right { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 420px) { .chip { padding: 6px 10px; font-size: 13px; } }
+  .panel .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .panel button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+  .progress {
+    position: fixed; left: 0; right: 0; top: 0; height: 4px;
+    background: transparent; pointer-events: none;
+  }
+  .progress i { display: block; height: 100%; width: 0; background: var(--ink); opacity: .55; }
+
+  .jump {
+    position: fixed;
+    right: calc(max(16px, env(safe-area-inset-right, 0px)) + 8px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    width: 104px; height: 104px; border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.85);
+    background: var(--ink); color: #fff;
+    font: 28px/1 var(--font-hand); letter-spacing: 0.04em;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+    touch-action: none; cursor: pointer;
+    transition: transform 60ms, box-shadow 60ms;
+  }
+  .jump.down { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+
+  .panel {
+    position: fixed; left: 50%; top: 58%; transform: translate(-50%, -50%);
+    width: min(400px, calc(100% - 32px));
+    background: rgba(255, 255, 255, 0.94); color: var(--ink);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border-radius: 18px; padding: 18px 20px;
+    display: grid; gap: 10px; justify-items: center; text-align: center;
+  }
+  .panel h2 { margin: 0; font: 34px/1 var(--font-hand); text-wrap: balance; }
+  .panel p { margin: 0; font-size: 15px; line-height: 1.5; }
+  .panel button {
+    border: 0; border-radius: 999px; padding: 10px 22px; cursor: pointer;
+    background: var(--ink); color: #fff; font: 600 16px/1 var(--font-ui);
+  }
+  .panel[hidden] { display: none; }
+  @media (max-height: 420px) { .panel { top: 50%; } }
+</style>
+
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="progress"><i id="bar"></i></div>
+<div class="hud">
+  <span class="chip" id="deaths">Deaths: 0</span>
+  <div class="hud-right">
+    <button class="chip" id="pause" type="button">Pause</button>
+    <button class="chip" id="music" type="button" aria-pressed="true">Music: On</button>
+    <button class="chip" id="mute" type="button" aria-pressed="false">Sound: On</button>
+  </div>
+</div>
+<div class="panel" id="startPanel">
+  <h2>Colour Jump</h2>
+  <p>Your block keeps moving forward.<br>Tap JUMP to clear the gaps and blocks.<br>Walk into each coloured door to reach the next of 7 levels.</p>
+  <p style="opacity:.7">Tap JUMP to start. On a computer, press Space.</p>
+</div>
+<div class="panel" id="pausePanel" hidden>
+  <h2>Paused</h2>
+  <p id="pauseText">Tap JUMP or Resume to keep going.</p>
+  <div class="row">
+    <button type="button" id="resume">Resume</button>
+    <button type="button" id="restart" class="ghost">Restart level</button>
+    <button type="button" id="toLevel1" class="ghost">Back to Level 1</button>
+  </div>
+</div>
+<div class="panel" id="winPanel" hidden>
+  <h2>You made it!</h2>
+  <p id="winText"></p>
+  <button type="button" id="again">Play again</button>
+</div>
+<button class="jump" id="jump" type="button" aria-label="Jump">JUMP</button>
+
+<script>
+// ---------- Tunables ----------
+const S = 36;            // player size
+const SPEED = 260;       // forward speed, units per second
+const G = 2200;          // gravity
+const JV = -720;         // jump velocity
+const DT = 1 / 120;      // fixed physics step
+const COYOTE = 0.08;     // can still jump this long after leaving an edge
+const BUFFER = 0.12;     // a press this early before landing still counts
+const BASE = 260;        // default ground height
+const DOOR_W = 44, DOOR_H = 92;
+
+// ---------- Levels ----------
+// segs: [x, width, top]   blocks: [x, width, height]   door: x
+const LEVELS = [
+  {
+    name: 'Level 1',
+    c: { bg: '#FCE3E3', faint: '#F2B7B8', mid: '#E5484D', ground: '#7A1C22' },
+    segs: [[-600, 1400, BASE], [900, 700, BASE], [1710, 900, BASE]],
+    blocks: [[500, 30, 30], [1250, 30, 40], [2050, 40, 30]],
+    door: 2450,
+    hints: [[60, 'Tap JUMP to clear the block'], [700, 'Jump over the gap']],
+  },
+  {
+    name: 'Level 2',
+    c: { bg: '#FDE9D8', faint: '#F6C59E', mid: '#EE7D1F', ground: '#7A3A0B' },
+    segs: [[-600, 1300, BASE], [810, 500, BASE], [1420, 600, 230], [2130, 400, BASE], [2650, 1000, BASE]],
+    blocks: [[450, 30, 40], [1080, 30, 30], [1140, 30, 30], [1750, 40, 40], [2330, 30, 50], [2950, 30, 40], [3200, 60, 30]],
+    door: 3500,
+    hints: [],
+  },
+  {
+    name: 'Level 3',
+    c: { bg: '#FFF5CC', faint: '#F0DB80', mid: '#E8B90C', ground: '#6B5000' },
+    segs: [[-600, 1200, BASE], [720, 400, BASE], [1240, 300, 220], [1660, 300, BASE], [2090, 250, 230], [2470, 600, BASE], [3200, 1000, BASE]],
+    blocks: [[380, 30, 50], [900, 30, 40], [1380, 30, 40], [1780, 30, 30], [1840, 30, 30], [2700, 30, 50], [2880, 30, 50], [3450, 30, 40], [3620, 60, 40], [3820, 30, 50]],
+    door: 4050,
+    hints: [],
+  },
+  {
+    name: 'Level 4',
+    c: { bg: '#DFF3E2', faint: '#AFDDB7', mid: '#36A852', ground: '#1A5530' },
+    segs: [[-600, 1100, BASE], [630, 400, 230], [1160, 350, BASE], [1640, 300, 210], [2070, 500, BASE], [2700, 900, BASE]],
+    blocks: [[300, 30, 50], [800, 30, 40], [1300, 30, 40], [1360, 30, 40], [1780, 30, 30], [2250, 30, 60], [2420, 30, 40], [2900, 60, 40], [3150, 30, 50], [3300, 30, 50]],
+    door: 3450,
+    hints: [],
+  },
+  {
+    name: 'Level 5',
+    c: { bg: '#DCEBFA', faint: '#B5D0F0', mid: '#3B7DD8', ground: '#1F3F73' },
+    segs: [[-600, 1000, BASE], [530, 300, 240], [970, 300, BASE], [1410, 200, 220], [1750, 400, BASE], [2290, 300, 230], [2730, 350, BASE], [3220, 900, BASE]],
+    blocks: [[250, 30, 50], [650, 30, 40], [1100, 30, 50], [1500, 30, 30], [1900, 90, 40], [2420, 30, 50], [2900, 30, 50], [3400, 30, 40], [3550, 30, 60], [3750, 60, 40], [3900, 30, 50]],
+    door: 4000,
+    hints: [],
+  },
+  {
+    name: 'Level 6',
+    c: { bg: '#E3E4F9', faint: '#BBBEEC', mid: '#4A4FC4', ground: '#23256B' },
+    segs: [[-600, 1000, BASE], [540, 250, 250], [930, 250, 220], [1320, 250, BASE], [1710, 500, BASE], [2350, 200, 230], [2690, 200, 200], [3030, 400, BASE], [3570, 1000, BASE]],
+    blocks: [[200, 30, 50], [600, 30, 40], [1050, 30, 40], [1400, 30, 50], [1850, 60, 50], [2050, 30, 60], [2430, 30, 40], [3150, 30, 50], [3300, 30, 60], [3750, 30, 50], [3900, 90, 40], [4150, 30, 60]],
+    door: 4450,
+    hints: [],
+  },
+  {
+    name: 'Level 7',
+    c: { bg: '#F0E3F8', faint: '#D7BCEB', mid: '#9B4FD0', ground: '#4A1F6B' },
+    segs: [[-600, 900, BASE], [440, 200, 240], [780, 200, 210], [1120, 250, BASE], [1510, 180, 230], [1830, 180, 200], [2150, 400, BASE], [2690, 250, 240], [3080, 250, BASE], [3470, 1100, BASE]],
+    blocks: [[180, 30, 50], [540, 30, 40], [880, 30, 40], [1240, 30, 60], [1580, 30, 40], [2280, 30, 60], [2420, 60, 40], [2800, 30, 50], [3200, 30, 40], [3650, 30, 60], [3820, 90, 50], [4050, 30, 60], [4200, 30, 60]],
+    door: 4450,
+    hints: [],
+  },
+];
+const FINAL_DOOR = { mid: '#9B4FD0', ground: '#4A1F6B' };
+
+function topAt(L, x) {
+  for (const [sx, w, top] of L.segs) if (x >= sx && x < sx + w) return top;
+  return BASE;
+}
+for (const L of LEVELS) {
+  L.solids = L.segs.map(([x, w, top]) => ({ x, y: top, w, h: 10000, kind: 'ground' }));
+  for (const [x, w, h] of L.blocks) {
+    const top = topAt(L, x);
+    L.solids.push({ x, y: top - h, w, h, kind: 'block' });
+  }
+  const dTop = topAt(L, L.door);
+  L.doorRect = { x: L.door, y: dTop - DOOR_H, w: DOOR_W, h: DOOR_H };
+}
+
+// ---------- Physics (pure, also used by the level checker) ----------
+function newPlayer(L) {
+  return { x: 0, y: topAt(L, 0), vy: 0, grounded: true, lastGround: 0, used: false, t: 0, dead: false, done: false, rot: 0 };
+}
+function step(L, p, wantJump) {
+  p.t += DT;
+  let jumped = false;
+  if (wantJump && !p.used && (p.grounded || p.t - p.lastGround <= COYOTE)) {
+    p.vy = JV; p.grounded = false; p.used = true; jumped = true;
+  }
+  const prevBottom = p.y;
+  p.vy += G * DT;
+  p.x += SPEED * DT;
+  p.y += p.vy * DT;
+  const wasGrounded = p.grounded;
+  p.grounded = false;
+  for (const s of L.solids) {
+    if (p.x + S > s.x && p.x < s.x + s.w && p.y > s.y && p.y - S < s.y + s.h) {
+      if (prevBottom <= s.y + 0.01 && p.vy >= 0) {
+        p.y = s.y; p.vy = 0; p.grounded = true; p.lastGround = p.t; p.used = false;
+      } else {
+        p.dead = true;
+      }
+    }
+  }
+  if (p.y - S > 700) p.dead = true;
+  if (p.x + S >= L.doorRect.x + 6) p.done = true;
+  p.landed = p.grounded && !wasGrounded;
+  return jumped;
+}
+window.__colourJump = { LEVELS, newPlayer, step, DT };
+
+// ---------- Player face ----------
+const face = new Image();
+face.src = 'data:image/jpeg;base64,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';
+
+// ---------- Sound ----------
+let actx = null, muted = false;
+function beep(freq, dur, type = 'square', vol = 0.06, slide = 0) {
+  if (muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+const sfx = {
+  jump: () => beep(520, 0.12, 'square', 0.05, 1.6),
+  fall: () => playFx(aahVoice),
+  ew: () => playFx(ewVoice),
+  yes: () => playFx(yesVoice),
+  boom: () => playFx(boomFx),
+  crash: () => playFx(sadTrombone),
+  // Each door gets its own key and a whoosh; the last door plays a longer run.
+  door: k => {
+    const base = [392, 440, 494, 523, 587, 659, 523][k] || 523, steps = k === 6 ? [1, 1.25, 1.5, 2, 2.5, 3] : [1, 1.25, 1.5, 2];
+    beep(180, 0.5, 'sawtooth', 0.03, 4);
+    steps.forEach((m, i) => setTimeout(() => beep(base * m, 0.16, 'triangle', 0.08), 80 + i * 85));
+  },
+};
+
+// ---------- Music: a 90s rave / eurodance loop, synthesised live ----------
+// 138 BPM, A minor, Am-F-C-G. Four-on-the-floor kick, offbeat bass and hats,
+// syncopated detuned-saw piano stabs and a square-wave arpeggio. Each level raises the key.
+const BPM = 138, SIXTEENTH = 60 / BPM / 4;
+const CHORDS = [[57, 60, 64], [57, 60, 65], [55, 60, 64], [55, 59, 62]];   // Am, F, C, G voicings
+const ROOTS = [45, 41, 48, 43];
+const KEY_SHIFT = [0, 2, 3, 5, 7, 8, 10];
+const STAB_STEPS = [0, 3, 6, 10, 12];
+const ARP = [0, 1, 2, 1, 0, 2, 1, 2];
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+function makeNoise(ac) {
+  const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+function env(ac, dest, t, peak, decay) {
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+  g.connect(dest); return g;
+}
+function osc(ac, type, f, t, dur, dest, detune = 0) {
+  const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.detune.value = detune;
+  o.connect(dest); o.start(t); o.stop(t + dur + 0.05); return o;
+}
+function noiseHit(ac, noise, dest, t, type, freq, peak, decay) {
+  const s = ac.createBufferSource(); s.buffer = noise;
+  const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  s.connect(f).connect(env(ac, dest, t, peak, decay)); s.start(t, Math.random() * 0.5); s.stop(t + decay + 0.05);
+}
+// Schedule one sixteenth note. step counts from 0; a loop is 4 bars of 16 steps.
+function musicStep(ac, dest, noise, step, t, shift) {
+  const s = step % 16, bar = Math.floor(step / 16) % 4, chord = CHORDS[bar].map(n => n + shift), root = ROOTS[bar] + shift;
+  if (s % 4 === 0) {                                   // kick
+    const g = env(ac, dest, t, 0.9, 0.28), o = osc(ac, 'sine', 150, t, 0.3, g);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  }
+  if (s === 4 || s === 12) noiseHit(ac, noise, dest, t, 'bandpass', 1600, 0.45, 0.14);       // clap
+  if (s % 4 === 2) noiseHit(ac, noise, dest, t, 'highpass', 7000, 0.22, 0.11);               // open hat
+  else if (s % 2 === 1) noiseHit(ac, noise, dest, t, 'highpass', 9000, 0.07, 0.03);          // closed hat
+  if (s % 4 === 2 || s === 15) {                       // offbeat rave bass
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(1400, t);
+    f.frequency.exponentialRampToValueAtTime(220, t + 0.16); f.Q.value = 9;
+    f.connect(env(ac, dest, t, 0.32, 0.2));
+    osc(ac, 'sawtooth', hz(root), t, 0.2, f); osc(ac, 'square', hz(root - 12), t, 0.2, f);
+  }
+  if (STAB_STEPS.includes(s)) {                        // piano-house style stabs
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2600;
+    f.connect(env(ac, dest, t, 0.075, 0.22));
+    for (const n of chord) for (const dt of [-9, 9]) osc(ac, 'sawtooth', hz(n), t, 0.22, f, dt);
+  }
+  {                                                    // arpeggio, two octaves up
+    const n = chord[ARP[s % 8]] + (s >= 8 ? 24 : 12);
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3200;
+    f.connect(env(ac, dest, t, 0.045, 0.1));
+    osc(ac, 'square', hz(n), t, 0.1, f);
+  }
+}
+const music = {
+  on: true, timer: null, step: 0, next: 0, master: null, noise: null,
+  start() {
+    if (!this.on || this.timer) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      if (!this.master) {
+        const comp = actx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+        this.master = actx.createGain(); this.master.connect(comp).connect(actx.destination);
+        this.noise = makeNoise(actx);
+      }
+      const now = actx.currentTime;
+      this.master.gain.cancelScheduledValues(now); this.master.gain.setValueAtTime(0.0001, now);
+      this.master.gain.linearRampToValueAtTime(0.2, now + 0.4);
+      this.next = now + 0.06;
+      this.timer = setInterval(() => this.tick(), 25);
+    } catch (e) {}
+  },
+  tick() {
+    while (this.next < actx.currentTime + 0.12) {
+      musicStep(actx, this.master, this.noise, this.step, this.next, KEY_SHIFT[levelIdx] || 0);
+      this.step++; this.next += SIXTEENTH;
+    }
+  },
+  stop() {
+    if (!this.timer) return;
+    clearInterval(this.timer); this.timer = null;
+    const now = actx.currentTime;
+    this.master.gain.cancelScheduledValues(now); this.master.gain.setValueAtTime(this.master.gain.value, now);
+    this.master.gain.linearRampToValueAtTime(0.0001, now + 0.15);
+  },
+};
+
+// ---------- Voice-like effects ----------
+// "Aaah!": a sawtooth "voice" through three vowel formants, pitch sliding down as you fall.
+function aahVoice(ac, dest, t) {
+  const dur = 1.1, src = ac.createOscillator(), lfo = ac.createOscillator(), lfoGain = ac.createGain(), out = ac.createGain();
+  src.type = 'sawtooth';
+  src.frequency.setValueAtTime(380, t); src.frequency.linearRampToValueAtTime(470, t + 0.12);
+  src.frequency.exponentialRampToValueAtTime(150, t + dur);
+  lfo.frequency.value = 7; lfoGain.gain.value = 14; lfo.connect(lfoGain).connect(src.frequency);
+  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(1.0, t + 0.05);
+  out.gain.setValueAtTime(0.9, t + dur * 0.6); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  for (const [f, g, q] of [[820, 1, 7], [1180, 0.55, 9], [2800, 0.22, 12]]) {   // the "ah" vowel
+    const bp = ac.createBiquadFilter(), gg = ac.createGain();
+    bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; gg.gain.value = g;
+    src.connect(bp).connect(gg).connect(out);
+  }
+  out.connect(dest);
+  src.start(t); lfo.start(t); src.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+}
+// "Wah wah wah waaah": a sad trombone. Three short falling notes, then a long wobbling one.
+function sadTrombone(ac, dest, t, noise) {
+  if (noise) {                                         // the crunch of breaking apart
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noise; f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.8;
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    s.connect(f).connect(g).connect(dest); s.start(t); s.stop(t + 0.2);
+  }
+  const notes = [[196, 0.2], [185, 0.2], [175, 0.2], [165, 0.75]];
+  let at = t + 0.12;
+  notes.forEach(([f, d], i) => {
+    const last = i === notes.length - 1, lp = ac.createBiquadFilter(), g = ac.createGain();
+    lp.type = 'lowpass'; lp.Q.value = 6;
+    lp.frequency.setValueAtTime(350, at); lp.frequency.linearRampToValueAtTime(1500, at + 0.07);   // the "wah"
+    lp.frequency.linearRampToValueAtTime(500, at + d);
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.2, at + 0.03);
+    g.gain.setValueAtTime(0.19, at + d * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+    lp.connect(g).connect(dest);
+    for (const det of [-6, 6]) {
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+      if (last) {                                      // sorrowful wobble on the long note
+        const lfo = ac.createOscillator(), lg = ac.createGain();
+        lfo.frequency.value = 5.5; lg.gain.value = 5; lfo.connect(lg).connect(o.frequency);
+        lfo.start(at); lfo.stop(at + d + 0.05);
+        o.frequency.setValueAtTime(f, at + d * 0.5); o.frequency.linearRampToValueAtTime(f * 0.94, at + d);
+      }
+      o.connect(lp); o.start(at); o.stop(at + d + 0.05);
+    }
+    at += d + 0.03;
+  });
+}
+// "Ew!": a voice gliding from an "ee" vowel to an "oo" vowel, pitch bending up then down in disgust.
+function ewVoice(ac, dest, t) {
+  const dur = 0.55, src = ac.createOscillator(), out = ac.createGain();
+  src.type = 'sawtooth';
+  src.frequency.setValueAtTime(330, t); src.frequency.linearRampToValueAtTime(420, t + 0.12);
+  src.frequency.exponentialRampToValueAtTime(230, t + dur);
+  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(1.0, t + 0.03);
+  out.gain.setValueAtTime(0.9, t + dur * 0.55); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  //            ee formants          oo formants
+  for (const [f0, f1, g, q] of [[300, 320, 1, 8], [2300, 850, 0.5, 10], [3000, 2300, 0.2, 12]]) {
+    const bp = ac.createBiquadFilter(), gg = ac.createGain();
+    bp.type = 'bandpass'; bp.Q.value = q; gg.gain.value = g;
+    bp.frequency.setValueAtTime(f0, t); bp.frequency.setValueAtTime(f0, t + 0.15);
+    bp.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+    src.connect(bp).connect(gg).connect(out);
+  }
+  out.connect(dest); src.start(t); src.stop(t + dur + 0.05);
+}
+// "YES!": an excited voice rising through "y-e" into a hissed "s".
+function yesVoice(ac, dest, t, noise) {
+  const vow = 0.32, src = ac.createOscillator(), out = ac.createGain();
+  src.type = 'sawtooth';
+  src.frequency.setValueAtTime(260, t); src.frequency.exponentialRampToValueAtTime(430, t + vow * 0.7);
+  src.frequency.linearRampToValueAtTime(400, t + vow);
+  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(1.0, t + 0.04);
+  out.gain.setValueAtTime(1.0, t + vow * 0.75); out.gain.exponentialRampToValueAtTime(0.0001, t + vow + 0.04);
+  //            "y" (ee)      "e" (as in yes)
+  for (const [f0, f1, g, q] of [[300, 600, 1, 7], [2300, 1850, 0.55, 10], [3000, 2600, 0.2, 12]]) {
+    const bp = ac.createBiquadFilter(), gg = ac.createGain();
+    bp.type = 'bandpass'; bp.Q.value = q; gg.gain.value = g;
+    bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + 0.1);
+    src.connect(bp).connect(gg).connect(out);
+  }
+  out.connect(dest); src.start(t); src.stop(t + vow + 0.08);
+  if (noise) {                                         // the "s"
+    const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain(), ts = t + vow - 0.03;
+    s.buffer = noise; hp.type = 'highpass'; hp.frequency.value = 4500;
+    g.gain.setValueAtTime(0.0001, ts); g.gain.linearRampToValueAtTime(0.35, ts + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, ts + 0.22);
+    s.connect(hp).connect(g).connect(dest); s.start(ts); s.stop(ts + 0.25);
+  }
+}
+// A firework bursting: a low thump and a crackle.
+function boomFx(ac, dest, t, noise) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+  g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+  o.connect(g).connect(dest); o.start(t); o.stop(t + 0.4);
+  const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g2 = ac.createGain();
+  s.buffer = noise; bp.type = 'bandpass'; bp.frequency.value = 2500;
+  g2.gain.setValueAtTime(0.12, t + 0.05); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  s.connect(bp).connect(g2).connect(dest); s.start(t + 0.05, Math.random() * 0.3); s.stop(t + 0.65);
+}
+function playFx(fn) {
+  if (muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    fn(actx, actx.destination, actx.currentTime + 0.01, makeNoise(actx));
+  } catch (e) {}
+}
+
+// ---------- Sky: cartoon clouds drifting slowly, crows flapping past now and then ----------
+// Clouds sit at fixed places in the sky along the whole course (world units), so the block runs
+// past them; each also drifts slowly left on its own. Further (smaller) clouds scroll a bit slower.
+const CLOUDS = [];
+for (let i = 0, x = -500; x < 5200; i++) {
+  const r = n => { const v = Math.sin((i + 1) * 91.7 + n * 13.3) * 43758.5453; return v - Math.floor(v); };
+  CLOUDS.push({ x, y: 0.07 + r(1) * 0.25, s: 0.7 + r(2) * 0.7, v: 4 + r(3) * 6 });
+  x += 260 + r(4) * 260;
+}
+let crows = [], crowTimer = 2.5;
+function updateSky(dt) {
+  crowTimer -= dt;
+  // Crows live in the world like the clouds and always fly the way they face, so the block
+  // runs past slow ones and fast ones overtake it. Speeds are world units per second (block: SPEED).
+  const k = view.scale, left = view.camX, right = view.camX + view.w / k;
+  if (crowTimer <= 0 && crows.length < 2) {
+    const kind = Math.random(), base = { y: 0.1 + Math.random() * 0.25, s: 0.8 + Math.random() * 0.5, ph: Math.random() * 6 };
+    if (kind < 0.55) crows.push({ ...base, wx: right + 60, dir: -1, v: 60 + Math.random() * 70 });             // heading towards you
+    else if (kind < 0.8) crows.push({ ...base, wx: right + 60, dir: 1, v: 110 + Math.random() * 70 });       // same way, you overtake it
+    else crows.push({ ...base, wx: left - 60, dir: 1, v: SPEED + 90 + Math.random() * 80 });                 // same way, it overtakes you
+    crowTimer = 4 + Math.random() * 6;
+  }
+  for (const c of crows) { c.wx += c.dir * c.v * dt; c.ph += dt * 9; crowDrops(c, dt); }
+  updatePoops(dt);
+  crows = crows.filter(c => c.wx > left - 150 && c.wx < right + 150);
+}
+function drawClouds(c) {
+  const k = view.scale;
+  for (const cl of CLOUDS) {
+    const r = 34 * cl.s * k, depth = 0.6 + 0.3 * cl.s;
+    const x = (cl.x - clock * cl.v - view.camX * depth) * k;
+    if (x < -r * 2 || x > view.w + r * 2) continue;
+    const y = view.h * cl.y + r;
+    // Soft tinted underside first, then the white puffs on top of it.
+    ctx.fillStyle = c.faint; ctx.globalAlpha = 0.55;
+    puff(x, y + r * 0.12, r);
+    ctx.globalAlpha = 1; ctx.fillStyle = '#FFFFFF';
+    puff(x, y, r);
+  }
+}
+function puff(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x - r * 1.1, y, r * 0.6, 0, Math.PI * 2);
+  ctx.arc(x - r * 0.4, y - r * 0.45, r * 0.8, 0, Math.PI * 2);
+  ctx.arc(x + r * 0.5, y - r * 0.3, r * 0.7, 0, Math.PI * 2);
+  ctx.arc(x + r * 1.15, y + r * 0.05, r * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  roundRect(x - r * 1.7, y - r * 0.1, r * 3.4, r * 0.65, r * 0.32); ctx.fill();
+}
+function drawCrows() {
+  const u = Math.max(0.7, view.scale);
+  for (const c of crows) {
+    const s = c.s * u * 1.6, flap = 0.3 + 0.7 * Math.sin(c.ph), bob = Math.sin(c.ph * 0.5) * 3;
+    ctx.save(); ctx.translate((c.wx - view.camX) * view.scale, view.h * c.y + bob); ctx.scale(c.dir * s, s);
+    ctx.fillStyle = '#26232B'; ctx.strokeStyle = '#26232B'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // wings: two curved strokes that flap up and down
+    ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.moveTo(-2, 0); ctx.quadraticCurveTo(-8, -12 * flap - 2, -18, -10 * flap + 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2, 0); ctx.quadraticCurveTo(6, -13 * flap - 3, 14, -11 * flap); ctx.stroke();
+    // body, tail and head
+    ctx.beginPath(); ctx.ellipse(0, 1, 9, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-15, -3); ctx.lineTo(-15, 5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(9, -1, 3.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#E8A33A'; ctx.beginPath(); ctx.moveTo(12, -2); ctx.lineTo(17, -0.5); ctx.lineTo(12, 1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(10, -2, 1.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ---------- Bird droppings ----------
+// Crows drop now and then, and are more likely to let go when the drop would land on the block.
+// A hit never kills: the block just gets a splat on its head and says "Ew!".
+const POOP_G = 900;
+let poops = [];
+function crowDrops(c, dt) {
+  const k = view.scale, sy = view.h * c.y, wy = BASE + (sy - view.groundY) / k;
+  c.dropIn = (c.dropIn ?? 0.8 + Math.random() * 2) - dt;
+  let drop = c.dropIn <= 0;
+  if (!drop && !c.aimed && p && (mode === 'play')) {
+    const fallT = Math.sqrt(Math.max(0, 2 * (p.y - S - wy) / POOP_G));
+    const landX = c.wx + c.dir * c.v * 0.4 * fallT, playerX = p.x + S / 2 + SPEED * fallT;
+    if (Math.abs(landX - playerX) < 14) { c.aimed = true; drop = Math.random() < 0.55; }
+  }
+  if (drop) {
+    poops.push({ x: c.wx, y: wy + 4, vx: c.dir * c.v * 0.4, vy: 0, landed: false, life: 4 });
+    c.dropIn = 1.5 + Math.random() * 3;
+  }
+}
+function updatePoops(dt) {
+  for (const q of poops) {
+    if (q.landed) { q.life -= dt; continue; }
+    q.vy += POOP_G * dt; q.x += q.vx * dt; q.y += q.vy * dt;
+    if (p && mode === 'play' && q.x > p.x - 3 && q.x < p.x + S + 3 && q.y > p.y - S - 2 && q.y < p.y) {
+      q.life = 0; p.splats = (p.splats || 0) + 1; p.splatX = Math.max(0.25, Math.min(0.75, (q.x - p.x) / S));
+      sfx.ew();
+      continue;
+    }
+    for (const s of L().solids) {
+      if (q.x > s.x && q.x < s.x + s.w && q.y >= s.y && q.y - q.vy * dt <= s.y + 1) { q.y = s.y; q.landed = true; break; }
+    }
+    if (q.y > 800) q.life = 0;
+  }
+  poops = poops.filter(q => q.life > 0);
+}
+function drawPoops() {
+  const k = view.scale;
+  for (const q of poops) {
+    const x = (q.x - view.camX) * k, y = view.groundY + (q.y - BASE) * k;
+    if (x < -20 || x > view.w + 20) continue;
+    ctx.globalAlpha = Math.min(1, q.life);
+    if (q.landed) {                                    // a flat splat on the ground
+      ctx.fillStyle = '#FAFAF5'; ctx.beginPath(); ctx.ellipse(x, y - 1.5 * k, 7 * k, 2.6 * k, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6B6A55'; ctx.beginPath(); ctx.ellipse(x + 1 * k, y - 1.8 * k, 2.4 * k, 1.2 * k, 0, 0, Math.PI * 2); ctx.fill();
+    } else {                                           // a falling white drop with a dark centre
+      ctx.fillStyle = '#FAFAF5'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, y - 10 * k); ctx.quadraticCurveTo(x + 6 * k, y, x, y + 3.5 * k); ctx.quadraticCurveTo(x - 6 * k, y, x, y - 10 * k);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#6B6A55'; ctx.beginPath(); ctx.arc(x, y - 0.5 * k, 2 * k, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+// The splat on the block's head, drawn in the block's own (tilting) frame.
+function drawHeadSplat(cx, cy) {
+  if (!p || !p.splats) return;
+  const k = view.scale, top = cy - S / 2 * k, x = cx + (p.splatX - 0.5) * S * k;
+  ctx.fillStyle = '#FAFAF5'; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(x, top + 1 * k, 9 * k, 4.5 * k, 0, 0, Math.PI * 2);
+  ctx.moveTo(x - 4 * k, top + 3 * k); ctx.quadraticCurveTo(x - 5 * k, top + 10 * k, x - 3 * k, top + 11 * k);
+  ctx.quadraticCurveTo(x - 1 * k, top + 10 * k, x - 1.5 * k, top + 3 * k);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#6B6A55'; ctx.beginPath(); ctx.arc(x + 2 * k, top, 2 * k, 0, Math.PI * 2); ctx.fill();
+  if (p.splats > 1) { ctx.fillStyle = '#FAFAF5'; ctx.beginPath(); ctx.arc(x - 9 * k, top + 6 * k, 3 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+}
+
+// ---------- Fireworks for the finish ----------
+let rockets = [], sparks = [], fwTimer = 0;
+function updateFireworks(dt) {
+  const W = view.w, H = view.h;
+  fwTimer -= dt;
+  if (fwTimer <= 0) {
+    const n = rockets.length < 3 ? 1 + (Math.random() < 0.4) : 0;
+    for (let i = 0; i < n; i++) {
+      rockets.push({ x: W * (0.1 + Math.random() * 0.8), y: H + 10, vx: (Math.random() - 0.5) * 60,
+                     vy: -(H * 0.9 + Math.random() * H * 0.5), col: LEVELS[Math.floor(Math.random() * 7)].c.mid });
+    }
+    fwTimer = 0.35 + Math.random() * 0.5;
+  }
+  for (const r of rockets) {
+    r.vy += H * 0.9 * dt; r.x += r.vx * dt; r.y += r.vy * dt;
+    if (r.vy >= -H * 0.05) {                            // top of the climb: burst
+      r.gone = true; sfx.boom();
+      const count = 60 + Math.floor(Math.random() * 30), speed = Math.min(W, H) * (0.35 + Math.random() * 0.2);
+      const rainbow = Math.random() < 0.35;
+      for (let i = 0; i < count; i++) {
+        const a = i / count * Math.PI * 2 + Math.random() * 0.1, v = speed * (0.6 + Math.random() * 0.4);
+        sparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1.2 + Math.random() * 0.6,
+                      col: rainbow ? LEVELS[i % 7].c.mid : r.col });
+      }
+    }
+  }
+  rockets = rockets.filter(r => !r.gone);
+  for (const s of sparks) { s.vx *= 1 - 1.6 * dt; s.vy = s.vy * (1 - 1.6 * dt) + H * 0.25 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; }
+  sparks = sparks.filter(s => s.life > 0);
+}
+function drawFireworks() {
+  ctx.save(); ctx.globalCompositeOperation = 'source-over';
+  for (const r of rockets) {
+    ctx.strokeStyle = r.col; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - r.vx * 0.04, r.y - r.vy * 0.04); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(r.x, r.y, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const s of sparks) {
+    ctx.globalAlpha = Math.min(1, s.life / 0.6);
+    ctx.strokeStyle = s.col; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.045, s.y - s.vy * 0.045); ctx.stroke();
+    if (s.life > 1.0 && Math.random() < 0.3) { ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 1, s.y - 1, 2.5, 2.5); }   // twinkle
+  }
+  ctx.restore();
+}
+
+// ---------- Game state ----------
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+let mode = 'title';         // title | play | dying | wipe | intro | win | paused
+let levelIdx = 0, deaths = 0, p = null, pressAt = -1, clock = 0;
+let deathTimer = 0, wipe = 0, shake = 0, particles = [], pixelOrder = null;
+let introT = 0, physAcc = 0, pausedFrom = null, idleDeaths = 0, pressedThisTry = false;
+let view = { w: 0, h: 0, scale: 1, groundY: 0, camX: 0 };
+
+function L() { return LEVELS[levelIdx]; }
+function resetLevel() {
+  p = newPlayer(L()); pressAt = -1; particles = []; pressedThisTry = false; poops = [];
+  applyTheme();
+}
+function applyTheme() {
+  const c = L().c;
+  document.documentElement.style.setProperty('--ink', c.ground);
+  document.documentElement.style.setProperty('--paper', c.bg);
+  $('deaths').textContent = `Deaths: ${deaths}`;
+}
+
+function press() {
+  if (mode === 'title') { $('startPanel').hidden = true; mode = 'play'; resetLevel(); beep(440, 0.08, 'triangle', 0.05); music.start(); return; }
+  if (mode === 'paused') { resume(); return; }
+  if (mode === 'play') { pressAt = p.t; pressedThisTry = true; idleDeaths = 0; }
+}
+function pause(reason) {
+  if (mode !== 'play' && mode !== 'dying') return;
+  pausedFrom = mode; mode = 'paused';
+  $('pauseText').textContent = reason || 'Tap JUMP or Resume to keep going.';
+  $('pausePanel').hidden = false; $('pause').textContent = 'Resume';
+  music.stop();
+}
+function resume() {
+  if (mode !== 'paused') return;
+  mode = pausedFrom || 'play'; last = 0;
+  $('pausePanel').hidden = true; $('pause').textContent = 'Pause';
+  music.start();
+}
+$('pause').addEventListener('click', () => (mode === 'paused' ? resume() : pause()));
+$('resume').addEventListener('click', resume);
+$('restart').addEventListener('click', () => { resetLevel(); pausedFrom = 'play'; resume(); });
+// Start the whole run again from Level 1, with a fresh death count and its title card.
+$('toLevel1').addEventListener('click', () => { levelIdx = 0; deaths = 0; resetLevel(); introT = 0; pausedFrom = 'intro'; resume(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+function pressDown(e) { e.preventDefault(); $('jump').classList.add('down'); press(); }
+function pressUp() { $('jump').classList.remove('down'); }
+$('jump').addEventListener('pointerdown', pressDown);
+$('jump').addEventListener('pointerup', pressUp);
+$('jump').addEventListener('pointercancel', pressUp);
+$('jump').addEventListener('pointerleave', pressUp);
+$('jump').addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); press(); }
+  if (e.code === 'Escape' || e.code === 'KeyP') { mode === 'paused' ? resume() : pause(); }
+});
+$('music').addEventListener('click', () => {
+  music.on = !music.on;
+  $('music').textContent = music.on ? 'Music: On' : 'Music: Off';
+  $('music').setAttribute('aria-pressed', String(music.on));
+  if (!music.on) music.stop(); else if (mode !== 'title' && mode !== 'paused') music.start();
+});
+$('mute').addEventListener('click', () => {
+  muted = !muted;
+  $('mute').textContent = muted ? 'Sound: Off' : 'Sound: On';
+  $('mute').setAttribute('aria-pressed', String(muted));
+});
+$('again').addEventListener('click', () => {
+  levelIdx = 0; deaths = 0; rockets = []; sparks = []; $('winPanel').hidden = true; mode = 'play'; resetLevel(); music.start();
+});
+// Stop double-tap zoom / scroll anywhere on the page.
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('dblclick', e => e.preventDefault());
+
+function die() {
+  // Falling already screamed on the way down; hitting a block gets the sad trombone.
+  const fell = p.screamed || p.y - S > 700;   // hitting a pit wall on the way down still counts as a fall
+  mode = 'dying'; deathTimer = fell ? 0.5 : 1.0; deaths++; shake = 0.25;
+  if (!fell) sfx.crash();
+  idleDeaths = pressedThisTry ? 0 : idleDeaths + 1;
+  const c = L().c;
+  for (let i = 0; i < 10; i++) {
+    particles.push({ x: p.x + S / 2, y: p.y - S / 2, vx: (Math.random() - 0.5) * 500, vy: -Math.random() * 600, s: 6 + Math.random() * 8, life: 0.7, col: i % 2 ? c.mid : c.ground });
+  }
+  $('deaths').textContent = `Deaths: ${deaths}`;
+}
+function dust() {
+  for (let i = 0; i < 5; i++) particles.push({ x: p.x + Math.random() * S, y: p.y, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, s: 4, life: 0.35, col: L().c.faint });
+}
+
+// ---------- Loop ----------
+function update(dt) {
+  clock += dt;
+  for (const q of particles) { q.vy += G * 0.5 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; }
+  particles = particles.filter(q => q.life > 0);
+  shake = Math.max(0, shake - dt);
+  if (mode !== 'paused') updateSky(dt);
+  if (mode === 'win') updateFireworks(dt);
+
+  if (mode === 'play') {
+    // Fixed-step physics: run whole DT steps and carry the remainder to the next frame,
+    // so the block moves at SPEED on any screen refresh rate.
+    physAcc += dt;
+    while (physAcc >= DT) {
+      physAcc -= DT;
+      const want = pressAt >= 0 && p.t - pressAt <= BUFFER;
+      if (step(L(), p, want)) { pressAt = -1; sfx.jump(); }
+      // Lean back on the way up, forward on the way down; level out on the ground.
+      const lean = p.grounded ? 0 : Math.max(-0.3, Math.min(0.3, p.vy / 2400));
+      p.rot += (lean - p.rot) * 0.2;
+      if (p.landed) dust();
+      if (!p.screamed && !p.grounded && p.vy > 0 && p.y > BASE + 70) { p.screamed = true; sfx.fall(); }
+      if (p.dead) { die(); break; }
+      if (p.done) { mode = 'wipe'; wipe = 0; sfx.door(levelIdx); sfx.yes(); break; }
+    }
+  } else if (mode === 'dying') {
+    deathTimer -= dt;
+    if (deathTimer <= 0) {
+      mode = 'play'; resetLevel();
+      // Nobody has pressed JUMP for two tries in a row: stop instead of crashing forever.
+      if (idleDeaths >= 2) { idleDeaths = 0; pause('Paused because nobody was jumping. Tap JUMP to carry on.'); }
+    }
+  } else if (mode === 'intro') {
+    introT += dt;
+    if (introT >= INTRO_TIME) mode = 'play';
+  } else if (mode === 'wipe') {
+    wipe += dt / TRANSITION_TIME;
+    if (wipe >= 1) {
+      if (levelIdx === LEVELS.length - 1) {
+        mode = 'win'; rockets = []; sparks = []; fwTimer = 0; $('winText').textContent = `All 7 levels cleared with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}.`; $('winPanel').hidden = false;
+      } else {
+        levelIdx++; resetLevel(); mode = 'intro'; introT = 0;
+      }
+    }
+  }
+  const prog = p ? Math.max(0, Math.min(1, p.x / L().door)) : 0;
+  $('bar').style.width = (mode === 'win' ? 100 : prog * 100) + '%';
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  view.w = w; view.h = h;
+  view.scale = Math.min(h / 400, w / 640);
+  view.groundY = h * (w < h ? 0.62 : 0.7);
+}
+window.addEventListener('resize', resize);
+
+function nextColours() { return levelIdx < LEVELS.length - 1 ? LEVELS[levelIdx + 1].c : FINAL_DOOR; }
+const FINAL_BG = '#FFF8E8';
+
+function draw() {
+  const Lv = L(), c = Lv.c, k = view.scale;
+  const px = p ? p.x : 0;
+  const viewWorldW = view.w / k;
+  view.camX = px - viewWorldW * 0.28;
+  const sx = shake > 0 ? (Math.random() - 0.5) * 10 * shake * 4 : 0;
+  const wx = x => (x - view.camX) * k + sx;
+  const wy = y => view.groundY + (y - BASE) * k;
+
+  ctx.fillStyle = c.bg; ctx.fillRect(0, 0, view.w, view.h);
+
+  drawClouds(c);
+
+  // Title, like the sketch: the level name.
+  ctx.textAlign = 'center'; ctx.fillStyle = c.faint;
+  const titleSize = Math.min(view.w * 0.13, view.h * 0.16, 110);
+  ctx.font = `${titleSize}px ${getComputedStyle(document.body).getPropertyValue('--font-hand') || 'cursive'}`;
+  const titleY = Math.max(view.h * 0.2, 70) + titleSize * 0.3;
+  ctx.fillText(Lv.name, view.w / 2, titleY);
+  drawCrows();
+
+  // Hints
+  ctx.fillStyle = c.ground; ctx.globalAlpha = 0.55;
+  ctx.font = `${Math.max(14, 20 * k)}px ${getComputedStyle(document.body).getPropertyValue('--font-hand') || 'cursive'}`;
+  for (const [hx, text] of Lv.hints) ctx.fillText(text, wx(hx + 100), wy(BASE - 105));
+  ctx.globalAlpha = 1;
+
+  // Ground and blocks
+  for (const s of Lv.solids) {
+    const x = wx(s.x), y = wy(s.y), w = s.w * k;
+    if (x > view.w || x + w < 0) continue;
+    ctx.fillStyle = c.ground;
+    if (s.kind === 'ground') {
+      ctx.fillRect(x, y, w, view.h - y + 20);
+      ctx.fillStyle = c.mid; ctx.globalAlpha = 0.35; ctx.fillRect(x, y, w, Math.max(3, 4 * k)); ctx.globalAlpha = 1;
+    } else {
+      // Blocks are part of the ground: square corners, filled down past the ground's top edge, no seam.
+      const edge = Math.max(3, 4 * k);
+      ctx.fillRect(x, y, w, s.h * k + edge + 1);
+      ctx.fillStyle = c.mid; ctx.globalAlpha = 0.35; ctx.fillRect(x, y, w, edge); ctx.globalAlpha = 1;
+    }
+  }
+
+  // Door in the next level's colour
+  const d = Lv.doorRect, nc = nextColours();
+  const glow = 0.5 + 0.5 * Math.sin(clock * 4);
+  ctx.save();
+  ctx.shadowColor = nc.mid; ctx.shadowBlur = (12 + 10 * glow) * k;
+  ctx.fillStyle = nc.ground; roundRect(wx(d.x) - 5 * k, wy(d.y) - 5 * k, (d.w + 10) * k, (d.h + 5) * k, 8 * k); ctx.fill();
+  ctx.restore();
+  if (levelIdx === LEVELS.length - 1) {
+    // Final door: the seven colours as vertical stripes
+    ctx.save(); roundRect(wx(d.x), wy(d.y), d.w * k, d.h * k, 5 * k); ctx.clip();
+    LEVELS.forEach((lv, i) => { ctx.fillStyle = lv.c.mid; ctx.fillRect(wx(d.x + i * d.w / 7), wy(d.y), d.w * k / 7 + 1, d.h * k); });
+    ctx.restore();
+  } else {
+    ctx.fillStyle = nc.mid; roundRect(wx(d.x), wy(d.y), d.w * k, d.h * k, 5 * k); ctx.fill();
+  }
+  ctx.fillStyle = nc.ground; ctx.beginPath(); ctx.arc(wx(d.x + d.w - 10), wy(d.y + d.h * 0.55), 3.5 * k, 0, Math.PI * 2); ctx.fill();
+
+  // Player
+  if (p && mode !== 'dying' && mode !== 'wipe' && mode !== 'win') {
+    ctx.save();
+    ctx.translate(wx(p.x + S / 2), wy(p.y - S / 2));
+    ctx.rotate(p.rot);
+    drawHero(0, 0, c);
+    drawHeadSplat(0, 0);
+    ctx.restore();
+  }
+  // Title screen: idle block on the start platform
+  if (!p) {
+    drawHero(wx(S / 2), wy(BASE - S / 2), c);
+  }
+
+  drawPoops();
+  for (const q of particles) {
+    ctx.globalAlpha = Math.max(0, q.life / 0.7);
+    ctx.fillStyle = q.col; ctx.fillRect(wx(q.x) - q.s * k / 2, wy(q.y) - q.s * k / 2, q.s * k, q.s * k);
+  }
+  ctx.globalAlpha = 1;
+
+  // A different transition behind every door
+  if (mode === 'wipe' || mode === 'win') {
+    const t = mode === 'win' ? 1 : Math.min(1, wipe);
+    drawTransition(levelIdx, t, wx(d.x + d.w / 2), wy(d.y + d.h / 2), nextPalette());
+    if (mode === 'wipe' && levelIdx < LEVELS.length - 1) {
+      drawCard(LEVELS[levelIdx + 1], clamp01((t - 0.62) / 0.15), 1 + 1.4 * (1 - easeOut(clamp01((t - 0.62) / 0.3))));
+    }
+  }
+  if (mode === 'intro') drawCard(Lv, 1 - introT / INTRO_TIME, 1 - 0.12 * introT / INTRO_TIME);
+  if (mode === 'win') { drawRainbow(); drawFireworks(); }
+}
+
+const TRANSITION_TIME = 1.6, INTRO_TIME = 0.7;
+const rnd = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeBack = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+function nextPalette() {
+  return levelIdx < LEVELS.length - 1 ? LEVELS[levelIdx + 1].c : { bg: FINAL_BG, mid: '#F2B523', faint: '#FFE7A3', ground: '#4A1F6B' };
+}
+function disc(x, y, r, col) { if (r <= 0) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+// One transition per door. t runs 0..1; every kind ends with the screen covered in nc.bg.
+function drawTransition(kind, t, cx, cy, nc) {
+  const W = view.w, H = view.h, R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy)) + 20;
+  if (kind === 0) {            // Portal: four rings burst out of the door, a dashed ring spins, sparks fly
+    [nc.ground, nc.mid, nc.faint, nc.bg].forEach((col, i) => disc(cx, cy, R * easeOut(clamp01((t - i * 0.1) / 0.6)), col));
+    const r0 = R * easeOut(clamp01(t / 0.6));
+    ctx.save();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.setLineDash([18, 14]); ctx.lineDashOffset = -t * 400;
+    ctx.globalAlpha = 1 - clamp01((t - 0.45) / 0.3);
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, r0 * 0.92), 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    for (let i = 0; i < 40; i++) {
+      const a = rnd(i) * Math.PI * 2, d = R * (0.4 + rnd(i + 99)) * easeOut(clamp01(t / 0.7)), s = 9 * (1 - t);
+      ctx.fillStyle = i % 2 ? '#fff' : nc.mid; ctx.fillRect(cx + Math.cos(a) * d - s / 2, cy + Math.sin(a) * d - s / 2, s, s);
+    }
+  } else if (kind === 1) {     // Warp: speed streaks rush past, then a slanted wall with a glowing edge
+    ctx.globalAlpha = 0.85 * (1 - clamp01((t - 0.75) / 0.25));
+    for (let i = 0; i < 40; i++) {
+      const len = (80 + rnd(i + 7) * 260) * (0.3 + t), y = rnd(i) * H;
+      const x = ((rnd(i + 3) * W + t * W * 3 * (0.6 + rnd(i + 5))) % (W + len)) - len;
+      ctx.fillStyle = i % 3 ? nc.mid : '#fff'; ctx.fillRect(x, y, len, 2 + rnd(i + 1) * 5);
+    }
+    ctx.globalAlpha = 1;
+    const e = easeInOut(clamp01((t - 0.15) / 0.75)), slant = H * 0.6, x = (W + slant + 60) * e;
+    ctx.fillStyle = nc.mid;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 30 - slant, H); ctx.lineTo(0, H); ctx.fill();
+    ctx.fillStyle = nc.bg;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, 0); ctx.lineTo(x - slant, H); ctx.lineTo(0, H); ctx.fill();
+  } else if (kind === 2) {     // Shutters: columns slam down from the door outwards and bounce
+    const n = 9, cw = W / n, doorCol = Math.max(0, Math.min(n - 1, Math.floor(cx / cw)));
+    for (let i = 0; i < n; i++) {
+      const lt = clamp01((t - Math.abs(i - doorCol) * 0.06) / 0.45);
+      if (lt <= 0) continue;
+      const h = (H + 20) * easeBack(lt), x0 = Math.floor(i * cw), w0 = Math.ceil(cw) + 1;
+      ctx.fillStyle = nc.mid; ctx.fillRect(x0, 0, w0, h);
+      ctx.fillStyle = nc.bg; ctx.fillRect(x0, 0, w0, lt >= 1 ? h : Math.max(0, h - 26));
+      if (lt < 1) { ctx.fillStyle = nc.ground; ctx.fillRect(x0, 0, 2, h); }
+    }
+  } else if (kind === 3) {     // Pixel storm: squares pop in, rippling out from the door
+    const cell = Math.max(W, H) / 16, cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
+    for (let i = 0; i < cols * rows; i++) {
+      const gx = (i % cols + 0.5) * cell, gy = (Math.floor(i / cols) + 0.5) * cell;
+      const lt = clamp01((t - Math.hypot(gx - cx, gy - cy) / R * 0.55) / 0.3);
+      if (lt <= 0) continue;
+      const s = lt >= 1 ? cell + 1 : cell * easeBack(lt);
+      ctx.fillStyle = lt >= 1 ? nc.bg : (rnd(i) < 0.5 ? nc.mid : nc.faint);
+      ctx.save(); ctx.translate(gx, gy); ctx.rotate((1 - lt) * 1.5); ctx.fillRect(-s / 2, -s / 2, s, s); ctx.restore();
+    }
+  } else if (kind === 4) {     // Kaleidoscope: nested squares spin open in opposite directions
+    [nc.ground, nc.mid, nc.faint, nc.bg].forEach((col, i) => {
+      const lt = easeInOut(clamp01((t - i * 0.09) / 0.62)), side = R * 2.9 * lt;
+      if (side <= 0) return;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4 + (1 - lt) * Math.PI * (i % 2 ? -1 : 1));
+      ctx.fillStyle = col; ctx.fillRect(-side / 2, -side / 2, side, side); ctx.restore();
+    });
+  } else if (kind === 5) {     // Tide: two waves rise with bubbles streaming up
+    const wave = (lag, col, amp, ph) => {
+      const level = H + 60 - (H + 160) * easeInOut(clamp01((t - lag) / 0.75));
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W + 10; x += 10) ctx.lineTo(x, level + Math.sin(x * 0.02 + t * 12 + ph) * amp);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    };
+    wave(0, nc.mid, 26, 0);
+    wave(0.14, nc.bg, 20, 2);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.7 * (1 - clamp01((t - 0.75) / 0.25));
+    for (let i = 0; i < 28; i++) {
+      const by = H + 20 - ((t * 1.4 + rnd(i + 11)) % 1) * (H + 40), bx = rnd(i) * W + Math.sin(t * 10 + i) * 8;
+      ctx.beginPath(); ctx.arc(bx, by, 4 + rnd(i + 2) * 9, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  } else {                     // Finale: spinning rainbow rays, rainbow rings and confetti
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 1.5); ctx.globalAlpha = 0.6;
+    const len = R * 1.6 * easeOut(clamp01(t / 0.5));
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2;
+      ctx.fillStyle = LEVELS[i % 7].c.mid; ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a - 0.11) * len, Math.sin(a - 0.11) * len); ctx.lineTo(Math.cos(a + 0.11) * len, Math.sin(a + 0.11) * len); ctx.fill();
+    }
+    ctx.restore(); ctx.globalAlpha = 1;
+    for (let i = 0; i < 7; i++) disc(cx, cy, R * clamp01(t * 1.6 - i * 0.08), LEVELS[i].c.mid);
+    disc(cx, cy, R * 1.02 * clamp01(t * 1.6 - 0.6) / 0.98, nc.bg);
+    for (let i = 0; i < 70; i++) {
+      const y = -20 + (H + 40) * clamp01(t * 1.4 - rnd(i + 5) * 0.4), x = rnd(i) * W + Math.sin(t * 8 + i) * 20;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(t * 10 + i); ctx.fillStyle = LEVELS[i % 7].c.mid; ctx.fillRect(-3, -5, 6, 10); ctx.restore();
+    }
+  }
+  if (t < 0.1) { ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.55 * (1 - t / 0.1); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+}
+// Big "Level N" card that zooms in at the end of a transition and fades as the level starts.
+function drawCard(lv, alpha, scale) {
+  if (alpha <= 0) return;
+  const size = Math.min(view.w * 0.16, view.h * 0.22, 120), hand = getComputedStyle(document.body).getPropertyValue('--font-hand') || 'cursive';
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(view.w / 2, view.h * 0.45); ctx.scale(scale, scale);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = lv.c.ground; ctx.font = `${size}px ${hand}`; ctx.fillText(lv.name, 0, 0);
+  ctx.restore();
+}
+function drawRainbow() {
+  const cx = view.w / 2, cy = view.h, base = Math.min(view.w * 0.48, view.h * 0.95), band = base / 12;
+  for (let i = 0; i < 7; i++) {
+    ctx.strokeStyle = LEVELS[i].c.mid; ctx.lineWidth = band + 1;
+    ctx.beginPath(); ctx.arc(cx, cy, base - i * band, Math.PI, 0); ctx.stroke();
+  }
+}
+// The player: a block in the level's dark colour with Jason's face inside.
+function drawHero(cx, cy, c) {
+  const k = view.scale, half = S / 2 * k, b = 3 * k;
+  ctx.fillStyle = c.ground; roundRect(cx - half, cy - half, S * k, S * k, 7 * k); ctx.fill();
+  ctx.save();
+  roundRect(cx - half + b, cy - half + b, S * k - 2 * b, S * k - 2 * b, 4 * k); ctx.clip();
+  if (face.complete && face.naturalWidth) ctx.drawImage(face, cx - half + b, cy - half + b, S * k - 2 * b, S * k - 2 * b);
+  else { ctx.fillStyle = c.mid; ctx.fill(); }
+  ctx.restore();
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+}
+function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+let last = 0;
+function frame(ts) {
+  const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0);
+  last = ts;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+
+function start(saved) {
+  if (saved && typeof saved.levelIdx === 'number') {
+    levelIdx = Math.min(saved.levelIdx, LEVELS.length - 1); deaths = saved.deaths || 0;
+  }
+  resize(); applyTheme();
+  if (document.fonts && document.fonts.load) document.fonts.load('40px "Patrick Hand"').catch(() => {});
+  requestAnimationFrame(frame);
+}
+window.claude?.hot?.snapshot?.(() => ({ levelIdx, deaths }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+</body>
+</html>
