@@ -133,6 +133,7 @@ const COYOTE = 0.08;     // can still jump this long after leaving an edge
 const BUFFER = 0.12;     // a press this early before landing still counts
 const BASE = 260;        // default ground height
 const DOOR_W = 44, DOOR_H = 92;
+const SLIP_TIME = 0.45, SLIP_BOOST = 0.6;   // stepping in a dropping: up to 60% faster, easing off over SLIP_TIME
 
 // ---------- Levels ----------
 // segs: [x, width, top]   blocks: [x, width, height]   door: x
@@ -222,7 +223,9 @@ function step(L, p, wantJump) {
   }
   const prevBottom = p.y;
   p.vy += G * DT;
-  p.x += SPEED * DT;
+  // Sliding on a dropping pushes the block forward faster for a moment, which throws off jump timing.
+  if (p.slip > 0) p.slip = Math.max(0, p.slip - DT);
+  p.x += SPEED * (1 + SLIP_BOOST * ((p.slip || 0) / SLIP_TIME)) * DT;
   p.y += p.vy * DT;
   const wasGrounded = p.grounded;
   p.grounded = false;
@@ -266,6 +269,17 @@ const sfx = {
   ew: () => playFx(ewVoice),
   yes: () => playFx(yesVoice),
   boom: () => playFx(boomFx),
+  // A squeaky whoop up and down, with a wet swish under it.
+  slip: () => playFx((ac, dest, t, noise) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(1700, t + 0.12); o.frequency.exponentialRampToValueAtTime(500, t + 0.32);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+    o.connect(g).connect(dest); o.start(t); o.stop(t + 0.36);
+    const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g2 = ac.createGain();
+    s.buffer = noise; bp.type = 'bandpass'; bp.frequency.setValueAtTime(600, t); bp.frequency.linearRampToValueAtTime(2200, t + 0.3); bp.Q.value = 2;
+    g2.gain.setValueAtTime(0.18, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    s.connect(bp).connect(g2).connect(dest); s.start(t); s.stop(t + 0.37);
+  }),
   crash: () => playFx(sadTrombone),
   // Each door gets its own key and a whoosh; the last door plays a longer run.
   door: k => {
@@ -568,7 +582,14 @@ function crowDrops(c, dt) {
 }
 function updatePoops(dt) {
   for (const q of poops) {
-    if (q.landed) { q.life -= dt; continue; }
+    if (q.landed) {
+      q.life -= dt;
+      // Stepping on it while running along the ground: slip.
+      if (!q.slipped && p && mode === 'play' && p.grounded && Math.abs(p.y - q.y) < 2 && q.x > p.x + 4 && q.x < p.x + S - 4) {
+        q.slipped = true; q.life = Math.max(q.life, 2); p.slip = SLIP_TIME; sfx.slip();
+      }
+      continue;
+    }
     q.vy += POOP_G * dt; q.x += q.vx * dt; q.y += q.vy * dt;
     if (p && mode === 'play' && q.x > p.x - 3 && q.x < p.x + S + 3 && q.y > p.y - S - 2 && q.y < p.y) {
       q.life = 0; p.splats = (p.splats || 0) + 1; p.splatX = Math.max(0.25, Math.min(0.75, (q.x - p.x) / S));
@@ -576,7 +597,7 @@ function updatePoops(dt) {
       continue;
     }
     for (const s of L().solids) {
-      if (q.x > s.x && q.x < s.x + s.w && q.y >= s.y && q.y - q.vy * dt <= s.y + 1) { q.y = s.y; q.landed = true; break; }
+      if (q.x > s.x && q.x < s.x + s.w && q.y >= s.y && q.y - q.vy * dt <= s.y + 1) { q.y = s.y; q.landed = true; q.life = 8; break; }
     }
     if (q.y > 800) q.life = 0;
   }
@@ -588,8 +609,9 @@ function drawPoops() {
     const x = (q.x - view.camX) * k, y = view.groundY + (q.y - BASE) * k;
     if (x < -20 || x > view.w + 20) continue;
     ctx.globalAlpha = Math.min(1, q.life);
-    if (q.landed) {                                    // a flat splat on the ground
-      ctx.fillStyle = '#FAFAF5'; ctx.beginPath(); ctx.ellipse(x, y - 1.5 * k, 7 * k, 2.6 * k, 0, 0, Math.PI * 2); ctx.fill();
+    if (q.landed) {                                    // a flat splat on the ground, smeared long once slipped on
+      const len = q.slipped ? 16 : 7;
+      ctx.fillStyle = '#FAFAF5'; ctx.beginPath(); ctx.ellipse(x + (q.slipped ? 8 * k : 0), y - 1.5 * k, len * k, 2.6 * k, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#6B6A55'; ctx.beginPath(); ctx.ellipse(x + 1 * k, y - 1.8 * k, 2.4 * k, 1.2 * k, 0, 0, Math.PI * 2); ctx.fill();
     } else {                                           // a falling white drop with a dark centre
       ctx.fillStyle = '#FAFAF5'; ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
@@ -770,7 +792,9 @@ function update(dt) {
       const want = pressAt >= 0 && p.t - pressAt <= BUFFER;
       if (step(L(), p, want)) { pressAt = -1; sfx.jump(); }
       // Lean back on the way up, forward on the way down; level out on the ground.
-      const lean = p.grounded ? 0 : Math.max(-0.3, Math.min(0.3, p.vy / 2400));
+      const lean = p.slip > 0 ? -0.45 * (p.slip / SLIP_TIME) + Math.sin(p.t * 40) * 0.06   // arms-flailing lean back while sliding
+                 : p.grounded ? 0 : Math.max(-0.3, Math.min(0.3, p.vy / 2400));
+      if (p.slip > 0 && p.grounded && Math.random() < 0.5) particles.push({ x: p.x + 4, y: p.y, vx: -80 - Math.random() * 80, vy: -Math.random() * 90, s: 4, life: 0.3, col: '#FAFAF5' });
       p.rot += (lean - p.rot) * 0.2;
       if (p.landed) dust();
       if (!p.screamed && !p.grounded && p.vy > 0 && p.y > BASE + 70) { p.screamed = true; sfx.fall(); }
