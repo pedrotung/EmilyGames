@@ -11,6 +11,14 @@
 <meta name="apple-mobile-web-app-title" content="Meow Brigade">
 <meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="icon-180.png">
+<meta name="description" content="Cats against rats: build a team of hand-drawn cats and beat 10 levels of rats and bosses. Free in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Meow Brigade">
+<meta property="og:description" content="Cats against rats: build a team of hand-drawn cats and beat 10 levels of rats and bosses. Free in your browser.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/cat-rat-battle/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/cat-rat-battle/cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
 <style>
   /* One 1280x720 canvas scaled to fit the screen; everything in the game is drawn on it.
      Black and white hand-drawn look (only the Rainbow Rat and the red hit flash have colour). */
@@ -1112,9 +1120,14 @@ function drawBattle() {
     else lines.push('You keep the coins from the rats.');
     const btns = [];
     if (o.win && b.lv < LEVELS.length) btns.push(['Next level', () => go(Team(b.lv + 1))]);
+    if (o.win && window.EmilyShare) btns.push(['Share', () => EmilyShare.open()]);
     if (!o.win) btns.push(['Try again', () => go(Team(b.lv))]);
     btns.push(['Menu', () => go(Menu)]);
     overlay(o.win ? (b.lv === LEVELS.length ? 'YOU BEAT ALL 10 LEVELS!' : 'VICTORY!') : 'THE RATS WON...', lines, btns);
+    // picture of the win screen, with the game's address, for the Share button
+    if (o.win && !o.snapped && window.EmilyShare && !b.silent) { o.snapped = true;
+      EmilyShare.snap({ canvas: cv, game: 'Meow Brigade', path: 'cat-rat-battle/',
+        text: b.lv === LEVELS.length ? 'I beat all 10 levels of Meow Brigade!' : `I beat Level ${b.lv} of Meow Brigade!` }); }
   }
 }
 function overlay(title, lines, btns) {
@@ -1122,7 +1135,7 @@ function overlay(title, lines, btns) {
   ctx.fillStyle = '#fff'; ctx.fillRect(340, 170, 600, 380); hbox(340, 170, 600, 380, { lw: 4 });
   txt(title, W / 2, 225, title.length > 16 ? 40 : 56);
   (lines || []).forEach((l, i) => txt(l, W / 2, 300 + i * 40, 30));
-  const n = btns.length, bw = 220, gap = 30, x0 = W / 2 - (n * bw + (n - 1) * gap) / 2;
+  const n = btns.length, bw = n > 2 ? 170 : 220, gap = n > 2 ? 20 : 30, x0 = W / 2 - (n * bw + (n - 1) * gap) / 2;
   btns.forEach(([s, fn], i) => button(x0 + i * (bw + gap), 450, bw, 64, s, fn, { size: 32 }));
 }
 function drawCat(c) {

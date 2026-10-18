@@ -11,6 +11,14 @@
 <meta name="apple-mobile-web-app-title" content="Colour Jump">
 <meta name="theme-color" content="#FCE3E3">
 <link rel="apple-touch-icon" href="icon-180.png">
+<meta name="description" content="A one-button jump game through 7 rainbow levels. Free in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Colour Jump">
+<meta property="og:description" content="A one-button jump game through 7 rainbow levels. Free in your browser.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/colour-jump/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/colour-jump/share-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
 <title>Colour Jump</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
@@ -156,6 +164,7 @@
   <p id="winText"></p>
   <div class="row">
     <button type="button" id="again">Play again</button>
+    <button type="button" id="winShare" hidden>Share</button>
     <button type="button" id="winHome" class="ghost">Home</button>
   </div>
 </div>
@@ -821,6 +830,17 @@ $('mute').addEventListener('click', () => {
   $('mute').textContent = muted ? 'Sound: Off' : 'Sound: On';
   $('mute').setAttribute('aria-pressed', String(muted));
 });
+// Share: a picture of the rainbow and fireworks with the game's address (share.js, on the website only)
+const winLine = () => `I cleared all 7 levels of Colour Jump with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}!`;
+function snapWin() {
+  if (!window.EmilyShare) return;
+  $('winShare').hidden = false;
+  setTimeout(() => { if (mode === 'win') EmilyShare.snap({ canvas: cv, game: 'Colour Jump', path: 'colour-jump/', text: winLine() }); }, 1500);
+}
+$('winShare').addEventListener('click', () => {
+  if (EmilyShare.last && EmilyShare.last.game === 'Colour Jump') EmilyShare.open();
+  else EmilyShare.open({ canvas: cv, game: 'Colour Jump', path: 'colour-jump/', text: winLine() });
+});
 $('again').addEventListener('click', () => {
   levelIdx = 0; deaths = 0; rockets = []; sparks = []; $('winPanel').hidden = true; mode = 'play'; resetLevel(); music.start();
 });
@@ -885,7 +905,7 @@ function update(dt) {
     wipe += dt / TRANSITION_TIME;
     if (wipe >= 1) {
       if (levelIdx === LEVELS.length - 1) {
-        mode = 'win'; rockets = []; sparks = []; fwTimer = 0; $('winText').textContent = `All 7 levels cleared with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}.`; $('winPanel').hidden = false;
+        mode = 'win'; rockets = []; sparks = []; fwTimer = 0; $('winText').textContent = `All 7 levels cleared with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}.`; $('winPanel').hidden = false; snapWin();
       } else {
         levelIdx++; resetLevel(); mode = 'intro'; introT = 0;
       }

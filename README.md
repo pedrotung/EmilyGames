@@ -14,6 +14,14 @@ toolbars, so on iPhone use **Share > Add to Home Screen** and start the game fro
 it then opens full screen with no browser bars. Each game folder has its own `manifest.webmanifest`
 and icons for this.
 
+## Sharing a win
+
+When you clear a game (every level in Meow Brigade, a song in Disco Funkin', all 7 levels in Colour Jump) the game keeps a
+picture of the screen with the game's web address on it, and a **Share** button opens a panel: share the picture through
+the phone's own share menu, open X, Facebook, WhatsApp, Telegram, Reddit or Weibo with the game link, save the picture, or
+copy the link. Web pages cannot post for you, so you always tap to share. The code is in [`share.js`](share.js); each page
+also has Open Graph tags and a `share-card` picture so links show a preview.
+
 ## Colour Jump
 
 [`colour-jump/index.html`](colour-jump/index.html) is a one-button jump game drawn from a hand sketch.

@@ -11,6 +11,14 @@
 <meta name="apple-mobile-web-app-title" content="Disco Funkin'">
 <meta name="theme-color" content="#120828">
 <link rel="apple-touch-icon" href="icon-180.png">
+<meta name="description" content="A disco dance battle: hit the falling arrows on the beat. Five songs, free in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Disco Funkin'">
+<meta property="og:description" content="A disco dance battle: hit the falling arrows on the beat. Five songs, free in your browser.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/disco-funkin/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/disco-funkin/share-card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&display=swap">
 <style>
@@ -180,6 +188,7 @@
     <p class="unlock" id="rUnlock" hidden></p>
     <div class="row">
       <button class="primary" id="rNext">Next song</button>
+      <button id="rShare" hidden>Share</button>
       <button id="rRetry">Retry</button>
       <button id="rList">Song list</button>
       <button id="rHome">Home</button>
@@ -707,6 +716,10 @@ function finish(cleared) {
   if (cleared && G.idx === SONGS.length - 1) { $('rUnlock').hidden = false; $('rUnlock').textContent = 'You beat the final boss. Disco legend!'; }
   const hasNext = cleared && G.idx + 1 < SONGS.length;
   $('rNext').hidden = !hasNext;
+  // Share: a picture of the dance floor with the game's address (share.js, on the website only)
+  $('rShare').hidden = !(cleared && window.EmilyShare);
+  if (cleared && window.EmilyShare) EmilyShare.snap({ canvas: cv, game: "Disco Funkin'", path: 'disco-funkin/',
+    text: `I cleared ${G.song.name} (${DIFFS[G.diff]}) with rank ${rank} in Disco Funkin'!` });
   $('resultOv').hidden = false;
   (hasNext ? $('rNext') : $('rRetry')).focus();
 }
@@ -938,6 +951,7 @@ const goHome = () => { location.href = '../index.html'; };
 $('homeBtn').addEventListener('click', goHome);
 $('rHome').addEventListener('click', goHome);
 $('rRetry').addEventListener('click', () => { sel = G.idx; startGame(); });
+$('rShare').addEventListener('click', () => EmilyShare.open());
 $('rNext').addEventListener('click', () => { sel = G.idx + 1; startGame(); });
 $('rList').addEventListener('click', () => { sel = G ? G.idx : sel; G = null; showSelect(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { if (mode === 'play') pause(); stopPreview(); } });
