@@ -18,3 +18,15 @@ then walk through the coloured door into the next level.
 
 Everything is in the one HTML file. Open it in a browser, or serve the repo with GitHub Pages
 and visit `/colour-jump/`.
+
+## Disco Funkin'
+
+[`disco-funkin/index.html`](disco-funkin/index.html) is a Friday Night Funkin'-style dance game drawn from hand sketches.
+Arrows fall down four lanes (down, up, left, right); hit each one as it reaches the hit line with the
+arrow keys, **D F J K**, or by tapping the lane. Every hit makes the stick dancer strike the matching pose.
+
+- 5 original 80s/90s disco songs (120 to 148 BPM), all synthesised in the browser, unlocked one by one
+- EASY / NORMAL / HARD charts with double arrows, fast runs and hold arrows
+- PERFECT / GOOD / OK / MISS timing, combo, health bar, S to D rank and best scores saved on the device
+
+Everything, including the hand-drawn art, is in the one HTML file. Open it in a browser, or visit `/disco-funkin/` on GitHub Pages.
