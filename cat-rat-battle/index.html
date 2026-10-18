@@ -118,7 +118,7 @@ const LEVELS = [
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
 const slotsFor = lv => lv === 1 ? 3 : lv === 2 ? 4 : 5;
 // Battle formation (feet positions): melee column in front, ranged + Nurse behind.
-const FRONT = [[520, 330], [610, 475], [520, 625]], BACK = [[220, 385], [220, 625]];
+const FRONT = [[520, 330], [610, 475], [520, 625]], BACK = [[220, 385], [220, 625]], SLOTS = FRONT.concat(BACK);
 const RAINBOW = [['RED: FIRE', '#ff5a4e'], ['YELLOW: LIGHTNING', '#ffd84a'], ['GREEN: HEAL', '#4fd463'], ['BLUE: SHIELD', '#4a8bff']];
 
 /* ======================= save ======================= */
@@ -525,40 +525,57 @@ const Levels = {
 /* ----- Team: pick which cats fight ----- */
 function Team(lv) {
   const N = slotsFor(lv);
-  const free = (id, team) => (save.owned[id] || 0) - team.filter(t => t === id).length;
-  let team = [];
-  for (const id of save.team || []) if (team.length < N && free(id, team) > 0) team.push(id);
-  // fill any empty slots with the strongest cats still free
-  CATS.slice().sort((a, b) => b.r - a.r || b.hp - a.hp).forEach(c => { while (team.length < N && free(c.id, team) > 0) team.push(c.id); });
+  // slots 0-2 are the front column, 3-4 the back column; the player can move any cat to any slot
+  let slots = [null, null, null, null, null], sel = null;
+  const used = id => slots.filter(t => t === id).length, free = id => (save.owned[id] || 0) - used(id), count = () => slots.filter(Boolean).length;
+  const add = (id, at) => {
+    if (count() >= N || free(id) <= 0) return;
+    if (at != null && !slots[at]) { slots[at] = id; return; }
+    const pref = CAT[id].row === 'front' ? [0, 1, 2, 3, 4] : [3, 4, 0, 1, 2], s = pref.find(i => !slots[i]);
+    if (s != null) slots[s] = id;
+  };
+  if (Array.isArray(save.slots) && save.slots.length === 5) save.slots.forEach((id, i) => { if (id && CAT[id]) add(id, i); });
+  else for (const id of save.team || []) if (CAT[id]) add(id);
+  // fill any empty places with the strongest cats still free
+  CATS.slice().sort((a, b) => b.r - a.r || b.hp - a.hp).forEach(c => { while (count() < N && free(c.id) > 0) add(c.id); });
   const prev = (x, y) => [40 + x * 0.62, 265 + (y - 330)];
+  const at = i => prev(...SLOTS[i]);
   return {
     draw() {
       topBar(); txt(`LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
-      txt('Tap a cat to add it. Tap it on the left to take it out.', W / 2 + 40, 678, 22, 'center', '#666');
+      txt(sel == null ? 'Tap a cat to add it. Tap a cat on the left, then a place, to move it.' : (slots[sel] ? 'Tap another place to move it there, or tap it again to take it out.' : 'Tap a cat on the right to put it here.'),
+        W / 2 + 40, 678, 22, 'center', '#666');
       hbox(30, 125, 570, 505, { lw: 2 }); txt('FRONT: melee', 360, 608, 22); txt('BACK: ranged + Nurse', 175, 608, 22);
-      const placed = placeTeam(team);
-      placed.sort((a, b) => a.y - b.y).forEach(p => {
-        const [x, y] = prev(p.x, p.y), d = CAT[p.id], h = d.h * 0.85;
-        spr(d.img, x, y, h);
-        const w = h * iw(d.img) / ih(d.img);
-        hits.push({ x: x - w / 2, y: y - h, w, h, fn: () => { team.splice(p.i, 1); } });
+      const order = [0, 1, 2, 3, 4].sort((a, b) => SLOTS[a][1] - SLOTS[b][1]);
+      order.forEach(i => {
+        const [x, y] = at(i), id = slots[i];
+        if (sel === i || !id) { ctx.setLineDash(sel === i ? [] : [6, 6]); ctx.strokeStyle = sel === i ? INK : '#bbb'; ctx.lineWidth = sel === i ? 3 : 2; ctx.beginPath(); ctx.ellipse(x, y + 2, 46, 13, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+        if (id) { const d = CAT[id]; spr(d.img, x, y, d.h * 0.85); }
+        else if (count() < N || sel != null) txt('+', x, y - 30, 34, 'center', '#bbb');
+        hits.push({ x: x - 62, y: y - 125, w: 124, h: 140, fn: () => {
+          if (sel == null) { if (id || count() < N) sel = i; return; }
+          if (sel === i) { if (id) slots[i] = null; sel = null; return; }
+          [slots[i], slots[sel]] = [slots[sel], slots[i]]; sel = null;
+        } });
       });
-      txt(`${team.length} / ${N} cats`, 315, 150, 26);
+      txt(`${count()} / ${N} cats`, 315, 150, 26);
       CATS.forEach((d, i) => {
-        const x = 625 + (i % 5) * 128, y = 125 + Math.floor(i / 5) * 128, own = save.owned[d.id] || 0, f = free(d.id, team);
+        const x = 625 + (i % 5) * 128, y = 125 + Math.floor(i / 5) * 128, own = save.owned[d.id] || 0, f = free(d.id);
         if (!own) { hbox(x, y, 120, 120, { lw: 2 }); txt('?', x + 60, y + 60, 44, 'center', '#bbb'); return; }
-        button(x, y, 120, 120, '', () => { if (team.length < N && f > 0) team.push(d.id); }, { lw: 2, disabled: f <= 0 || team.length >= N, draw: () => {
+        const into = sel != null && !slots[sel] ? sel : null;
+        button(x, y, 120, 120, '', () => { add(d.id, into); sel = null; }, { lw: 2, disabled: f <= 0 || count() >= N, draw: () => {
           spr(d.img, x + 60, y + 82, Math.min(68, 68 * 100 / Math.max(80, iw(d.img) * 68 / ih(d.img))));
           txt(d.name, x + 60, y + 98, 20); txt(`x${f}  ${d.row}`, x + 60, y + 114, 16, 'center', '#666');
         } });
       });
       button(70, 650, 160, 50, 'Back', () => go(Levels), { size: 28 });
-      button(1040, 650, 220, 56, 'FIGHT!', () => { save.team = team.slice(); persist(); go(Battle(lv, team.slice())); }, { size: 38, disabled: !team.length });
+      button(1040, 650, 220, 56, 'FIGHT!', () => { save.slots = slots.slice(); save.team = slots.filter(Boolean); persist(); go(Battle(lv, save.team.slice(), slots.slice())); }, { size: 38, disabled: !count() });
     },
   };
 }
 // Front-row cats take the front slots, the rest go behind; spare cats spill into the other column.
-function placeTeam(ids) {
+function placeTeam(ids, slots) {
+  if (slots) return slots.map((id, s) => id && { id, x: SLOTS[s][0], y: SLOTS[s][1], col: s < 3 ? 'front' : 'back' }).filter(Boolean);
   const front = [], back = [], out = [];
   ids.forEach((id, i) => (CAT[id].row === 'front' ? front : back).push(i));
   const F = FRONT.slice(), Bk = BACK.slice();
@@ -570,10 +587,10 @@ function placeTeam(ids) {
 
 /* ======================= battle ======================= */
 let B = null;
-function Battle(lv, ids) {
+function Battle(lv, ids, slots) {
   // small rats get stronger every level, faster after level 5
   const L = LEVELS[lv - 1], mult = lv <= 5 ? Math.pow(1.1, lv - 1) : 1.4641 * Math.pow(1.25, lv - 5);
-  const cats = placeTeam(ids).map(p => {
+  const cats = placeTeam(ids, slots).map(p => {
     const d = CAT[p.id];
     return { d, x: p.x, y: p.y, hx: p.x, hy: p.y, col: p.col, hp: d.hp, max: d.hp, cd: 0.4 + Math.random() * 0.8, flash: 0, lunge: 0,
       dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0 };
