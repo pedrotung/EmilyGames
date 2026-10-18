@@ -35,6 +35,10 @@
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Everything lives in #stage. On a phone held upright the stage is turned 90 degrees so the
+     game always plays in landscape; its fixed-position children are placed inside it. */
+  #stage { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: hidden; transform-origin: 0 0; }
+  #stage.rotated { transform: translateX(100vw) rotate(90deg); }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
   .hud {
@@ -110,6 +114,7 @@
 
 </head>
 <body>
+<div id="stage">
 <canvas id="cv"></canvas>
 <div class="progress"><i id="bar"></i></div>
 <div class="hud">
@@ -155,6 +160,7 @@
   </div>
 </div>
 <button class="jump" id="jump" type="button" aria-label="Jump">JUMP</button>
+</div>
 
 <script>
 // ---------- Tunables ----------
@@ -889,9 +895,24 @@ function update(dt) {
   $('bar').style.width = (mode === 'win' ? 100 : prog * 100) + '%';
 }
 
+// A phone: touch screen whose short side is small (tablets keep their own orientation).
+const IS_PHONE = (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)) && Math.min(screen.width, screen.height) < 600;
+// Once full screen (see toggleFullscreen), also lock to landscape where the browser allows it (mostly Android Chrome).
+function lockLandscape() {
+  if (!IS_PHONE || !fsOn()) return;
+  try { const r = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  setTimeout(resize, 200);
+}
+document.addEventListener('fullscreenchange', lockLandscape);
+document.addEventListener('webkitfullscreenchange', lockLandscape);
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = window.innerWidth, h = window.innerHeight;
+  // On a phone held upright, play sideways: swap the stage's width and height and turn it 90 degrees.
+  const rotated = IS_PHONE && window.innerHeight > window.innerWidth;
+  const w = rotated ? window.innerHeight : window.innerWidth, h = rotated ? window.innerWidth : window.innerHeight;
+  const stage = $('stage');
+  stage.classList.toggle('rotated', rotated);
+  stage.style.width = w + 'px'; stage.style.height = h + 'px';
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   view.w = w; view.h = h;
@@ -899,6 +920,7 @@ function resize() {
   view.groundY = h * (w < h ? 0.62 : 0.7);
 }
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 function nextColours() { return levelIdx < LEVELS.length - 1 ? LEVELS[levelIdx + 1].c : FINAL_DOOR; }
 const FINAL_BG = '#FFF8E8';
