@@ -489,8 +489,8 @@ let scr = null;
 function go(s) { scr = s; if (s.enter) s.enter(); setMusic(s.battle ? 'battle' : 'menu'); }
 
 const Menu = {
-  confirm: false, taps: 0, lastTap: 0, bonusT: 0,
-  enter() { this.confirm = false; this.taps = 0; },
+  confirm: false,
+  enter() { this.confirm = false; },
   draw() {
     topBar();
     txt('MEOW BRIGADE', W / 2, 130, 110); hline([[380, 190], [900, 192]], 2, 5);
@@ -504,15 +504,7 @@ const Menu = {
     const t = performance.now() / 1000;
     spr('cat_cool', 200, 640, 160, { sy: 1 + Math.sin(t * 2) * 0.012 });
     [[760, 50, 0], [920, 50, 1], [1110, 110, 2]].forEach(([x, h, i]) => spr(i === 2 ? 'rat_basic' : 'rat_basic2', x + Math.sin(t * 1.3 + i) * 6, 640, h));
-    button(940, 664, 150, 40, save.music ? 'Music: on' : 'Music: off', () => {
-      save.music = !save.music;
-      // secret: 10 quick taps in a row on Music gives 2000 coins
-      const now = performance.now(); this.taps = now - this.lastTap < 800 ? this.taps + 1 : 1; this.lastTap = now;
-      if (this.taps >= 10) { this.taps = 0; save.coins += 2000; this.bonusT = now; SFX.coin(); }
-      persist();
-    }, { size: 22, lw: 2 });
-    const bq = (performance.now() - this.bonusT) / 1500;
-    if (this.bonusT && bq < 1) { ctx.globalAlpha = 1 - bq * bq; txt('+2000 coins!', 1015, 540 - bq * 60, 34); ctx.globalAlpha = 1; }
+    button(940, 664, 150, 40, save.music ? 'Music: on' : 'Music: off', () => { save.music = !save.music; persist(); }, { size: 22, lw: 2 });
     button(1110, 664, 150, 40, save.sound ? 'Sound: on' : 'Sound: off', () => { save.sound = !save.sound; persist(); }, { size: 22, lw: 2 });
     if (this.confirm) this.drawConfirm();
   },
