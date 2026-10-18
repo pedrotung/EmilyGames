@@ -1013,6 +1013,7 @@ const Spin = {
   draw() {
     topBar();
     RARITY.forEach((s, i) => button(40 + i * 200, 85, 180, 50, s, () => { if (!this.spinning) { this.tab = i; this.result = null; } }, { on: this.tab === i, size: 28 }));
+    button(40, 650, 160, 50, 'Back', () => { this.spinning = null; go(Menu); }, { size: 28 });
     if (this.tab === 4) return this.drawSecret();
     const list = CATS.filter(c => c.r === this.tab), n = list.length, seg = Math.PI * 2 / n, cx = 400, cy = 420, R = 245;
     if (this.spinning) {
@@ -1048,11 +1049,11 @@ const Spin = {
     txt('Secret cats are not in any wheel. Buy them for 6000 coins each.', W / 2, 170, 28);
     CATS.filter(c => c.r === 4).forEach((d, i) => {
       const x = 160 + i * 520, y = 210;
-      hbox(x, y, 440, 440, { lw: 3 }); txt(d.name, x + 220, y + 36, 38);
-      spr(d.img, x + 220, y + 250, 170); wrapText(d.desc, x + 220, y + 285, 390, 22, 26);
+      hbox(x, y, 440, 430, { lw: 3 }); txt(d.name, x + 220, y + 36, 38);
+      spr(d.img, x + 220, y + 245, 165); wrapText(d.desc, x + 220, y + 275, 400, 20, 23);
       txt(`You have ${save.owned[d.id] || 0}`, x + 220, y + 345, 24);
-      button(x + 90, y + 368, 260, 56, '', () => { save.coins -= SECRET_COST; save.owned[d.id] = (save.owned[d.id] || 0) + 1; persist(); SFX.buy(); },
-        { disabled: save.coins < SECRET_COST, draw: () => { txt('BUY', x + 175, y + 397, 34); coinIcon(x + 228, y + 396, 30); txt('6000', x + 248, y + 397, 30, 'left'); } });
+      button(x + 90, y + 362, 260, 54, '', () => { save.coins -= SECRET_COST; save.owned[d.id] = (save.owned[d.id] || 0) + 1; persist(); SFX.buy(); },
+        { disabled: save.coins < SECRET_COST, draw: () => { txt('BUY', x + 175, y + 390, 34); coinIcon(x + 228, y + 389, 30); txt('6000', x + 248, y + 390, 30, 'left'); } });
     });
   },
 };
