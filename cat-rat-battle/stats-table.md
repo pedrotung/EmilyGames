@@ -33,7 +33,7 @@
 | Legendary | Military cat | 后排 | 140 | 机枪 | 3 | 每秒 **4.5 发**（4） | 13.5 |
 | Legendary | Witch cat | 后排 | 140 | 扔药水，溅射并减速 | **15**（12），打范围内全部 | 3 秒 | 约 15（3 只加起来）+ 减速 |
 | Secret | Angel cat（6000） | 后排 | 210 | 飞到顶上 3 秒，神圣喵叫打全场；空中被 Boss 打到就掉下来重来 | 全场每只 30 | 10 秒 | 每只约 2.3，全场约 18 |
-| Secret | Devil cat（6000） | 前排 | 300 | 三叉戟戳 | 普通老鼠秒杀，Boss 40 | 2 秒 | Boss 20 |
+| Secret | Devil cat（6000） | 前排 | 300 | 三叉戟戳 | 老鼠剩一半血或更少时秒杀，否则 40；Boss 40 | 3.5 秒（第 4 版削弱，原来 2 秒、一戳秒杀） | Boss 11 |
 
 ## 老鼠
 每过一关，小兵血量和攻击 +10%。老鼠进场间隔从 2.5 秒改成 **3.5 秒**。
@@ -98,7 +98,7 @@
 | 7 | Cat kid、Senpai、Fairy、Water、Nurse | 94% | 27% | 没有 Legendary | 0% |
 | 8 | Cat kid、Senpai、Fairy、Witch、Nurse | 75% | 40% | 没有 Nurse | 0% |
 | 9 | Cat kid、Senpai、Witch、Fairy、Military | 81% | 17% | 没有 Military | 0% |
-| 10 | 3 只 Legendary + Devil cat | 100% | 76% | 没有 Secret | 19% |
+| 10 | 3 只 Legendary + Devil cat（削弱后） | 84% | 38% | 没有 Secret | 10% |
 
 ## 第 3 版的模拟结果（旧，第一版游戏代码，玩家血低于 30% 时用 Nurse 治疗）
 | 关卡 | 队伍 | 赢 | 赢完剩血 |

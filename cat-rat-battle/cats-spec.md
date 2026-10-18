@@ -45,7 +45,7 @@ Up to 5 cats on the field, duplicates allowed: rolling the same cat again gives 
 | Cat | Attack | Damage | Range / cooldown |
 |---|---|---|---|
 | Angel cat | Flies up to the top of the battlefield (3 s, default), plays a holy "meow" chorus sound, and hits every rat on the field at once. If it is hit while flying (bosses that can attack airborne cats: Long Rat's neck, Rainbow Rat's lightning, default), it drops back to the ground and has to start again | 30 to every rat on the field | 10 s cooldown after the blast (default) |
-| Devil cat | Stabs with its trident (front row, melee). One stab defeats any normal rat; bosses only take damage | Instant defeat on normal rats; 40 on bosses (default) | 2 s cooldown (default) |
+| Devil cat | Stabs with its trident (front row, melee). Defeats a normal rat at half HP or less in one stab; bosses only take damage | Instant defeat on rats at ≤50% HP, otherwise 40; 40 on bosses | 3.5 s cooldown (nerfed from 2 s, Jason 2026-10-18) |
 
 Attack animations mockup: src/mock_attacks.py -> design/attacks/common-attacks.gif
 Epic animations: src/mock_attacks_epic.py -> design/attacks/epic-attacks.gif

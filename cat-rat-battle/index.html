@@ -55,6 +55,7 @@
 const W = 1280, H = 720, INK = '#222', GREY = '#aaa', RED = 'rgb(255,165,165)';
 const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET'];
 const SPIN_COST = [50, 100, 500, 2000], SECRET_COST = 6000;
+const DEVIL = { cd: 3.5, dmg: 40, boss: 40, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
 // row: where the cat stands. Front = melee, back = ranged and Nurse.
 const CATS = [
   { id: 'cat', name: 'Cat', r: 0, row: 'front', hp: 100, img: 'cat_cat', h: 100, desc: 'Scratches: 5 damage every 2 s.' },
@@ -76,7 +77,7 @@ const CATS = [
   { id: 'military', name: 'Military cat', r: 3, row: 'back', hp: 140, img: 'cat_military', h: 95, desc: 'Machine gun: 3 damage, 4.5 bullets a second.' },
   { id: 'witch', name: 'Witch cat', r: 3, row: 'back', hp: 140, img: 'cat_witch', h: 115, desc: 'Potion splash: 15 damage to every rat nearby and slows them, every 3 s.' },
   { id: 'angel', name: 'Angel cat', r: 4, row: 'back', hp: 210, img: 'cat_angel', h: 90, desc: 'Flies up, sings a holy meow and hits every rat for 30. If a boss hits it in the air, it falls and starts again.' },
-  { id: 'devil', name: 'Devil cat', r: 4, row: 'front', hp: 300, img: 'cat_devil', h: 110, desc: 'Trident stab defeats any rat in one hit, every 2 s. Bosses take 40.' },
+  { id: 'devil', name: 'Devil cat', r: 4, row: 'front', hp: 300, img: 'cat_devil', h: 110, desc: 'Trident stab every 3.5 s: defeats a rat at half HP or less in one hit, otherwise hits for 40. Bosses take 40.' },
 ];
 const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
 const RATS = {
@@ -774,7 +775,7 @@ function updateCat(c, dt) {
     case 'cat': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; hurtRat(r, 5); slash(r); SFX.scratch(); c.cd = 2; } else c.cd = 0.1; } break;
     case 'senpai': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.2; hurtRat(r, 8); sparks(...center(r)); SFX.pen(); c.cd = 1; } else c.cd = 0.1; } break;
     case 'catkid': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.3; hurtRat(r, 20); sparks(...center(r)); SFX.headbutt(); hurtCat(c, 2, { self: true }); c.cd = 2.5; } else c.cd = 0.1; } break;
-    case 'devil': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; sparks(...center(r)); SFX.trident(); if (r.d.boss && !r.fake) hurtRat(r, 40); else { float(r.x, r.y - r.h - 30, 'STAB!', 26); hurtRat(r, r.hp, { quiet: true }); } c.cd = 2; } else c.cd = 0.1; } break;
+    case 'devil': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; sparks(...center(r)); SFX.trident(); if (r.d.boss && !r.fake) hurtRat(r, DEVIL.boss); else if (r.hp <= r.max * DEVIL.finish) { float(r.x, r.y - r.h - 30, 'STAB!', 26); hurtRat(r, r.hp, { quiet: true }); } else hurtRat(r, DEVIL.dmg); c.cd = DEVIL.cd; } else c.cd = 0.1; } break;
     case 'cool': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = anchor(c, 0.68, 0.32), [tx, ty] = center(r); hurtRat(r, 5); SFX.laser();
       addFx(0.2, () => { ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke(); }); c.cd = 2.5; } else c.cd = 0.1; } break;
     case 'bad': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.55, 0.42), speed: 600, dmg: 10, kind: 'cig' }); SFX.spit(); c.cd = 5; } else c.cd = 0.1; } break;
