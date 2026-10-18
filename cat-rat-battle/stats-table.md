@@ -1,4 +1,4 @@
-# Meow Brigade：全部数值总表（第 3 版，和第一版游戏一致）
+# Meow Brigade：全部数值总表（第 4 版，和游戏一致）
 
 “每秒伤害”是把冷却算进去后平均每秒打多少。
 
@@ -80,7 +80,27 @@
 | 7 | 约 4300 | 1 次 Legendary |
 | 10 | 约 10000 | 再加重打，够买 1 只 Secret |
 
-## 模拟结果（第一版游戏代码，玩家血低于 30% 时用 Nurse 治疗）
+
+## 第 4 版：加难度和策略（Jason 2026-10-18 觉得太简单）
+- **老鼠会绕后**：Spike rat 冲过前排，直接打后排的远程猫和 Nurse；第 3 关起，25% 到 30% 的 Basic rat 也会绕到后排。前排不再能挡住所有老鼠。
+- **每关加强**：小老鼠血量第 1 关 ×1.15（攻击 ×1.1），第 4、5、10 关 ×1.15，其他关 ×1.04 到 ×1.1；第 4 关 Boss 血量 ×1.1，第 5 关 ×1.15，第 8 关 ×1.05；第 10 关 Rainbow Rat 1100 血。
+- **选猫页面有提示**：每关写着这关 Boss 的特点和该带什么猫，比如第 4 关“Long Rat 咬后排，带 Nurse”。
+
+模拟结果（每支队伍打 16 次，玩家在猫血低于 30% 时用 Nurse）：
+| 关卡 | 有策略的队伍 | 赢 | 剩血 | 随便组的队伍 | 赢 |
+|---|---|---|---|---|---|
+| 1 | Cat、Cool cat、Bad cat | 94% | 48% | 没有前排（Daisy、Alert、Gentlemat） | 0% |
+| 2 | 两只 Cat 在前排 + Cool、Bad | 94% | 28% | 没有前排 | 0% |
+| 3 | 带 Water（打多只）和 Nurse | 88% | 21% | 没有 Nurse 和 Rare | 0% |
+| 4 | Cat、Bleh、Water、Ghost、Nurse | 100% | 29% | 没有 Nurse，后排太脆 | 0% |
+| 5 | 1 只 Epic + Bleh、Water、Ghost、Nurse | 94% | 40% | 只有 Rare | 0% |
+| 6 | Cat kid、Senpai、Poison、Water、Nurse | 81% | 31% | 只有 1 只 Epic | 0% |
+| 7 | Cat kid、Senpai、Fairy、Water、Nurse | 94% | 27% | 没有 Legendary | 0% |
+| 8 | Cat kid、Senpai、Fairy、Witch、Nurse | 75% | 40% | 没有 Nurse | 0% |
+| 9 | Cat kid、Senpai、Witch、Fairy、Military | 81% | 17% | 没有 Military | 0% |
+| 10 | 3 只 Legendary + Devil cat | 100% | 76% | 没有 Secret | 19% |
+
+## 第 3 版的模拟结果（旧，第一版游戏代码，玩家血低于 30% 时用 Nurse 治疗）
 | 关卡 | 队伍 | 赢 | 赢完剩血 |
 |---|---|---|---|
 | 1 | Cat、Cool cat、Daisy | 100% | 58% |

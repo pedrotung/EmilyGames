@@ -90,17 +90,29 @@ const RATS = {
   rainbow: { name: 'RAINBOW RAT', img: 'rat_rainbow', h: 125, hp: 500, dmg: 5, rate: 1, speed: 45, coins: 120, boss: true },
 };
 const rep = (k, n) => Array(n).fill(k);
+// tip: shown on the team screen so the player can pick counters. flank: share of Basic rats that run for the back row.
+// hpMul / dmgMul scale the small rats, bossMul / bossDmg the bosses, gap is seconds between rats.
 const LEVELS = [
-  { minions: rep('basic', 6), bosses: ['queen'], reward: 60, gap: 2.5 },
-  { minions: [...rep('basic', 6), ...rep('ball', 3)], bosses: ['legged'], reward: 120, gap: 3 },
-  { minions: [...rep('basic', 8), ...rep('ball', 4)], bosses: ['clone'], reward: 200, gap: 2.5 },
-  { minions: [...rep('basic', 8), ...rep('ball', 6)], bosses: ['long'], reward: 350, gap: 2.2 },
-  { minions: [...rep('ball', 8), ...rep('spike', 6)], bosses: ['rainbow'], reward: 600 },
-  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], reward: 800, gap: 2.3 },
-  { minions: [...rep('basic', 8), ...rep('ball', 6), ...rep('spike', 4)], bosses: ['legged', 'clone'], reward: 1000, gap: 1.9 },
-  { minions: [...rep('ball', 6), ...rep('spike', 12)], bosses: ['long'], reward: 1300, gap: 3 },
-  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], seq: true, reward: 1600, gap: 2 },
-  { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, rainbowHp: 1000, phase: 3 },
+  { minions: rep('basic', 6), bosses: ['queen'], reward: 60, hpMul: 1.15, dmgMul: 1.1, gap: 2.5,
+    tip: 'Boss: RAT QUEEN keeps calling more rats. Cats that shoot from far away help.' },
+  { minions: [...rep('basic', 6), ...rep('ball', 3)], bosses: ['legged'], reward: 120, hpMul: 1.07, gap: 3,
+    tip: 'Boss: LEGGED RAT jumps and hits your whole front row. Put tough cats in front.' },
+  { minions: [...rep('basic', 8), ...rep('ball', 4)], bosses: ['clone'], reward: 200, hpMul: 1.05, gap: 2.5, flank: 0.25,
+    tip: 'Boss: CLONE RAT makes fake clones. Cats that hit many rats at once find the real one.' },
+  { minions: [...rep('basic', 8), ...rep('ball', 6)], bosses: ['long'], reward: 350, hpMul: 1.15, bossMul: 1.1, gap: 2.2, flank: 0.25,
+    tip: 'Boss: LONG RAT bites over your front row. Keep your back row alive. A Nurse helps.' },
+  { minions: [...rep('ball', 8), ...rep('spike', 6)], bosses: ['rainbow'], reward: 600, hpMul: 1.15, bossMul: 1.15, flank: 0.25,
+    tip: 'Spike rats dash to your back row. RAINBOW RAT heals and shields itself. Bring strong cats.' },
+  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], reward: 800, hpMul: 1.04, gap: 2.3, flank: 0.3,
+    tip: 'Two RAT QUEENS and lots of rats. Cats that hit many rats at once help.' },
+  { minions: [...rep('basic', 8), ...rep('ball', 6), ...rep('spike', 4)], bosses: ['legged', 'clone'], reward: 1000, hpMul: 1.1, gap: 1.9, flank: 0.3,
+    tip: 'LEGGED RAT and CLONE RAT together. Tough front row and wide attacks.' },
+  { minions: [...rep('ball', 6), ...rep('spike', 12)], bosses: ['long'], reward: 1300, hpMul: 1.05, bossMul: 1.05, gap: 3, flank: 0.3,
+    tip: 'Lots of Spike rats and a LONG RAT. Your back row is in danger.' },
+  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], seq: true, reward: 1600, hpMul: 1.1, gap: 2, flank: 0.3,
+    tip: 'Four bosses, one after another. Your team has to last.' },
+  { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, hpMul: 1.15, rainbowHp: 1100, phase: 3, flank: 0.3,
+    tip: 'SUPER RAINBOW RAT: 1100 HP and changes colour faster.' },
 ];
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
 const slotsFor = lv => lv === 1 ? 3 : lv === 2 ? 4 : 5;
@@ -502,7 +514,8 @@ function Team(lv) {
   const prev = (x, y) => [40 + x * 0.62, 265 + (y - 330)];
   return {
     draw() {
-      topBar(); txt(`LEVEL ${lv}`, W / 2, 40, 40); txt(`Choose up to ${N} cats  -  tap a cat to add it, tap it again on the left to take it out`, W / 2, 95, 24);
+      topBar(); txt(`LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
+      txt('Tap a cat to add it. Tap it on the left to take it out.', W / 2 + 40, 678, 22, 'center', '#666');
       hbox(30, 125, 570, 505, { lw: 2 }); txt('FRONT: melee', 360, 608, 22); txt('BACK: ranged + Nurse', 175, 608, 22);
       const placed = placeTeam(team);
       placed.sort((a, b) => a.y - b.y).forEach(p => {
@@ -568,12 +581,12 @@ function float(x, y, s, size = 26) { B.floats.push({ x, y, s, t: 0, size }); }
 function addFx(dur, draw, o = {}) { B.fx.push(Object.assign({ t: 0, dur, draw }, o)); }
 function makeRat(key, x, y, o = {}) {
   const d = RATS[key], boss = !!d.boss && !o.fake;
-  let hp = d.hp * (boss ? (B.lv > 5 ? 1 + 0.4 * (B.lv - 5) : 1) : B.mult);
+  let hp = d.hp * (boss ? (B.lv > 5 ? 1 + 0.4 * (B.lv - 5) : 1) * (B.L.bossMul || 1) : B.mult * (B.L.hpMul || 1));
   if (key === 'rainbow' && B.L.rainbowHp) hp = B.L.rainbowHp;
   if (o.fake) hp = 1;
-  const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * (boss ? 1 : B.dmgMult), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
+  const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * (boss ? (B.L.bossDmg || 1) : B.dmgMult * (B.L.dmgMul || 1)), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
     tgt: null, yOff: (Math.random() - 0.5) * 70, xOff: Math.random() * 50, h: d.h, w: d.h * iw(d.img) / ih(d.img), ph: Math.random() * 6,
-    fake: !!o.fake, slow: 0, frozen: 0, held: false, fleeing: false, stared: false, dashed: false, timer: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
+    fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, fleeing: false, stared: false, dashed: false, timer: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
   B.rats.push(r); return r;
 }
 function spawnBoss() {
@@ -619,7 +632,10 @@ function hurtCat(c, dmg, o = {}) {
 function pickTarget(r) {
   const live = B.cats.filter(alive); if (!live.length) return null;
   const ground = live.filter(c => !airborne(c));
-  let pool = ground.filter(c => c.col === 'front'); if (!pool.length) pool = ground.length ? ground : live;
+  // Spike rats and flankers run past the front row to get at the ranged cats and the Nurse.
+  const back = ground.filter(c => c.col === 'back');
+  let pool = (r.key === 'spike' || r.flank) && back.length ? back : ground.filter(c => c.col === 'front');
+  if (!pool.length) pool = ground.length ? ground : live;
   let best = null, bs = 1e9;
   for (const c of pool) { const n = B.rats.filter(o => o !== r && !o.dead && o.tgt === c).length, s = n * 220 + Math.hypot(c.x - r.x, c.y - r.y); if (s < bs) { bs = s; best = c; } }
   return best;
