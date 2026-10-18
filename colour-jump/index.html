@@ -60,9 +60,14 @@
   .chip.fs svg { width: 14px; height: 14px; flex: none; }
   @media (max-width: 520px) { .chip.fs span { display: none; } }
   .chip { white-space: nowrap; }
-  @media (max-width: 420px) { .chip { padding: 6px 8px; } .hud-right { gap: 4px; } }
+  .hud-left { display: flex; gap: 6px; }
+  a.chip.home { pointer-events: auto; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  a.chip.home svg { width: 14px; height: 14px; flex: none; }
+  a.chip.home:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  @media (max-width: 520px) { a.chip.home span { display: none; } }
+  @media (max-width: 420px) { .chip { padding: 5px 7px; font-size: 12px; } .hud-right, .hud-left { gap: 4px; } .hud { gap: 6px; padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); } }
   #homePanel { background: #fff; z-index: 2; }
-  @media (max-width: 380px) { .chip { padding: 5px 7px; font-size: 12px; } }
+  @media (max-width: 380px) { .chip { padding: 5px 6px; } .hud-right, .hud-left { gap: 3px; } }
   .panel .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .panel button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
   .progress {
@@ -108,7 +113,10 @@
 <canvas id="cv"></canvas>
 <div class="progress"><i id="bar"></i></div>
 <div class="hud">
-  <span class="chip" id="deaths">Deaths: 0</span>
+  <div class="hud-left">
+    <a class="chip home" href="../index.html" aria-label="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.8V20h5v-6h3v6h5V9.8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg><span>Home</span></a>
+    <span class="chip" id="deaths">Deaths: 0</span>
+  </div>
   <div class="hud-right">
     <button class="chip fs" id="fs" type="button" aria-label="Full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" fill="none" stroke="currentColor" stroke-width="2.8"/></svg><span>Full screen</span></button>
     <button class="chip" id="pause" type="button">Pause</button>
@@ -128,6 +136,7 @@
     <button type="button" id="resume">Resume</button>
     <button type="button" id="restart" class="ghost">Restart level</button>
     <button type="button" id="toLevel1" class="ghost">Back to Level 1</button>
+    <button type="button" id="goHome" class="ghost">Home</button>
   </div>
 </div>
 <div class="panel" id="homePanel" hidden>
@@ -140,7 +149,10 @@
 <div class="panel" id="winPanel" hidden>
   <h2>You made it!</h2>
   <p id="winText"></p>
-  <button type="button" id="again">Play again</button>
+  <div class="row">
+    <button type="button" id="again">Play again</button>
+    <button type="button" id="winHome" class="ghost">Home</button>
+  </div>
 </div>
 <button class="jump" id="jump" type="button" aria-label="Jump">JUMP</button>
 
@@ -776,6 +788,8 @@ function syncFs() {
   $('fs').querySelector('span').textContent = label; $('fs').setAttribute('aria-label', label);
 }
 $('fs').addEventListener('click', toggleFullscreen);
+$('goHome').addEventListener('click', () => { location.href = '../index.html'; });
+$('winHome').addEventListener('click', () => { location.href = '../index.html'; });
 $('homeOk').addEventListener('click', () => { $('homePanel').hidden = true; });
 document.addEventListener('fullscreenchange', syncFs);
 document.addEventListener('webkitfullscreenchange', syncFs);
