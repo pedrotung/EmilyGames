@@ -513,7 +513,7 @@ const Levels = {
         const b = RATS[L.bosses[L.bosses.length - 1]];
         spr(b.img, x + 105, y + 150, Math.min(b.h, 100) * 0.9);
         if (!open) txt('LOCKED', x + 105, y + 180, 24);
-        else if (lv <= save.cleared) txt(`CLEARED  (+${L.reward / 2})`, x + 105, y + 180, 22);
+        else if (lv <= save.cleared) txt(`CLEARED  (+${Math.round(L.reward / 4)})`, x + 105, y + 180, 22);
         else { coinIcon(x + 70, y + 180, 24); txt(`+${L.reward}`, x + 88, y + 181, 24, 'left'); }
       } });
     });
@@ -915,7 +915,7 @@ function endBattle(win) {
   if (B.over) return;
   const L = B.L, first = B.lv > save.cleared;
   let bonus = 0;
-  if (win) { bonus = first ? L.reward : L.reward / 2; save.coins += bonus; if (first) save.cleared = B.lv; }
+  if (win) { bonus = first ? L.reward : Math.round(L.reward / 4); /* replays pay a quarter so farming old levels stays slow */ save.coins += bonus; if (first) save.cleared = B.lv; }
   persist();
   B.over = { win, bonus, earned: B.earned, t: 0 };
   if (!B.silent) setMusic(null);

@@ -52,20 +52,20 @@
 以前打死 Boss 不给金币，现在给。
 
 ## 关卡和金币
-| 关卡 | 上场格子 | 小兵 | Boss | 通关金币 | 重打通关金币 |
+| 关卡 | 上场格子 | 小兵 | Boss | 通关金币 | 重打通关金币（1/4） |
 |---|---|---|---|---|---|
-| 1 | 3 | Basic ×6 | Rat Queen | **60**（50） | 30 |
-| 2 | 4 | Basic ×6，Ball ×3 | Legged Rat | **120**（100） | 60 |
-| 3 | 5 | Basic ×8，Ball ×4 | Clone Rat | 200 | 100 |
-| 4 | 5 | Basic ×8，Ball ×6 | Long Rat | 350 | 175 |
-| 5 | 5 | Ball ×8，Spike ×6 | Rainbow Rat | 600 | 300 |
-| 6 | 5 | 两只 Rat Queen，小兵翻倍 | | 800 | 400 |
-| 7 | 5 | Legged Rat + Clone Rat | | 1000 | 500 |
-| 8 | 5 | Long Rat + 大量 Spike rat | | **1300**（1200） | 650 |
-| 9 | 5 | Boss 连战：第 1 到 4 关的 Boss | | **1600**（1500） | 800 |
-| 10 | 5 | 加强版 Rainbow Rat | | **2500**（2000） | 1250 |
+| 1 | 3 | Basic ×6 | Rat Queen | **60**（50） | 15 |
+| 2 | 4 | Basic ×6，Ball ×3 | Legged Rat | **120**（100） | 30 |
+| 3 | 5 | Basic ×8，Ball ×4 | Clone Rat | 200 | 50 |
+| 4 | 5 | Basic ×8，Ball ×6 | Long Rat | 350 | 88 |
+| 5 | 5 | Ball ×8，Spike ×6 | Rainbow Rat | 600 | 150 |
+| 6 | 5 | 两只 Rat Queen，小兵翻倍 | | 800 | 200 |
+| 7 | 5 | Legged Rat + Clone Rat | | 1000 | 250 |
+| 8 | 5 | Long Rat + 大量 Spike rat | | **1300**（1200） | 325 |
+| 9 | 5 | Boss 连战：第 1 到 4 关的 Boss | | **1600**（1500） | 400 |
+| 10 | 5 | 加强版 Rainbow Rat | | **2500**（2000） | 625 |
 
-**新规则：重打已经通过的关卡，通关金币减半**（打老鼠的金币照给），这样不会靠刷第 1 关太快买到 Secret。
+**新规则：重打已经通过的关卡，通关金币只给四分之一**（Jason 2026-10-18，原来是一半；打老鼠的金币照给），这样不会靠刷第 1 关太快买到 Secret。
 
 转盘价格不变：Common 50，Rare 100，Epic 500，Legendary 2000；Secret 每只 6000。开局送 1 只 Cat 和 100 金币。
 
