@@ -85,37 +85,38 @@ const RATS = {
   basic: { name: 'Basic rat', img: 'rat_basic2', h: 55, hp: 25, dmg: 3, rate: 1, speed: 62, coins: 5 },
   ball: { name: 'Ball rat', img: 'rat_ball2', h: 62, hp: 35, dmg: 3, rate: 1, speed: 52, coins: 8, splash: true },
   spike: { name: 'Spike rat', img: 'rat_spike', h: 40, hp: 35, dmg: 3, rate: 1, speed: 95, coins: 12, dash: 15 },
-  queen: { name: 'RAT QUEEN', img: 'rat_queen', h: 95, hp: 100, dmg: 4, summon: 12, summonN: 1, rate: 1, speed: 45, coins: 30, boss: true },
-  legged: { name: 'LEGGED RAT', img: 'rat_legged', h: 115, hp: 150, dmg: 5, rate: 1, speed: 70, coins: 50, boss: true },
-  clone: { name: 'CLONE RAT', img: 'rat_clone', h: 90, hp: 200, dmg: 6, rate: 1, speed: 50, coins: 70, boss: true },
-  long: { name: 'LONG RAT', img: 'rat_long', h: 175, hp: 500, dmg: 12, rate: 4, speed: 45, coins: 90, boss: true },
-  rainbow: { name: 'RAINBOW RAT', img: 'rat_rainbow', h: 125, hp: 500, dmg: 5, rate: 1, speed: 45, coins: 120, boss: true },
+  queen: { name: 'RAT QUEEN', img: 'rat_queen', h: 95, hp: 130, dmg: 4, summon: 10, summonN: 1, rate: 1, speed: 45, coins: 30, boss: true },
+  legged: { name: 'LEGGED RAT', img: 'rat_legged', h: 115, hp: 200, dmg: 5, rate: 1, speed: 70, coins: 50, boss: true },
+  clone: { name: 'CLONE RAT', img: 'rat_clone', h: 90, hp: 260, dmg: 6, rate: 1, speed: 50, coins: 70, boss: true },
+  long: { name: 'LONG RAT', img: 'rat_long', h: 175, hp: 600, dmg: 11, rate: 4, speed: 45, coins: 90, boss: true },
+  rainbow: { name: 'RAINBOW RAT', img: 'rat_rainbow', h: 125, hp: 600, dmg: 5, rate: 1, speed: 45, coins: 120, boss: true },
 };
 const rep = (k, n) => Array(n).fill(k);
 // tip: shown on the team screen so the player can pick counters. flank: share of Basic rats that run for the back row.
-// hpMul / dmgMul scale the small rats, bossMul / bossDmg the bosses, gap is seconds between rats.
+// hpMul / dmgMul scale the small rats, bossMul / bossDmg the bosses (boss HP also grows 40% a level after level 5), gap is seconds between rats.
 const LEVELS = [
-  { minions: rep('basic', 6), bosses: ['queen'], reward: 60, hpMul: 1.15, dmgMul: 1.1, gap: 2.5,
-    tip: 'Boss: RAT QUEEN keeps calling more rats. Cats that shoot from far away help.' },
-  { minions: [...rep('basic', 6), ...rep('ball', 3)], bosses: ['legged'], reward: 120, hpMul: 1.07, gap: 3,
+  { minions: rep('basic', 6), bosses: ['queen'], reward: 60, bossMul: 0.8, hpMul: 1.15, dmgMul: 1.1, gap: 2.5,
+    tip: 'Boss: RAT QUEEN calls more rats and screams at your front row. Cats that shoot from far away help.' },
+  { minions: [...rep('basic', 6), ...rep('ball', 3)], bosses: ['legged'], reward: 120, bossMul: 0.85, hpMul: 1.07, gap: 3,
     tip: 'Boss: LEGGED RAT jumps and hits your whole front row. Put tough cats in front.' },
-  { minions: [...rep('basic', 8), ...rep('ball', 4)], bosses: ['clone'], reward: 200, hpMul: 1.05, gap: 2.5, flank: 0.25,
-    tip: 'Boss: CLONE RAT makes fake clones. Cats that hit many rats at once find the real one.' },
-  { minions: [...rep('basic', 8), ...rep('ball', 6)], bosses: ['long'], reward: 350, hpMul: 1.15, bossMul: 1.1, gap: 2.2, flank: 0.25,
-    tip: 'Boss: LONG RAT bites over your front row. Keep your back row alive. A Nurse helps.' },
-  { minions: [...rep('ball', 8), ...rep('spike', 6)], bosses: ['rainbow'], reward: 600, hpMul: 1.15, bossMul: 1.15, flank: 0.25,
+  { minions: [...rep('basic', 8), ...rep('ball', 4)], bosses: ['clone'], reward: 200, bossMul: 0.7, hpMul: 1.05, gap: 2.5, flank: 0.25,
+    tip: 'Boss: CLONE RAT makes fake clones and claws one cat hard. Cats that hit many rats at once find the real one.' },
+  { minions: [...rep('basic', 8), ...rep('ball', 6)], bosses: ['long'], reward: 350, bossMul: 1.15, hpMul: 1.15, gap: 2.2, flank: 0.25,
+    tip: 'Boss: LONG RAT bites your back row and sweeps its tail at the front. A Nurse helps.' },
+  { minions: [...rep('ball', 8), ...rep('spike', 6)], bosses: ['rainbow'], reward: 600, bossMul: 1.15, hpMul: 1.15, flank: 0.25,
     tip: 'Spike rats dash to your back row. RAINBOW RAT heals and shields itself. Bring strong cats.' },
-  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], reward: 800, hpMul: 1.04, gap: 2.3, flank: 0.3,
+  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], reward: 800, bossMul: 0.8, hpMul: 1.04, gap: 2.3, flank: 0.3,
     tip: 'Two RAT QUEENS and lots of rats. Cats that hit many rats at once help.' },
-  { minions: [...rep('basic', 8), ...rep('ball', 6), ...rep('spike', 4)], bosses: ['legged', 'clone'], reward: 1000, hpMul: 1.1, gap: 1.9, flank: 0.3,
+  { minions: [...rep('basic', 8), ...rep('ball', 6), ...rep('spike', 4)], bosses: ['legged', 'clone'], reward: 1000, bossMul: 0.75, hpMul: 1.1, gap: 1.9, flank: 0.3,
     tip: 'LEGGED RAT and CLONE RAT together. Tough front row and wide attacks.' },
-  { minions: [...rep('ball', 6), ...rep('spike', 12)], bosses: ['long'], reward: 1300, hpMul: 1.05, bossMul: 1.05, gap: 3, flank: 0.3,
+  { minions: [...rep('ball', 6), ...rep('spike', 12)], bosses: ['long'], reward: 1300, bossMul: 0.95, hpMul: 1.05, gap: 3, flank: 0.3,
     tip: 'Lots of Spike rats and a LONG RAT. Your back row is in danger.' },
-  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], seq: true, reward: 1600, hpMul: 1.1, gap: 2, flank: 0.3,
+  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], seq: true, reward: 1600, bossMul: 0.85, hpMul: 1.1, gap: 2, flank: 0.3,
     tip: 'Four bosses, one after another. Your team has to last.' },
-  { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, hpMul: 1.15, rainbowHp: 1100, phase: 3, flank: 0.3,
-    tip: 'SUPER RAINBOW RAT: 1100 HP and changes colour faster.' },
+  { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, hpMul: 1.15, rainbowHp: 1350, phase: 3, flank: 0.3,
+    tip: 'SUPER RAINBOW RAT: 1350 HP and changes colour faster.' },
 ];
+const RAINBOW_STRIPES = ['#ff5a4e', '#ff9a3a', '#ffd84a', '#5ccf6a', '#4aa8ff', '#5a6bff', '#b06bff'];
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
 const slotsFor = lv => lv === 1 ? 3 : lv === 2 ? 4 : 5;
 // Battle formation (feet positions): melee column in front, ranged + Nurse behind.
@@ -320,6 +321,10 @@ const SFX_DEF = {
   zap: () => { tone(1250, 0.16, 'sawtooth', 0.05, 200); noise(0.12, 3000, 'highpass', 0.08); },
   ratHeal: () => [392, 523, 659].forEach((f, i) => tone(f, 0.2, 'sine', 0.06, 0, i * 0.1)),
   boom: () => tone(140, 0.3, 'triangle', 0.12, 50),
+  scream: () => { tone(900, 0.5, 'sawtooth', 0.06, 1600); tone(1350, 0.5, 'p25', 0.04, 2200); noise(0.5, 3000, 'bandpass', 0.12, 1500); },
+  whip: () => { noise(0.25, 700, 'bandpass', 0.5, 4200, 0, 3); tone(120, 0.22, 'triangle', 0.3, 45, 0.2); },
+  claw: () => { for (let i = 0; i < 3; i++) noise(0.09, 3800, 'bandpass', 0.3, 1400, i * 0.07, 2); tone(150, 0.15, 'sawtooth', 0.1, 70, 0.2); },
+  beam: () => { tone(300, 0.7, 'sawtooth', 0.05, 900); tone(600, 0.7, 'p12', 0.04, 1800); noise(0.7, 2000, 'bandpass', 0.1); },
 };
 // Each sound plays at most once per GAP ms, so fast attacks (gun, ghost pokes) don't pile up.
 const SFX_GAP = { gun: 90, poke: 90, squeak: 70, mew: 120, bite: 60, bossHurt: 120, petal: 60, scratch: 60 };
@@ -631,7 +636,7 @@ function makeRat(key, x, y, o = {}) {
   if (o.fake) hp = 1;
   const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * (boss ? (B.L.bossDmg || 1) : B.dmgMult * (B.L.dmgMul || 1)), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
     tgt: null, yOff: (Math.random() - 0.5) * 70, xOff: Math.random() * 50, h: d.h, w: d.h * iw(d.img) / ih(d.img), ph: Math.random() * 6,
-    fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, fleeing: false, stared: false, dashed: false, timer: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
+    fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, fleeing: false, stared: false, dashed: false, timer: 0, t2: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
   B.rats.push(r); return r;
 }
 function spawnBoss() {
@@ -721,6 +726,7 @@ function updateBattle(dt) {
   B.clouds = B.clouds.filter(c => c.life > 0);
   for (const p of B.projs) updateProj(p, dt);
   B.projs = B.projs.filter(p => !p.done);
+  if (B.shake > 0) B.shake = Math.max(0, B.shake - 40 * dt);
   for (const f of B.fx) { f.t += dt; if (f.tick) f.tick(f, dt); }
   B.fx = B.fx.filter(f => f.t < f.dur);
   for (const f of B.floats) f.t += dt;
@@ -742,12 +748,21 @@ function updateRat(r, dt) {
   const d = r.d, k = r.key;
   // boss specials start once the boss is on screen
   if (!r.fake && r.x < 1180) {
-    if (k === 'queen') { r.timer += dt; if (r.timer >= d.summon) { r.timer = 0; for (let i = 0; i < d.summonN; i++) makeRat('basic', r.x + 40, r.y + (i ? 60 : -60)); float(r.x, r.y - r.h - 40, 'help!', 26); SFX.summon(); } }
-    if (k === 'legged') {
-      r.timer += dt; if (r.timer >= 8 && r.jump <= 0) { r.timer = 0; r.jump = 0.7; }
-      if (r.jump > 0) { r.jump -= dt; if (r.jump <= 0) { B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c)).forEach(c => hurtCat(c, 6)); SFX.slam(); addFx(0.4, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(f.x, f.y, 40 + q * 160, 10 + q * 30, 0, 0, Math.PI * 2); ctx.stroke(); }, { x: r.x, y: r.y }); } return; }
+    if (k === 'queen') {
+      r.timer += dt; r.t2 += dt;
+      if (r.timer >= d.summon) { r.timer = 0; summonRats(r, d.summonN); }
+      if (r.t2 >= 9) { r.t2 = 0; queenScream(r); }
     }
-    if (k === 'clone') { r.timer += dt; if (r.timer >= 12) { r.timer = 0; for (const s of [-1, 1]) makeRat('clone', r.x + 30, r.y + s * 90, { fake: true }); float(r.x, r.y - r.h - 40, 'poof! clones', 24); SFX.poof(); } }
+    if (k === 'legged') {
+      r.timer += dt; if (r.timer >= 7 && r.jump <= 0) { r.timer = 0; r.jump = 0.9; warn(r, frontRow(), 0.9, 'JUMP!'); }
+      if (r.jump > 0) { r.jump -= dt; if (r.jump <= 0) leggedSlam(r); return; }
+    }
+    if (k === 'clone') {
+      r.timer += dt; r.t2 += dt;
+      if (r.timer >= 10) { r.timer = 0; for (const s of [-1, 1]) { makeRat('clone', r.x + 30, r.y + s * 90, { fake: true }); smoke(r.x + 30, r.y + s * 90 - 40); } smoke(r.x, r.y - 40); float(r.x, r.y - r.h - 40, 'poof! clones', 24); SFX.poof(); }
+      if (r.t2 >= 6 && r.tgt && alive(r.tgt) && Math.hypot(r.tgt.x - r.x, r.tgt.y - r.y) < 200) { r.t2 = 0; cloneClaw(r, r.tgt); }
+    }
+    if (k === 'long') { r.t2 += dt; if (r.t2 >= 10) { r.t2 = 0; longTail(r); } }
     if (k === 'rainbow') {
       r.phaseT -= dt; const pd = B.L.phase || 5;
       if (r.phaseT <= 0) { r.phase = (r.phase + 1) % 4; r.phaseT = pd; r.midBolt = false; rainbowStart(r); }
@@ -784,18 +799,18 @@ function rainbowStart(r) {
   const [label] = RAINBOW[r.phase]; float(r.x, r.y - r.h - 50, label, 26);
   if (r.phase === 0) { // fire on the whole front row
     const front = B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c));
-    front.forEach(c => hurtCat(c, 15));
+    front.forEach(c => hurtCat(c, 18)); shake(8);
     addFx(0.7, (f, q) => { for (let i = 0; i < 9; i++) { const x = f.x - 60 - (q * 380) * (i / 9 + 0.3), y = f.y + Math.sin(i * 2 + q * 12) * 40; ctx.fillStyle = i % 2 ? '#ff5a4e' : '#ffb03a'; ctx.beginPath(); ctx.arc(x, y, 14 - i, 0, 7); ctx.fill(); } }, { x: r.x - r.w * 0.4, y: r.y - r.h * 0.55 });
     SFX.fire();
   }
-  if (r.phase === 1) rainbowBolt(r);
+  if (r.phase === 1) rainbowBeam(r);
   if (r.phase === 2) SFX.ratHeal();
   if (r.phase === 3) { r.inv = 3; SFX.shield(); }
 }
 function rainbowBolt(r) { // yellow lightning: a flying Angel first, else a random cat
   const live = B.cats.filter(alive); if (!live.length) return;
   const t = live.find(airborne) || live[Math.floor(Math.random() * live.length)];
-  hurtCat(t, 8); SFX.zap();
+  hurtCat(t, 10); SFX.zap(); shake(4);
   bolt(t.x, t.y - t.h * 0.5, '#ffd84a');
 }
 function bolt(x, y, color) {
@@ -808,6 +823,105 @@ function slash(r) {
 }
 function sparks(x, y) {
   addFx(0.22, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 2.5; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, r1 = 8 + q * 10, r2 = 18 + q * 12; ctx.beginPath(); ctx.moveTo(x + r1 * Math.cos(a), y + r1 * Math.sin(a)); ctx.lineTo(x + r2 * Math.cos(a), y + r2 * Math.sin(a)); ctx.stroke(); } });
+}
+
+/* ----- boss big moves: a warning first, then the hit with ink effects and a screen shake ----- */
+const frontRow = () => B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c));
+function shake(n) { B.shake = Math.max(B.shake || 0, n); }
+function later(delay, fn) { addFx(delay, () => {}, { tick: f => { if (f.t >= f.dur && !f.done) { f.done = true; fn(); } } }); }
+function warn(r, cats, delay, label) { // shrinking dashed rings under the cats about to be hit, and a blinking "!" over the boss
+  float(r.x, r.y - r.h - 90, label, 30);
+  addFx(delay, (f, q) => {
+    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+    for (const c of cats) if (!c.dead) { const rr = 75 - q * 30; ctx.beginPath(); ctx.ellipse(c.x, c.y + 2, rr, rr * 0.3, 0, 0, 7); ctx.stroke(); }
+    ctx.setLineDash([]);
+    if (!r.dead && Math.floor(q * 8) % 2 === 0) txt('!', r.x + 50, r.y - r.h - 10, 56);
+  });
+}
+function impact(x, y, s = 1) { // white star with ink spikes, and bits flying out
+  const bits = Array.from({ length: 10 }, () => ({ a: Math.random() * Math.PI * 2, v: 120 + Math.random() * 200, r: 3 + Math.random() * 5 }));
+  addFx(0.5, (f, q) => {
+    const R = (30 + q * 60) * s; ctx.globalAlpha = 1 - q;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath();
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, rr = i % 2 ? R * 0.45 : R; ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK; for (const b of bits) { const d = b.v * q * s; ctx.beginPath(); ctx.arc(x + Math.cos(b.a) * d, y + Math.sin(b.a) * d + 220 * q * q, b.r, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  });
+}
+function smoke(x, y) {
+  const puffs = Array.from({ length: 7 }, (_, i) => ({ a: i / 7 * Math.PI * 2, r: 14 + Math.random() * 10 }));
+  addFx(0.6, (f, q) => { ctx.globalAlpha = 1 - q; ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    for (const p of puffs) { const d = 10 + q * 45; ctx.beginPath(); ctx.arc(x + Math.cos(p.a) * d, y + Math.sin(p.a) * d * 0.7 - q * 20, p.r * (1 + q), 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.globalAlpha = 1; });
+}
+function summonRats(r, n) { // a turning magic circle on the ground, then the rats climb out of it
+  const x = r.x + 60, y = r.y;
+  float(r.x, r.y - r.h - 40, 'come, my rats!', 26); SFX.summon();
+  addFx(1, (f, q) => { const R = 70 * Math.min(1, q * 3); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.globalAlpha = q > 0.8 ? (1 - q) * 5 : 1;
+    ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.32, 0, 0, 7); ctx.stroke(); ctx.setLineDash([10, 8]); ctx.lineDashOffset = -q * 120;
+    ctx.beginPath(); ctx.ellipse(x, y, R * 0.7, R * 0.22, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + q * 4; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * R * 0.7, y + Math.sin(a) * R * 0.22); ctx.lineTo(x + Math.cos(a) * R, y + Math.sin(a) * R * 0.32 - 14); ctx.stroke(); }
+    ctx.globalAlpha = 1; });
+  later(0.6, () => { if (r.dead) return; for (let i = 0; i < n; i++) { makeRat('basic', x, y + (i % 2 ? 50 : -50)); smoke(x, y + (i % 2 ? 50 : -50) - 20); } });
+}
+function queenScream(r) { // sound rings roll over the front row
+  const cats = frontRow(); if (!cats.length) return;
+  warn(r, cats, 0.8, 'SCREAM!');
+  later(0.8, () => { if (r.dead) return;
+    const x = r.x - r.w * 0.35, y = r.y - r.h * 0.6; SFX.scream(); shake(9);
+    addFx(0.8, (f, q) => { ctx.strokeStyle = INK; for (let i = 0; i < 5; i++) { const qq = q * 1.6 - i * 0.15; if (qq <= 0 || qq > 1) continue; const R = 30 + qq * 420;
+      ctx.globalAlpha = 1 - qq; ctx.lineWidth = 6 - i; ctx.beginPath(); ctx.arc(x, y, R, Math.PI * 0.72, Math.PI * 1.28); ctx.stroke(); } ctx.globalAlpha = 1; });
+    frontRow().forEach(c => { hurtCat(c, r.dmg * 1.2); impact(c.x, c.y - c.h * 0.5, 0.6); });
+  });
+}
+function leggedSlam(r) { // lands on the front row: shock rings, cracks in the ground, flying rocks
+  const x = r.x, y = r.y; SFX.slam(); shake(16); impact(x - 40, y - 10, 1.3);
+  frontRow().forEach(c => { hurtCat(c, r.dmg * 1.3); impact(c.x, c.y - 20, 0.7); });
+  addFx(0.6, (f, q) => { ctx.strokeStyle = INK; for (const k of [0, 0.25]) { const qq = Math.min(1, Math.max(0, (q - k) / 0.75)); if (!qq) continue; ctx.globalAlpha = 1 - qq; ctx.lineWidth = 5 - k * 8;
+    ctx.beginPath(); ctx.ellipse(x, y, 40 + qq * 330, 12 + qq * 70, 0, 0, 7); ctx.stroke(); } ctx.globalAlpha = 1; });
+  const cracks = Array.from({ length: 6 }, (_, i) => { let px = x, py = y; const a = Math.PI * (0.75 + i * 0.1) + (Math.random() - 0.5) * 0.2, pts = [[px, py]];
+    for (let k = 0; k < 5; k++) { px += Math.cos(a) * (30 + Math.random() * 25); py += Math.sin(a) * 9 + (Math.random() - 0.5) * 14; pts.push([px, py]); } return pts; });
+  addFx(1.6, (f, q) => { ctx.globalAlpha = q < 0.7 ? 1 : (1 - q) / 0.3; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    for (const pts of cracks) { ctx.beginPath(); pts.forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b)); ctx.stroke(); } ctx.globalAlpha = 1; });
+}
+function cloneClaw(r, c) { // three big claw slashes on one cat
+  warn(r, [c], 0.5, 'CLAW!');
+  later(0.5, () => { if (r.dead || c.dead) return;
+    const x = c.x, y = c.y - c.h * 0.55; SFX.claw(); shake(7); r.lunge = 0.2;
+    hurtCat(c, r.dmg * 2); impact(x, y, 0.8);
+    addFx(0.45, (f, q) => { ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) { const qq = Math.min(1, Math.max(0, q * 4 - i * 0.5)); if (!qq) continue; const ox = (i - 1) * 26, x1 = x + 55 + ox, y1 = y - 65, x2 = x1 + (-110) * qq, y2 = y1 + 130 * qq;
+        ctx.globalAlpha = q > 0.7 ? (1 - q) / 0.3 : 1; ctx.strokeStyle = INK; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.stroke(); }
+      ctx.globalAlpha = 1; });
+  });
+}
+function longTail(r) { // a huge tail sweep along the front row
+  const cats = frontRow(); if (!cats.length) return;
+  warn(r, cats, 0.8, 'TAIL!');
+  later(0.8, () => { if (r.dead) return;
+    SFX.whip(); shake(12);
+    const ys = cats.map(c => c.y), y0 = Math.min(...ys) - 60, y1 = Math.max(...ys) + 10, x0 = r.x + r.w * 0.3;
+    addFx(0.5, (f, q) => { const e = Math.min(1, q * 2.5), tx = x0 - (x0 - 380) * e, ty = y0 + (y1 - y0) * e;
+      ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 16; ctx.globalAlpha = q > 0.6 ? (1 - q) / 0.4 : 1;
+      ctx.beginPath(); ctx.moveTo(x0, r.y - 20); ctx.quadraticCurveTo((x0 + tx) / 2, ty + 120, tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 1; i <= 4; i++) { const k = Math.max(0, e - i * 0.08), sx = x0 - (x0 - 380) * k, sy = y0 + (y1 - y0) * k; ctx.beginPath(); ctx.moveTo(sx + 30, sy - 8); ctx.lineTo(sx + 90, sy - 8); ctx.stroke(); }
+      ctx.globalAlpha = 1; });
+    frontRow().forEach(c => { hurtCat(c, r.dmg * 0.8); impact(c.x, c.y - c.h * 0.4, 0.7); });
+  });
+}
+function rainbowBeam(r) { // a fat rainbow beam at a back-row cat (the Angel in the air first)
+  const live = B.cats.filter(alive); if (!live.length) return;
+  const back = live.filter(c => c.col === 'back' && !airborne(c)), t = live.find(airborne) || (back.length ? back : live)[Math.floor(Math.random() * (back.length || live.length))];
+  warn(r, [t], 0.6, 'BEAM!');
+  later(0.6, () => { if (r.dead || t.dead) return;
+    const hx = r.x - r.w * 0.4, hy = r.y - r.h * 0.6, tx = t.x, ty = t.y - t.h * 0.5; SFX.beam(); shake(10);
+    hurtCat(t, 20); impact(tx, ty, 1);
+    addFx(0.6, (f, q) => { const a = Math.atan2(ty - hy, tx - hx), L = Math.hypot(tx - hx, ty - hy), wob = Math.sin(q * 40) * 3;
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(a); ctx.globalAlpha = q > 0.7 ? (1 - q) / 0.3 : 1;
+      RAINBOW_STRIPES.forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(0, (i - 3.5) * 7 + wob, L, 7); });
+      ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(0, -24.5 + wob, L, 49); ctx.restore(); ctx.globalAlpha = 1; });
+  });
 }
 
 function updateCat(c, dt) {
@@ -962,6 +1076,8 @@ function drawBattle() {
   if (b.hadNurse) { spr('cat_nurse', 920, 118, 36); txt(`Heals left: ${b.heals}`, 950, 100, 24, 'left'); }
   if (b.t < 6 && !b.over) txt('Cats fight on their own.  Tap a hurt cat to use a Nurse heal.', W / 2, 700, 24);
 
+  // the battlefield shakes after big boss hits
+  ctx.save(); if (b.shake > 0) ctx.translate((Math.random() - 0.5) * b.shake, (Math.random() - 0.5) * b.shake);
   // poison clouds under everything
   for (const cl of b.clouds) {
     const a = Math.min(1, cl.life, (8 - cl.life) * 3);
@@ -981,6 +1097,7 @@ function drawBattle() {
   for (const p of b.projs) drawProj(p);
   for (const f of b.fx) f.draw(f, Math.min(1, f.t / f.dur));
   for (const f of b.floats) txt(f.s, f.x, f.y - f.t * 40, f.size);
+  ctx.restore();
 
   if (b.healSel && !b.healSel.dead && b.heals > 0 && !b.over) {
     const c = b.healSel, x = c.x - 55, y = c.y - c.h - 78;
@@ -1040,7 +1157,7 @@ function drawRat(r) {
   let x = r.x, y = r.y;
   const walk = r.frozen > 0 || r.held ? 0 : Math.sin(r.ph * 9) * 2;
   if (r.lunge > 0) x -= Math.sin((r.lunge / 0.2) * Math.PI) * 18;
-  if (r.jump > 0) y -= Math.sin((r.jump / 0.7) * Math.PI) * 90;
+  if (r.jump > 0) { const q = 1 - r.jump / 0.9; y -= Math.sin(q * Math.PI) * 170; ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.w * 0.45 * (1 - Math.sin(q * Math.PI) * 0.5), 10, 0, 0, 7); ctx.fill(); }
   if (r.key === 'rainbow' && r.phase >= 0) { // rainbow aura in the colour of its current move
     const col = RAINBOW[r.phase][1]; ctx.globalAlpha = 0.35; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, y - r.h * 0.5, r.w * 0.62, r.h * 0.62, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     if (r.inv > 0) { ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(x, y - r.h * 0.5, r.w * 0.7, r.h * 0.7, 0, 0, 7); ctx.stroke(); }
