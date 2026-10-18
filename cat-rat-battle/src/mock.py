@@ -1,4 +1,4 @@
-# Design mockups for Cats vs Rats, built from Jason's own sprites (assets/).
+# Design mockups for Meow Brigade, built from Jason's own sprites (assets/).
 import math, os, random
 from PIL import Image, ImageDraw, ImageFont
 D = os.path.dirname(os.path.abspath(__file__)); A = os.path.join(D, '..', 'assets'); OUT = os.path.join(D, '..', 'design')
@@ -66,7 +66,7 @@ def save(c, name):
 
 # 1. Main page ---------------------------------------------------------------
 c = Image.new('RGBA', (W, H), 'white'); d = ImageDraw.Draw(c); top_bar(c, d)
-text(d, (W/2, 130), 'CATS vs RATS', 110)
+text(d, (W/2, 130), 'MEOW BRIGADE', 110)
 line(d, [(380, 190), (900, 194)], 3)
 for i, (lab, sub) in enumerate([('PLAY', 'Level 3 / 5'), ('SPIN', 'Get new cats'), ('MY CATS', '7 / 20 found')]):
     x = 300 + i*340; box(d, x-140, 240, x+140, 380, 5)

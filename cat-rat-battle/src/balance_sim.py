@@ -1,4 +1,4 @@
-# Rough balance simulation for Cats vs Rats: auto battle in 0.1 s steps, prints how much team HP is left.
+# Rough balance simulation for Meow Brigade: auto battle in 0.1 s steps, prints how much team HP is left.
 import random, sys, statistics
 DT = 0.1
 # cat: hp, dps (damage per second averaged over cooldown), role, special

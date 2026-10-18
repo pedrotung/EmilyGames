@@ -1,4 +1,4 @@
-# Cats vs Rats: cat abilities (from Jason)
+# Meow Brigade: cat abilities (from Jason)
 
 Numbers follow stats-table.md version 2 (balance pass, 2026-10-18). HP per cat is in stats-table.md.
 

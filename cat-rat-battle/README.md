@@ -1,4 +1,4 @@
-# Cats vs Rats (design, not built yet)
+# Meow Brigade (design, not built yet)
 
 Auto-battle game: up to 5 cats in a formation fight waves of rats; tap a hurt cat to use a Nurse heal. Win coins, spin for new cats.
 

@@ -1,4 +1,4 @@
-# Cats vs Rats：老鼠设定草案（待讨论）
+# Meow Brigade：老鼠设定草案（待讨论）
 
 > 注意：这里是旧数字。最新的血量、攻击和金币以 stats-table.md 第 2 版为准。
 
