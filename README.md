@@ -6,6 +6,14 @@ Each game lives in its own folder on `main` (`<game>/index.html`), and [`index.h
 at the root is a home page linking to all of them. With GitHub Pages on, the home page is
 `https://pedrotung.github.io/EmilyGames/` and each game is at `/<game>/`.
 
+## Playing full screen on a phone or tablet
+
+Every game has a **Full screen** button, and on phones and tablets it also goes full screen by itself
+after your first tap (Android, iPad and computers). iPhone Safari does not let web pages hide its
+toolbars, so on iPhone use **Share > Add to Home Screen** and start the game from the new icon:
+it then opens full screen with no browser bars. Each game folder has its own `manifest.webmanifest`
+and icons for this.
+
 ## Colour Jump
 
 [`colour-jump/index.html`](colour-jump/index.html) is a one-button jump game drawn from a hand sketch.

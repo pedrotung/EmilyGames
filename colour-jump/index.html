@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <style>html, body { margin: 0; } [hidden] { display: none !important; }</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Colour Jump">
+<meta name="theme-color" content="#FCE3E3">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Colour Jump</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
@@ -49,6 +56,13 @@
 
   .hud-right { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   @media (max-width: 420px) { .chip { padding: 6px 10px; font-size: 13px; } }
+  .chip.fs { display: inline-flex; align-items: center; gap: 6px; }
+  .chip.fs svg { width: 14px; height: 14px; flex: none; }
+  @media (max-width: 520px) { .chip.fs span { display: none; } }
+  .chip { white-space: nowrap; }
+  @media (max-width: 420px) { .chip { padding: 6px 8px; } .hud-right { gap: 4px; } }
+  #homePanel { background: #fff; z-index: 2; }
+  @media (max-width: 380px) { .chip { padding: 5px 7px; font-size: 12px; } }
   .panel .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .panel button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
   .progress {
@@ -96,6 +110,7 @@
 <div class="hud">
   <span class="chip" id="deaths">Deaths: 0</span>
   <div class="hud-right">
+    <button class="chip fs" id="fs" type="button" aria-label="Full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" fill="none" stroke="currentColor" stroke-width="2.8"/></svg><span>Full screen</span></button>
     <button class="chip" id="pause" type="button">Pause</button>
     <button class="chip" id="music" type="button" aria-pressed="true">Music: On</button>
     <button class="chip" id="mute" type="button" aria-pressed="false">Sound: On</button>
@@ -114,6 +129,13 @@
     <button type="button" id="restart" class="ghost">Restart level</button>
     <button type="button" id="toLevel1" class="ghost">Back to Level 1</button>
   </div>
+</div>
+<div class="panel" id="homePanel" hidden>
+  <h2>Full screen</h2>
+  <p>This browser can't hide its toolbars for a web page. To play full screen, add the game to your home screen.</p>
+  <p><b>iPhone / iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the menu, then <b>Add to Home screen</b>.</p>
+  <p>Then open Colour Jump from the new icon.</p>
+  <button type="button" id="homeOk">OK</button>
 </div>
 <div class="panel" id="winPanel" hidden>
   <h2>You made it!</h2>
@@ -729,7 +751,35 @@ $('restart').addEventListener('click', () => { resetLevel(); pausedFrom = 'play'
 $('toLevel1').addEventListener('click', () => { levelIdx = 0; deaths = 0; resetLevel(); introT = 0; pausedFrom = 'intro'; resume(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 function pressDown(e) { e.preventDefault(); $('jump').classList.add('down'); press(); }
-function pressUp() { $('jump').classList.remove('down'); }
+function pressUp() {
+  $('jump').classList.remove('down');
+  // On phones and tablets, go full screen after the first JUMP tap.
+  if (!autoFs && fsCan && !fsOn() && matchMedia('(pointer: coarse)').matches) { autoFs = true; toggleFullscreen(); }
+}
+
+// Full screen: the Fullscreen API where the browser has it (Android, iPad, computers).
+// iPhone Safari has none, so explain Add to Home Screen instead; the home-screen
+// icon opens the game without browser bars (see manifest.webmanifest).
+let autoFs = false;
+const fsCan = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function toggleFullscreen() {
+  if (fsOn()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  if (!fsCan) { $('homePanel').hidden = false; $('homeOk').focus(); return; }
+  const el = document.documentElement;
+  try { const r = (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+function syncFs() {
+  $('fs').hidden = standalone;
+  const label = fsOn() ? 'Exit full screen' : 'Full screen';
+  $('fs').querySelector('span').textContent = label; $('fs').setAttribute('aria-label', label);
+}
+$('fs').addEventListener('click', toggleFullscreen);
+$('homeOk').addEventListener('click', () => { $('homePanel').hidden = true; });
+document.addEventListener('fullscreenchange', syncFs);
+document.addEventListener('webkitfullscreenchange', syncFs);
+syncFs();
 $('jump').addEventListener('pointerdown', pressDown);
 $('jump').addEventListener('pointerup', pressUp);
 $('jump').addEventListener('pointercancel', pressUp);
