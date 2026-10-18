@@ -110,7 +110,7 @@ const RAINBOW = [['RED: FIRE', '#ff5a4e'], ['YELLOW: LIGHTNING', '#ffd84a'], ['G
 
 /* ======================= save ======================= */
 const SAVE_KEY = 'meowBrigade';
-function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, team: ['cat'], sound: true }; }
+function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, team: ['cat'], sound: true, music: true }; }
 function loadSave() {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) return Object.assign(freshSave(), s); } catch (e) {}
   return freshSave();
@@ -201,34 +201,214 @@ function coinIcon(x, y, s = 34) { spr('cat_coin', x, y + s / 2, s); }
 function drawCoins(x, y, v) { coinIcon(x, y); txt(v.toLocaleString('en-US'), x + 26, y + 1, 34, 'left'); }
 
 /* ======================= sound ======================= */
-let actx = null;
+// Everything is synthesised in the browser: 8-bit style music (pulse waves, triangle bass, noise drums)
+// and a sound effect for every cat attack and every rat. AC/TOFF point at the live context, or at an
+// OfflineAudioContext when __meow.renderAudio() makes preview files.
+let actx = null, AC = null, TOFF = 0, OFFLINE = false;
+function setupContext(a) {
+  const comp = a.createDynamicsCompressor(); comp.connect(a.destination);
+  a._sfx = a.createGain(); a._sfx.gain.value = 0.9; a._sfx.connect(comp);
+  a._mus = a.createGain(); a._mus.gain.value = 0.5; a._mus.connect(comp);
+  const n = a.createBuffer(1, a.sampleRate, a.sampleRate), d = n.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  a._noise = n;
+  const pulse = duty => { // NES-style pulse wave
+    const N = 40, re = new Float32Array(N), im = new Float32Array(N);
+    for (let k = 1; k < N; k++) re[k] = 2 / (k * Math.PI) * Math.sin(k * Math.PI * duty);
+    return a.createPeriodicWave(re, im);
+  };
+  a._p12 = pulse(0.125); a._p25 = pulse(0.25); a._p50 = pulse(0.5);
+}
 function au() {
-  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); setupContext(actx); } catch (e) { return null; } }
   if (actx.state === 'suspended') actx.resume();
+  if (!OFFLINE) AC = actx;
+  startMusic();
   return actx;
 }
-function tone(f, d, type = 'square', vol = 0.05, f2 = 0, delay = 0) {
-  if (!save.sound || (B && B.silent)) return; const a = au(); if (!a) return;
-  const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
-  o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.02);
+function osc(a, type) {
+  const o = a.createOscillator();
+  if (type === 'p12' || type === 'p25' || type === 'p50') o.setPeriodicWave(a['_' + type]); else o.type = type;
+  return o;
 }
-const SFX = {
-  hit: () => tone(220, 0.07, 'square', 0.025, 120),
-  coin: () => { tone(988, 0.06, 'square', 0.03); tone(1319, 0.12, 'square', 0.03, 0, 0.06); },
-  alert: () => { for (let i = 0; i < 3; i++) tone(880, 0.12, 'square', 0.05, 0, i * 0.22); },
-  heal: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.06, 0, i * 0.07)); },
+// one tone: frequency f (sliding to f2), d seconds long
+function tone(f, d, type = 'square', vol = 0.05, f2 = 0, delay = 0, dest) {
+  const a = AC; if (!a) return;
+  const t = a.currentTime + TOFF + delay, o = osc(a, type), g = a.createGain();
+  o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(dest || a._sfx); o.start(t); o.stop(t + d + 0.02);
+}
+// a burst of filtered noise, filter frequency sliding from fq to fq2
+function noise(d, fq, ftype = 'bandpass', vol = 0.1, fq2 = 0, delay = 0, q = 1, dest) {
+  const a = AC; if (!a) return;
+  const t = a.currentTime + TOFF + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = a._noise; s.loop = true; f.type = ftype; f.Q.value = q;
+  f.frequency.setValueAtTime(fq, t); if (fq2) f.frequency.exponentialRampToValueAtTime(fq2, t + d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f).connect(g).connect(dest || a._sfx); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.02);
+}
+const SFX_DEF = {
+  // menus
+  coin: () => { tone(988, 0.06, 'p25', 0.05); tone(1319, 0.14, 'p25', 0.05, 0, 0.06); },
+  tick: () => tone(1500, 0.03, 'p25', 0.03),
+  heal: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.09, 0, i * 0.07)),
+  win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i === 6 ? 0.6 : 0.16, 'p25', 0.06, 0, i * 0.12)),
+  lose: () => [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? 0.7 : 0.28, 'p50', 0.05, i === 3 ? 196 : 0, i * 0.26)),
+  buy: () => [784, 988, 1175, 1568, 2093].forEach((f, i) => tone(f, 0.18, 'p12', 0.06, 0, i * 0.08)),
+  // cats
+  scratch: () => { noise(0.12, 3200, 'bandpass', 0.22, 1200, 0, 2); noise(0.1, 3600, 'bandpass', 0.15, 1500, 0.07, 2); },
+  laser: () => tone(1900, 0.18, 'p12', 0.06, 260),
+  spit: () => { tone(330, 0.09, 'p50', 0.06, 140); noise(0.05, 900, 'lowpass', 0.12); },
+  hatThrow: () => noise(0.3, 500, 'bandpass', 0.6, 1800, 0, 3),
+  bonk: () => tone(540, 0.12, 'triangle', 0.16, 180),
+  petal: () => tone(1500, 0.08, 'sine', 0.06, 2100),
+  alert: () => { for (let i = 0; i < 3; i++) { tone(880, 0.11, 'p50', 0.06, 0, i * 0.22); tone(1175, 0.08, 'p50', 0.05, 0, i * 0.22 + 0.11); } },
+  rizz: () => [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.14, 'triangle', 0.06, 0, i * 0.06)),
+  flee: () => tone(500, 0.35, 'p25', 0.04, 1700),
+  water: () => { noise(0.32, 1400, 'lowpass', 0.2, 400); tone(700, 0.12, 'sine', 0.04, 300); },
+  slurp: () => tone(200, 0.24, 'sine', 0.16, 950),
+  gulp: () => { tone(420, 0.14, 'sine', 0.18, 110); tone(320, 0.12, 'sine', 0.12, 90, 0.18); },
+  poke: () => tone(2300, 0.04, 'p25', 0.07),
+  clones: () => { for (let i = 0; i < 4; i++) tone(300 + i * 90, 0.3, 'sine', 0.06, 650 + i * 90, i * 0.07); },
+  pen: () => { tone(950, 0.05, 'p25', 0.05, 600); noise(0.05, 4500, 'highpass', 0.1); },
+  headbutt: () => { tone(250, 0.18, 'triangle', 0.22, 75); noise(0.07, 600, 'lowpass', 0.18); },
+  kickBall: () => { tone(170, 0.12, 'sine', 0.25, 50); noise(0.18, 800, 'bandpass', 0.08, 2200, 0.03); },
+  whiff: () => noise(0.3, 1600, 'bandpass', 0.35, 400, 0, 2),
+  poison: () => noise(0.7, 5000, 'highpass', 0.025, 2500),
+  lightning: () => { tone(1400, 0.16, 'sawtooth', 0.05, 160); noise(0.18, 3000, 'highpass', 0.1); tone(70, 0.25, 'triangle', 0.18, 40, 0.04); },
+  gun: () => { noise(0.05, 2600, 'highpass', 0.035); tone(150, 0.04, 'p50', 0.04, 80); },
+  throwPotion: () => noise(0.22, 700, 'bandpass', 0.6, 1600, 0, 3),
+  glass: () => { tone(2100, 0.14, 'sine', 0.08); tone(2750, 0.12, 'sine', 0.05, 0, 0.02); noise(0.3, 1500, 'lowpass', 0.16, 500, 0.02); },
+  flap: () => { for (let i = 0; i < 4; i++) noise(0.08, 900, 'bandpass', 0.45, 0, i * 0.14, 2); },
   meow: () => { // holy meow: three voices sliding up and down plus a soft chord
-    [1, 1.25, 1.5].forEach(m => { tone(420 * m, 0.35, 'sawtooth', 0.025, 760 * m); tone(760 * m, 0.6, 'sawtooth', 0.02, 380 * m, 0.33); });
-    [523, 659, 784].forEach(f => tone(f, 1.4, 'triangle', 0.03));
+    [1, 1.25, 1.5].forEach(m => { tone(420 * m, 0.35, 'sawtooth', 0.03, 760 * m); tone(760 * m, 0.6, 'sawtooth', 0.025, 380 * m, 0.33); });
+    [523, 659, 784, 1047].forEach(f => tone(f, 1.5, 'triangle', 0.04));
   },
-  win: () => { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, 0.2, 'square', 0.04, 0, i * 0.12)); },
-  lose: () => { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.3, 'triangle', 0.06, 0, i * 0.22)); },
-  tick: () => tone(1500, 0.03, 'square', 0.02),
-  zap: () => tone(1200, 0.15, 'sawtooth', 0.03, 200),
-  boom: () => tone(140, 0.3, 'triangle', 0.08, 50),
+  trident: () => { tone(2400, 0.2, 'p12', 0.04, 1800); noise(0.08, 5000, 'highpass', 0.12); tone(110, 0.18, 'sawtooth', 0.08, 55); },
+  shield: () => [1568, 2093, 2637].forEach((f, i) => tone(f, 0.3, 'triangle', 0.06, 0, i * 0.08)),
+  mew: () => tone(950, 0.13, 'triangle', 0.06, 640),
+  // rats
+  bite: () => { tone(210, 0.06, 'p50', 0.06, 120); noise(0.04, 1300, 'bandpass', 0.1); },
+  smash: () => tone(140, 0.16, 'triangle', 0.24, 55),
+  dash: () => { noise(0.18, 600, 'bandpass', 0.4, 2600, 0, 2); tone(1500, 0.06, 'p25', 0.04, 0, 0.15); },
+  squeak: () => tone(1700 + Math.random() * 500, 0.06, 'sine', 0.05, 2400),
+  die: () => tone(1600, 0.2, 'p25', 0.04, 500),
+  boss: () => { tone(110, 0.7, 'sawtooth', 0.09, 55); tone(116, 0.7, 'p25', 0.05, 58); },
+  bossHurt: () => tone(120, 0.11, 'sawtooth', 0.07, 80),
+  bossDie: () => { tone(440, 0.9, 'sawtooth', 0.07, 55); noise(0.9, 800, 'lowpass', 0.2, 100); },
+  bossBite: () => { tone(120, 0.12, 'sawtooth', 0.1, 70); noise(0.07, 800, 'bandpass', 0.12); },
+  summon: () => [1800, 2150, 2500].forEach((f, i) => tone(f, 0.05, 'sine', 0.05, 0, i * 0.05)),
+  slam: () => { tone(90, 0.45, 'triangle', 0.35, 35); noise(0.4, 500, 'lowpass', 0.25, 80); },
+  poof: () => noise(0.28, 1100, 'bandpass', 0.15, 300),
+  neck: () => { tone(180, 0.32, 'sine', 0.1, 750); tone(170, 0.09, 'p50', 0.07, 90, 0.32); },
+  fire: () => { noise(0.8, 700, 'lowpass', 0.3, 200); tone(80, 0.6, 'sawtooth', 0.05, 50); },
+  zap: () => { tone(1250, 0.16, 'sawtooth', 0.05, 200); noise(0.12, 3000, 'highpass', 0.08); },
+  ratHeal: () => [392, 523, 659].forEach((f, i) => tone(f, 0.2, 'sine', 0.06, 0, i * 0.1)),
+  boom: () => tone(140, 0.3, 'triangle', 0.12, 50),
 };
+// Each sound plays at most once per GAP ms, so fast attacks (gun, ghost pokes) don't pile up.
+const SFX_GAP = { gun: 90, poke: 90, squeak: 70, mew: 120, bite: 60, bossHurt: 120, petal: 60, scratch: 60 };
+const sfxLast = {};
+const SFX = new Proxy({}, { get: (_, k) => () => {
+  if (!save.sound || (B && B.silent) || !AC || !SFX_DEF[k]) return;
+  if (!OFFLINE) { const now = performance.now(); if (now - (sfxLast[k] || 0) < (SFX_GAP[k] || 40)) return; sfxLast[k] = now; }
+  SFX_DEF[k]();
+} });
+
+/* ----- music ----- */
+// Each song: tempo, chords (root first) and 16-step bars. Lead/bass tokens: a note, '.' holds, '-' rests.
+// Bass tokens: R root, O root an octave up, F fifth. Drums: k kick, s snare, h hat.
+const bars = s => s.trim().split('|').map(b => b.trim().split(/\s+/));
+const SONGS = {
+  menu: { // cute cat theme, C major, bouncy
+    bpm: 116, lead: 'p12', slide: true, leadVol: 0.07, arp: 'p25',
+    chords: ['C4 E4 G4', 'A3 C4 E4', 'F3 A3 C4', 'G3 B3 D4', 'C4 E4 G4', 'A3 C4 E4', 'F3 A3 C4', 'C4 E4 G4'],
+    melody: bars(`E5 . G5 . C6 . G5 . A5 G5 E5 . C5 . D5 . | E5 . . . C5 . A4 . C5 . E5 . A5 . G5 . |
+      F5 . A5 . C6 . A5 . G5 F5 E5 . D5 . C5 . | D5 . . . B4 . G4 . B4 . D5 . G5 . F5 . |
+      E5 . G5 . C6 . E6 . D6 C6 G5 . E5 . G5 . | A5 . . . E5 . C5 . A4 . C5 . E5 . . . |
+      F5 . E5 . D5 . C5 . D5 . E5 . F5 . G5 . | C6 . . . G5 . E5 . C5 . . . - - - -`),
+    bass: 'R . F . O . F . R . F . O . F .', drums: 'k . h . s . h . k . h k s . h .', arpEvery: 2,
+  },
+  battle: { // tense, A minor, driving
+    bpm: 144, lead: 'p50', leadVol: 0.055, arp: 'p25',
+    chords: ['A2 C3 E3', 'F2 A2 C3', 'G2 B2 D3', 'E2 G#2 B2', 'A2 C3 E3', 'F2 A2 C3', 'D2 F2 A2', 'E2 G#2 B2'],
+    melody: bars(`A5 . E5 . A5 . B5 . C6 . B5 . A5 . E5 . | F5 . C5 . F5 . G5 . A5 . G5 . F5 . C5 . |
+      G5 . D5 . G5 . A5 . B5 . A5 . G5 . D5 . | E5 . G#5 . B5 . E6 . D6 . B5 . G#5 . E5 . |
+      A5 . . . C6 . . . B5 . A5 . G5 . E5 . | F5 . . . A5 . . . G5 . F5 . E5 . C5 . |
+      D5 . F5 . A5 . D6 . C6 . A5 . F5 . D5 . | E5 . . . G#5 . . . B5 . . . E6 . . .`),
+    bass: 'R . R . O . R . R . O . R . O .', drums: 'k . h . s . h k k . h . s . h h', arpEvery: 1,
+  },
+  boss: { // faster and harsher, A minor with a half-step lift
+    bpm: 176, lead: 'p25', leadVol: 0.06, arp: 'p12',
+    chords: ['A2 C3 E3', 'A#2 D3 F3', 'A2 C3 E3', 'E2 G#2 B2', 'A2 C3 E3', 'A#2 D3 F3', 'F2 A2 C3', 'E2 G#2 B2'],
+    melody: bars(`A5 . A5 C6 . A5 E6 . D#6 . D6 . C6 . B5 . | A#5 . A#5 D6 . A#5 F6 . E6 . D6 . C#6 . A#5 . |
+      A5 . E5 . A5 . C6 . E6 . C6 . A5 . E5 . | G#5 . B5 . E6 . G#6 . F6 . E6 . D6 . B5 . |
+      A5 C6 E6 A6 . . E6 . C6 A5 E5 . A5 . . . | A#5 D6 F6 A#6 . . F6 . D6 A#5 F5 . A#5 . . . |
+      C6 . A5 . F5 . A5 . C6 . F6 . E6 . C6 . | B5 . G#5 . E5 . G#5 . B5 . E6 . G#6 . B6 .`),
+    bass: 'R R O R R R O R R R O R R O R O', drums: 'k h s h k h s h k h s h k s s s', arpEvery: 1,
+  },
+};
+const NOTE = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+const freq = n => { const m = n.match(/^([A-G]#?)(\d)$/); return 440 * Math.pow(2, (NOTE[m[1]] + (+m[2] + 1) * 12 - 69) / 12); };
+function voice(a, dest, type, f, t, dur, vol, slide) {
+  const o = osc(a, type), g = a.createGain();
+  if (slide) { o.frequency.setValueAtTime(f * 0.94, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.04); } else o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(vol * 0.55, t + Math.min(0.1, dur * 0.6)); g.gain.setValueAtTime(vol * 0.55, t + dur * 0.85);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(dest); o.start(t); o.stop(t + dur + 0.02);
+}
+function drum(a, dest, k, t) {
+  const n = (d, fq, ft, vol) => { const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); s.buffer = a._noise; f.type = ft; f.frequency.value = fq; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); s.connect(f).connect(g).connect(dest); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.02); };
+  if (k === 'k') { const o = osc(a, 'sine'), g = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); o.connect(g).connect(dest); o.start(t); o.stop(t + 0.18); }
+  if (k === 's') { n(0.12, 1800, 'highpass', 0.16); const o = osc(a, 'triangle'), g = a.createGain(); o.frequency.setValueAtTime(240, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.08); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(g).connect(dest); o.start(t); o.stop(t + 0.1); }
+  if (k === 'h') n(0.035, 7500, 'highpass', 0.06);
+}
+// Play one 16th-note step of a song at time t.
+function playStep(a, dest, S, step, t) {
+  const sd = 60 / S.bpm / 4, bar = Math.floor(step / 16) % S.melody.length, s = step % 16;
+  const held = (arr, i) => { let n = 1; while (i + n < arr.length && arr[i + n] === '.') n++; return n; };
+  const tok = S.melody[bar][s];
+  if (tok !== '.' && tok !== '-') voice(a, dest, S.lead, freq(tok), t, held(S.melody[bar], s) * sd * 0.92, S.leadVol, S.slide);
+  const chord = S.chords[bar].split(' ').map(freq), B_ = S.bass.split(' '), bt = B_[s];
+  if (bt !== '.' && bt !== '-') voice(a, dest, 'triangle', bt === 'O' ? chord[0] * 2 : bt === 'F' ? chord[0] * 1.5 : chord[0], t, held(B_, s) * sd * 0.9, 0.22);
+  if (s % S.arpEvery === 0) voice(a, dest, S.arp, chord[(s / S.arpEvery) % chord.length] * 4, t, sd * S.arpEvery * 0.7, 0.022);
+  const dk = S.drums.split(' ')[s]; if (dk !== '.') drum(a, dest, dk, t);
+}
+const Music = { cur: null, want: null, step: 0, next: 0, timer: null };
+function setMusic(name) { Music.want = name; startMusic(); }
+function startMusic() {
+  if (!actx || OFFLINE) return;
+  if (Music.cur !== Music.want) { Music.cur = Music.want; Music.step = 0; Music.next = actx.currentTime + 0.1; }
+  if (!Music.timer) Music.timer = setInterval(musicTick, 25);
+}
+function musicTick() {
+  if (!actx || !Music.cur) return;
+  const S = SONGS[Music.cur], sd = 60 / S.bpm / 4;
+  const quiet = !save.music || (scr && scr.battle && B && B.paused);
+  while (Music.next < actx.currentTime + 0.15) {
+    if (!quiet) playStep(actx, actx._mus, S, Music.step, Math.max(Music.next, actx.currentTime));
+    Music.next += sd; Music.step++;
+  }
+}
+document.addEventListener('visibilitychange', () => { if (!actx) return; document.hidden ? actx.suspend() : actx.resume(); });
+// Render a song or the sound-effect list to a WAV (for preview files).
+async function renderAudio(what, secs) {
+  const sr = 44100, a = new OfflineAudioContext(2, sr * secs, sr); setupContext(a);
+  const keepAC = AC; AC = a; OFFLINE = true;
+  try {
+    if (SONGS[what]) { const S = SONGS[what], sd = 60 / S.bpm / 4; for (let i = 0; i * sd < secs; i++) playStep(a, a._mus, S, i, i * sd); a._mus.gain.value = 0.8; }
+    else what.forEach((k, i) => { TOFF = 0.3 + i * 1.1; SFX_DEF[k](); });
+  } finally { AC = keepAC; OFFLINE = false; TOFF = 0; }
+  const buf = await a.startRendering(), L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length;
+  const out = new DataView(new ArrayBuffer(44 + n * 4)), w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); w(8, 'WAVEfmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true);
+  out.setUint32(24, sr, true); out.setUint32(28, sr * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) { out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true); out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+  let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 32768));
+  return btoa(bin);
+}
 
 /* ======================= buttons + input ======================= */
 let hits = [], lastHits = [];
@@ -273,7 +453,7 @@ function topBar(o = {}) {
 
 /* ======================= screens ======================= */
 let scr = null;
-function go(s) { scr = s; if (s.enter) s.enter(); }
+function go(s) { scr = s; if (s.enter) s.enter(); setMusic(s.battle ? 'battle' : 'menu'); }
 
 const Menu = {
   draw() {
@@ -288,6 +468,7 @@ const Menu = {
     const t = performance.now() / 1000;
     spr('cat_cool', 200, 640, 160, { sy: 1 + Math.sin(t * 2) * 0.012 });
     [[760, 50, 0], [920, 50, 1], [1110, 110, 2]].forEach(([x, h, i]) => spr(i === 2 ? 'rat_basic' : 'rat_basic2', x + Math.sin(t * 1.3 + i) * 6, 640, h));
+    button(940, 664, 150, 40, save.music ? 'Music: on' : 'Music: off', () => { save.music = !save.music; persist(); }, { size: 22, lw: 2 });
     button(1110, 664, 150, 40, save.sound ? 'Sound: on' : 'Sound: off', () => { save.sound = !save.sound; persist(); }, { size: 22, lw: 2 });
   },
 };
@@ -399,7 +580,8 @@ function spawnBoss() {
   const key = B.bosses.shift(); const r = makeRat(key, 1360, 470 + (Math.random() - 0.5) * 120);
   B.bossOn = true; B.banner = { s: `BOSS: ${r.d.name}`, t: 0 };
   const alertCats = B.cats.filter(c => alive(c) && c.d.id === 'alert');
-  alertCats.forEach(c => { c.alarm = 3; }); if (alertCats.length) SFX.alert(); else SFX.boom();
+  alertCats.forEach(c => { c.alarm = 3; }); if (alertCats.length) SFX.alert(); SFX.boss();
+  if (!B.silent && scr && scr.battle) setMusic('boss');
 }
 function center(u) { return [u.x, u.y - u.h * 0.5]; }
 function dist(a, b) { const [ax, ay] = center(a), [bx, by] = center(b); return Math.hypot(ax - bx, ay - by); }
@@ -414,13 +596,14 @@ function hurtRat(r, dmg, o = {}) {
   if (r.dead || r.fleeing) return;
   if (r.inv > 0) { float(r.x, r.y - r.h - 20, 'blocked', 20); return; }
   r.hp -= dmg; r.flash = 0.25; if (!o.quiet) float(r.x + (Math.random() - 0.5) * 20, r.y - r.h - 16, `-${Math.round(dmg)}`, 24);
-  if (Math.random() < 0.5) SFX.hit();
+  if (r.d.boss && !r.fake) SFX.bossHurt(); else SFX.squeak();
   if (r.hp <= 0) killRat(r, o);
 }
 function killRat(r, o = {}) {
   r.dead = true; r.deadT = 0; r.hp = 0;
   if (r.d.boss && !r.fake) { B.bossesLeft--; }
   if (!r.fake) { save.coins += r.d.coins; B.earned += r.d.coins; float(r.x, r.y - r.h - 46, `+${r.d.coins}`, 22); SFX.coin(); }
+  if (r.d.boss && !r.fake) SFX.bossDie(); else if (r.fake) SFX.poof(); else if (!o.flee && !o.eaten) SFX.die();
   if (o.flee) { r.dead = false; r.fleeing = true; r.flash = 0; }
   else if (!o.eaten) addFx(0.5, (f, k) => { for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, rr = 10 + k * 34; ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(f.x + rr * Math.cos(a), f.y + rr * Math.sin(a) * 0.7, 7 * (1 - k * 0.5), 0, Math.PI * 2); ctx.stroke(); } }, { x: r.x, y: r.y - r.h * 0.4 });
 }
@@ -429,6 +612,7 @@ function hurtCat(c, dmg, o = {}) {
   if (B.shield > 0 && !o.self) { float(c.x, c.y - c.h - 30, 'shield', 20); return; }
   if (c.d.id === 'ghost' && !o.self && Math.random() < GHOST_DODGE) { float(c.x, c.y - c.h - 30, 'miss', 20); return; }
   c.hp -= dmg; c.flash = 0.25; float(c.x + (Math.random() - 0.5) * 20, c.y - c.h - 30, `-${Math.round(dmg)}`, 26);
+  if (!o.self) SFX.mew();
   if (airborne(c)) { c.state = 'drop'; c.t = 0; float(c.x, c.y - c.h - 60, 'interrupted!', 26); }
   if (c.hp <= 0) { c.hp = 0; c.dead = true; c.deadT = 0; if (B.healSel === c) B.healSel = null; }
 }
@@ -464,7 +648,7 @@ function updateBattle(dt) {
   if (B.shield > 0) B.shield -= dt;
   // Alert cat: during boss fights, an 8% chance every 5 s to shield the team for 5 s
   if (B.rats.some(r => !r.dead && r.d.boss && !r.fake) && B.cats.some(c => alive(c) && c.d.id === 'alert')) {
-    B.shieldT += dt; if (B.shieldT >= 5) { B.shieldT = 0; if (Math.random() < 0.08 && B.shield <= 0) { B.shield = 5; float(W / 2, 200, 'SHIELD!', 40); SFX.heal(); } }
+    B.shieldT += dt; if (B.shieldT >= 5) { B.shieldT = 0; if (Math.random() < 0.08 && B.shield <= 0) { B.shield = 5; float(W / 2, 200, 'SHIELD!', 40); SFX.shield(); } }
   }
   for (const r of B.rats) updateRat(r, dt);
   for (const c of B.cats) updateCat(c, dt);
@@ -497,12 +681,12 @@ function updateRat(r, dt) {
   const d = r.d, k = r.key;
   // boss specials start once the boss is on screen
   if (!r.fake && r.x < 1180) {
-    if (k === 'queen') { r.timer += dt; if (r.timer >= d.summon) { r.timer = 0; for (let i = 0; i < d.summonN; i++) makeRat('basic', r.x + 40, r.y + (i ? 60 : -60)); float(r.x, r.y - r.h - 40, 'help!', 26); } }
+    if (k === 'queen') { r.timer += dt; if (r.timer >= d.summon) { r.timer = 0; for (let i = 0; i < d.summonN; i++) makeRat('basic', r.x + 40, r.y + (i ? 60 : -60)); float(r.x, r.y - r.h - 40, 'help!', 26); SFX.summon(); } }
     if (k === 'legged') {
       r.timer += dt; if (r.timer >= 8 && r.jump <= 0) { r.timer = 0; r.jump = 0.7; }
-      if (r.jump > 0) { r.jump -= dt; if (r.jump <= 0) { B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c)).forEach(c => hurtCat(c, 6)); SFX.boom(); addFx(0.4, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(f.x, f.y, 40 + q * 160, 10 + q * 30, 0, 0, Math.PI * 2); ctx.stroke(); }, { x: r.x, y: r.y }); } return; }
+      if (r.jump > 0) { r.jump -= dt; if (r.jump <= 0) { B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c)).forEach(c => hurtCat(c, 6)); SFX.slam(); addFx(0.4, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(f.x, f.y, 40 + q * 160, 10 + q * 30, 0, 0, Math.PI * 2); ctx.stroke(); }, { x: r.x, y: r.y }); } return; }
     }
-    if (k === 'clone') { r.timer += dt; if (r.timer >= 12) { r.timer = 0; for (const s of [-1, 1]) makeRat('clone', r.x + 30, r.y + s * 90, { fake: true }); float(r.x, r.y - r.h - 40, 'poof! clones', 24); } }
+    if (k === 'clone') { r.timer += dt; if (r.timer >= 12) { r.timer = 0; for (const s of [-1, 1]) makeRat('clone', r.x + 30, r.y + s * 90, { fake: true }); float(r.x, r.y - r.h - 40, 'poof! clones', 24); SFX.poof(); } }
     if (k === 'rainbow') {
       r.phaseT -= dt; const pd = B.L.phase || 5;
       if (r.phaseT <= 0) { r.phase = (r.phase + 1) % 4; r.phaseT = pd; r.midBolt = false; rainbowStart(r); }
@@ -518,7 +702,7 @@ function updateRat(r, dt) {
   const vx = dx - r.x, vy = dy - r.y, dd = Math.hypot(vx, vy), sp = d.speed * (r.slow > 0 ? 0.5 : 1) * dt;
   if (dd > 4) { r.x += vx / dd * Math.min(sp, dd); r.y += vy / dd * Math.min(sp, dd); return; }
   if (r.fake) return;
-  if (k === 'spike' && !r.dashed) { r.dashed = true; r.lunge = 0.2; hurtCat(c, d.dash * B.dmgMult); float(r.x, r.y - r.h - 30, 'dash!', 22); }
+  if (k === 'spike' && !r.dashed) { r.dashed = true; r.lunge = 0.2; hurtCat(c, d.dash * B.dmgMult); float(r.x, r.y - r.h - 30, 'dash!', 22); SFX.dash(); }
   r.atkT -= dt * (r.slow > 0 ? 0.5 : 1);
   if (r.atkT > 0) return;
   r.atkT = d.rate;
@@ -528,10 +712,11 @@ function updateRat(r, dt) {
     if (!t) return;
     const hx = r.x - r.w * 0.3, hy = r.y - r.h * 0.85;
     addFx(0.45, (f, q) => { const e = q < 0.5 ? q * 2 : (1 - q) * 2, tx = hx + (f.t2.x - hx) * e, ty = hy + (f.t2.y - f.t2.h * 0.6 - hy) * e; ctx.strokeStyle = INK; ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke(); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, 7); ctx.fill(); }, { t2: t });
-    hurtCat(t, r.dmg); return;
+    SFX.neck(); hurtCat(t, r.dmg); return;
   }
   if (airborne(c)) return; // rats can't reach a cat in the air
   r.lunge = 0.2; hurtCat(c, r.dmg);
+  if (d.boss) SFX.bossBite(); else if (d.splash) SFX.smash(); else SFX.bite();
   if (d.splash) { const o = B.cats.filter(o => alive(o) && o !== c && o.col === c.col && !airborne(o)).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0]; if (o && Math.hypot(o.x - c.x, o.y - c.y) < 260) hurtCat(o, r.dmg); }
 }
 function rainbowStart(r) {
@@ -540,10 +725,11 @@ function rainbowStart(r) {
     const front = B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c));
     front.forEach(c => hurtCat(c, 15));
     addFx(0.7, (f, q) => { for (let i = 0; i < 9; i++) { const x = f.x - 60 - (q * 380) * (i / 9 + 0.3), y = f.y + Math.sin(i * 2 + q * 12) * 40; ctx.fillStyle = i % 2 ? '#ff5a4e' : '#ffb03a'; ctx.beginPath(); ctx.arc(x, y, 14 - i, 0, 7); ctx.fill(); } }, { x: r.x - r.w * 0.4, y: r.y - r.h * 0.55 });
-    SFX.boom();
+    SFX.fire();
   }
   if (r.phase === 1) rainbowBolt(r);
-  if (r.phase === 3) r.inv = 3;
+  if (r.phase === 2) SFX.ratHeal();
+  if (r.phase === 3) { r.inv = 3; SFX.shield(); }
 }
 function rainbowBolt(r) { // yellow lightning: a flying Angel first, else a random cat
   const live = B.cats.filter(alive); if (!live.length) return;
@@ -569,26 +755,26 @@ function updateCat(c, dt) {
   const id = c.d.id, MELEE = 300;
   const ready = () => { c.cd -= dt; return c.cd <= 0; };
   switch (id) {
-    case 'cat': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; hurtRat(r, 5); slash(r); c.cd = 2; } else c.cd = 0.1; } break;
-    case 'senpai': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.2; hurtRat(r, 8); sparks(...center(r)); c.cd = 1; } else c.cd = 0.1; } break;
-    case 'catkid': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.3; hurtRat(r, 20); sparks(...center(r)); hurtCat(c, 2, { self: true }); c.cd = 2.5; } else c.cd = 0.1; } break;
-    case 'devil': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; sparks(...center(r)); if (r.d.boss && !r.fake) hurtRat(r, 40); else { float(r.x, r.y - r.h - 30, 'STAB!', 26); hurtRat(r, r.hp, { quiet: true }); } c.cd = 2; } else c.cd = 0.1; } break;
-    case 'cool': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = anchor(c, 0.68, 0.32), [tx, ty] = center(r); hurtRat(r, 5); SFX.zap();
+    case 'cat': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; hurtRat(r, 5); slash(r); SFX.scratch(); c.cd = 2; } else c.cd = 0.1; } break;
+    case 'senpai': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.2; hurtRat(r, 8); sparks(...center(r)); SFX.pen(); c.cd = 1; } else c.cd = 0.1; } break;
+    case 'catkid': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.3; hurtRat(r, 20); sparks(...center(r)); SFX.headbutt(); hurtCat(c, 2, { self: true }); c.cd = 2.5; } else c.cd = 0.1; } break;
+    case 'devil': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; sparks(...center(r)); SFX.trident(); if (r.d.boss && !r.fake) hurtRat(r, 40); else { float(r.x, r.y - r.h - 30, 'STAB!', 26); hurtRat(r, r.hp, { quiet: true }); } c.cd = 2; } else c.cd = 0.1; } break;
+    case 'cool': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = anchor(c, 0.68, 0.32), [tx, ty] = center(r); hurtRat(r, 5); SFX.laser();
       addFx(0.2, () => { ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke(); }); c.cd = 2.5; } else c.cd = 0.1; } break;
-    case 'bad': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.55, 0.42), speed: 600, dmg: 10, kind: 'cig' }); c.cd = 5; } else c.cd = 0.1; } break;
-    case 'gent': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.95, 0.5), speed: 520, dmg: 6, kind: 'hat', spin: true, back: true }); c.cd = 3; } else c.cd = 0.1; } break;
-    case 'daisy': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.52, 0.12), speed: 480, dmg: 2, kind: 'petal', spin: true }); c.cd = 1; } else c.cd = 0.1; } break;
-    case 'catcat': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.9), speed: 620, dmg: 22, kind: 'ball', spin: true, miss: Math.random() < 0.1 }); c.cd = 2.5; } else c.cd = 0.1; } break;
-    case 'military': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.99, 0.37), speed: 1100, dmg: 3, kind: 'bullet' }); c.cd = 0.22; if (Math.random() < 0.3) tone(300, 0.03, 'square', 0.015); } else c.cd = 0.1; } break;
-    case 'fairy': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = center(r); bolt(x, y); hurtRat(r, 10); sparks(...anchor(c, 0.95, 0.33)); SFX.zap(); c.cd = 0.75; } else c.cd = 0.1; } break;
-    case 'witch': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.65), dur: 0.7, dmg: 15, kind: 'potion', arc: true, spin: true }); c.cd = 3; } else c.cd = 0.1; } break;
-    case 'water': if (ready()) { const r = nearestRat(c); if (r) { waterFan(c, r); c.cd = 1.5; } else c.cd = 0.1; } break;
-    case 'poison': if (ready()) { const r = nearestRat(c); if (r) { poisonCloud(c, r); c.cd = 12; } else c.cd = 0.1; } break;
-    case 'bleh': if (ready()) { const r = nearestRat(c, 560); if (r) { tongue(c, r); c.cd = 8; } else c.cd = 0.1; } break;
+    case 'bad': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.55, 0.42), speed: 600, dmg: 10, kind: 'cig' }); SFX.spit(); c.cd = 5; } else c.cd = 0.1; } break;
+    case 'gent': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.95, 0.5), speed: 520, dmg: 6, kind: 'hat', spin: true, back: true }); SFX.hatThrow(); c.cd = 3; } else c.cd = 0.1; } break;
+    case 'daisy': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.52, 0.12), speed: 480, dmg: 2, kind: 'petal', spin: true }); SFX.petal(); c.cd = 1; } else c.cd = 0.1; } break;
+    case 'catcat': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.9), speed: 620, dmg: 22, kind: 'ball', spin: true, miss: Math.random() < 0.1 }); SFX.kickBall(); c.cd = 2.5; } else c.cd = 0.1; } break;
+    case 'military': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.99, 0.37), speed: 1100, dmg: 3, kind: 'bullet' }); c.cd = 0.22; SFX.gun(); } else c.cd = 0.1; } break;
+    case 'fairy': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = center(r); bolt(x, y); hurtRat(r, 10); sparks(...anchor(c, 0.95, 0.33)); SFX.lightning(); c.cd = 0.75; } else c.cd = 0.1; } break;
+    case 'witch': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.65), dur: 0.7, dmg: 15, kind: 'potion', arc: true, spin: true }); SFX.throwPotion(); c.cd = 3; } else c.cd = 0.1; } break;
+    case 'water': if (ready()) { const r = nearestRat(c); if (r) { waterFan(c, r); SFX.water(); c.cd = 1.5; } else c.cd = 0.1; } break;
+    case 'poison': if (ready()) { const r = nearestRat(c); if (r) { poisonCloud(c, r); SFX.poison(); c.cd = 12; } else c.cd = 0.1; } break;
+    case 'bleh': if (ready()) { const r = nearestRat(c, 560); if (r) { tongue(c, r); SFX.slurp(); c.cd = 8; } else c.cd = 0.1; } break;
     case 'ghost':
       c.cloneT += dt;
-      if (c.cloneT >= 20 && B.rats.some(targetable)) { c.cloneT = 0; for (let k = 0; k < 4; k++) B.clones.push({ x: c.x + (k - 1.5) * 30, y: c.y - 20, life: 5, cd: 0.3 + k * 0.08, tgt: null, ph: k }); float(c.x, c.y - c.h - 50, 'clones!', 26); }
-      if (ready()) { const r = nearestRat(c, 430); if (r) { hurtRat(r, 1, { quiet: Math.random() < 0.5 }); sparks(...center(r)); c.lunge = 0.15; c.cd = 1 / 3; } else c.cd = 0.1; }
+      if (c.cloneT >= 20 && B.rats.some(targetable)) { c.cloneT = 0; for (let k = 0; k < 4; k++) B.clones.push({ x: c.x + (k - 1.5) * 30, y: c.y - 20, life: 5, cd: 0.3 + k * 0.08, tgt: null, ph: k }); float(c.x, c.y - c.h - 50, 'clones!', 26); SFX.clones(); }
+      if (ready()) { const r = nearestRat(c, 430); if (r) { hurtRat(r, 1, { quiet: Math.random() < 0.5 }); sparks(...center(r)); SFX.poke(); c.lunge = 0.15; c.cd = 1 / 3; } else c.cd = 0.1; }
       break;
     case 'rizz': rizz(c, dt); break;
     case 'angel': angel(c, dt); break;
@@ -623,8 +809,8 @@ function tongue(c, r) {
     ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, 7); ctx.fill(); ctx.stroke();
   }, { tick: (f) => {
-    if (boss && !f.hit && f.t > 0.25) { f.hit = true; hurtRat(r, 30); }
-    if (!boss && !f.ate && f.t > 0.68) { f.ate = true; r.held = false; if (!r.dead) killRat(r, { eaten: true }); float(c.x, c.y - c.h - 40, 'gulp!', 26); c.chew = 2.2; }
+    if (boss && !f.hit && f.t > 0.25) { f.hit = true; hurtRat(r, 30); SFX.bonk(); }
+    if (!boss && !f.ate && f.t > 0.68) { f.ate = true; r.held = false; if (!r.dead) killRat(r, { eaten: true }); float(c.x, c.y - c.h - 40, 'gulp!', 26); SFX.gulp(); c.chew = 2.2; }
   } });
 }
 function rizz(c, dt) {
@@ -633,10 +819,10 @@ function rizz(c, dt) {
   if (c.state !== 'back' && (!tr || tr.dead || tr.fleeing || tr.held)) { if (tr) tr.frozen = 0; c.state = 'back'; }
   if (c.state === 'walk') {
     const dx = tr.x - 95 - c.x, dy = tr.y - c.y, d = Math.hypot(dx, dy);
-    if (d < 8) { c.state = 'stare'; c.t = 0; tr.frozen = 1; } else { c.x += dx / d * Math.min(d, 240 * dt); c.y += dy / d * Math.min(d, 240 * dt); }
+    if (d < 8) { c.state = 'stare'; c.t = 0; tr.frozen = 1; SFX.rizz(); } else { c.x += dx / d * Math.min(d, 240 * dt); c.y += dy / d * Math.min(d, 240 * dt); }
   } else if (c.state === 'stare') {
     tr.frozen = 1;
-    if (c.t >= 4) { tr.frozen = 0; float(tr.x, tr.y - tr.h - 30, 'ran away!', 24); killRat(tr, { flee: true }); c.state = 'back'; }
+    if (c.t >= 4) { tr.frozen = 0; float(tr.x, tr.y - tr.h - 30, 'ran away!', 24); killRat(tr, { flee: true }); SFX.flee(); c.state = 'back'; }
   } else if (c.state === 'back') {
     const dx = c.hx - c.x, dy = c.hy - c.y, d = Math.hypot(dx, dy);
     if (d < 6) { c.x = c.hx; c.y = c.hy; c.state = 'idle'; c.cd = 0.5; c.tr = null; } else { c.x += dx / d * Math.min(d, 260 * dt); c.y += dy / d * Math.min(d, 260 * dt); }
@@ -644,7 +830,7 @@ function rizz(c, dt) {
 }
 function angel(c, dt) {
   const TOP = 200;
-  if (c.state === 'idle') { c.cd -= dt; if (c.cd <= 0 && B.rats.some(targetable)) { c.state = 'rise'; c.t = 0; } }
+  if (c.state === 'idle') { c.cd -= dt; if (c.cd <= 0 && B.rats.some(targetable)) { c.state = 'rise'; c.t = 0; SFX.flap(); } }
   else if (c.state === 'rise') { c.y = c.hy - (c.hy - TOP) * Math.min(1, c.t / 3); if (c.t >= 3) { c.state = 'blast'; c.t = 0; SFX.meow(); float(c.x + 160, TOP - 120, '~ MEOOOW ~', 40); for (const r of B.rats) if (targetable(r)) hurtRat(r, 30); } }
   else if (c.state === 'blast') { if (c.t >= 0.9) { c.state = 'down'; c.t = 0; } }
   else if (c.state === 'down') { c.y = TOP + (c.hy - TOP) * Math.min(1, c.t / 1.2); if (c.t >= 1.2) { c.state = 'idle'; c.cd = 10; c.y = c.hy; } }
@@ -675,10 +861,10 @@ function updateProj(p, dt) {
   }
   if (p.cx === undefined) { p.cx = p.x; p.cy = p.y; if (p.miss) { p.vx = p.tx - p.x; p.vy = p.ty - p.y - 140; const m = Math.hypot(p.vx, p.vy); p.vx /= m; p.vy /= m; } }
   if (p.returning) { const dx = p.x - p.cx, dy = p.y - p.cy, d = Math.hypot(dx, dy); if (d < 20) { p.done = true; return; } p.cx += dx / d * p.speed * dt; p.cy += dy / d * p.speed * dt; return; }
-  if (p.miss) { p.cx += p.vx * p.speed * dt; p.cy += p.vy * p.speed * dt; if (p.cx > 1320 || p.cy < -40) p.done = true; if (!p.saidMiss && p.t > 0.3) { p.saidMiss = true; float(p.tx, p.ty - 70, 'miss!', 26); } return; }
+  if (p.miss) { p.cx += p.vx * p.speed * dt; p.cy += p.vy * p.speed * dt; if (p.cx > 1320 || p.cy < -40) p.done = true; if (!p.saidMiss && p.t > 0.3) { p.saidMiss = true; float(p.tx, p.ty - 70, 'miss!', 26); SFX.whiff(); } return; }
   const dx = p.tx - p.cx, dy = p.ty - p.cy, d = Math.hypot(dx, dy), step = p.speed * dt;
   if (d <= step + 6) {
-    if (p.r && !p.r.dead) hurtRat(p.r, p.dmg);
+    if (p.r && !p.r.dead) { hurtRat(p.r, p.dmg); if (p.kind === 'hat') SFX.bonk(); }
     if (p.back) p.returning = true; else p.done = true;
     return;
   }
@@ -686,7 +872,7 @@ function updateProj(p, dt) {
 }
 function splash(x, y, dmg) {
   for (const r of B.rats) if (targetable(r) && Math.hypot(r.x - x, r.y - r.h * 0.5 - y) < 125) { hurtRat(r, dmg); r.slow = 3; }
-  SFX.boom();
+  SFX.glass();
   addFx(0.5, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 0; i < 10; i++) { const a = Math.PI + i * Math.PI / 9, rr = 14 + q * 90; ctx.beginPath(); ctx.arc(x + rr * Math.cos(a) * 1.3, y + rr * Math.sin(a) + q * q * 50, 5, 0, 7); ctx.stroke(); } ctx.beginPath(); ctx.ellipse(x, y + 30, 120, 22, 0, 0, 7); ctx.stroke(); });
 }
 
@@ -697,6 +883,7 @@ function endBattle(win) {
   if (win) { bonus = first ? L.reward : L.reward / 2; save.coins += bonus; if (first) save.cleared = B.lv; }
   persist();
   B.over = { win, bonus, earned: B.earned, t: 0 };
+  if (!B.silent) setMusic(null);
   win ? SFX.win() : SFX.lose();
 }
 
@@ -864,7 +1051,7 @@ const Spin = {
       hbox(x, y, 440, 440, { lw: 3 }); txt(d.name, x + 220, y + 36, 38);
       spr(d.img, x + 220, y + 250, 170); wrapText(d.desc, x + 220, y + 285, 390, 22, 26);
       txt(`You have ${save.owned[d.id] || 0}`, x + 220, y + 345, 24);
-      button(x + 90, y + 368, 260, 56, '', () => { save.coins -= SECRET_COST; save.owned[d.id] = (save.owned[d.id] || 0) + 1; persist(); SFX.win(); },
+      button(x + 90, y + 368, 260, 56, '', () => { save.coins -= SECRET_COST; save.owned[d.id] = (save.owned[d.id] || 0) + 1; persist(); SFX.buy(); },
         { disabled: save.coins < SECRET_COST, draw: () => { txt('BUY', x + 175, y + 397, 34); coinIcon(x + 228, y + 396, 30); txt('6000', x + 248, y + 397, 30, 'left'); } });
     });
   },
@@ -918,7 +1105,7 @@ window.__meow = {
   get save() { return save; }, get battle() { return B; }, go: n => go({ Menu, Levels, Spin, MyCats }[n]),
   give(n) { save.coins += n; persist(); }, unlockAll() { save.cleared = LEVELS.length; CATS.forEach(c => { save.owned[c.id] = Math.max(save.owned[c.id] || 0, 5); }); persist(); },
   reset() { save = freshSave(); persist(); go(Menu); },
-  team: (lv) => go(Team(lv)), fight: (lv, ids) => go(Battle(lv, ids)),
+  team: (lv) => go(Team(lv)), fight: (lv, ids) => go(Battle(lv, ids)), renderAudio, music: () => Music,
   sim(lv, ids, maxT = 400) { // run a whole battle without drawing; returns the result
     const keep = save.coins, keepC = save.cleared, s = Battle(lv, ids); B.silent = true; let t = 0;
     while (!B.over && t < maxT) { // the player taps a Nurse heal on any cat under 30%
