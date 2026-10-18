@@ -56,6 +56,7 @@ Tap a hurt cat and then **HEAL** to use a Nurse heal.
 - 10 levels, each ending with a boss (Rat Queen, Legged Rat, Clone Rat, Long Rat, Rainbow Rat)
 - 20 cats with their own attacks; win coins and spin the Common, Rare, Epic and Legendary wheels, or buy the two Secret cats
 - 8-bit music (cute menu theme, tense battle theme, faster boss theme) and a sound for every cat attack and every rat, all synthesised in the browser
+- Beat all 10 levels to unlock Round 2: same cats and coins, much stronger rats, more coins (and Round 3, 4... after that)
 - Progress is saved on the device
 
 The game loads its art from `cat-rat-battle/assets/` and its font from `cat-rat-battle/src/fonts/`, so serve the whole folder

@@ -125,6 +125,12 @@ const LEVELS = [
     tip: 'SUPER RAINBOW RAT: 1350 HP and changes colour faster.' },
 ];
 const RAINBOW_STRIPES = ['#ff5a4e', '#ff9a3a', '#ffd84a', '#5ccf6a', '#4aa8ff', '#5a6bff', '#b06bff'];
+// Round 2 and later (after beating level 10): rats and bosses get ROUND2[level] times the HP and the square root
+// of that in damage, tuned so a round-2 team (Secret and Legendary cats, some doubled) wins about 70%.
+// Each round after that is 8% tougher again, and every round pays 50% more coins.
+const ROUND2 = [6, 7.5, 6, 3.5, 3.5, 3, 1.9, 1.75, 1.2, 1.3];
+let roundMul = (r, lv = 1) => { const k = r > 1 ? ROUND2[lv - 1] * Math.pow(1.08, r - 2) : 1;
+  return { hp: k, dmg: Math.sqrt(k), gap: 1, coin: 1 + 0.5 * (r - 1) }; };
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
 const slotsFor = lv => lv === 1 ? 3 : lv === 2 ? 4 : 5;
 // Battle formation (feet positions): melee column in front, ranged + Nurse behind.
@@ -133,7 +139,7 @@ const RAINBOW = [['RED: FIRE', '#ff5a4e'], ['YELLOW: LIGHTNING', '#ffd84a'], ['G
 
 /* ======================= save ======================= */
 const SAVE_KEY = 'meowBrigade';
-function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, team: ['cat'], sound: true, music: true }; }
+function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, round: 1, team: ['cat'], sound: true, music: true }; }
 function loadSave() {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) return Object.assign(freshSave(), s); } catch (e) {}
   return freshSave();
@@ -489,7 +495,7 @@ const Menu = {
     topBar();
     txt('MEOW BRIGADE', W / 2, 130, 110); hline([[380, 190], [900, 192]], 2, 5);
     const lv = Math.min(save.cleared + 1, LEVELS.length);
-    button(160, 240, 280, 140, '', () => go(Levels), { draw: () => { txt('PLAY', 300, 295, 56); txt(`Level ${lv} / ${LEVELS.length}`, 300, 350, 26); } });
+    button(160, 240, 280, 140, '', () => go(Levels), { draw: () => { txt('PLAY', 300, 295, 56); txt(save.round > 1 ? `Round ${save.round}  Level ${lv} / ${LEVELS.length}` : `Level ${lv} / ${LEVELS.length}`, 300, 350, 26); } });
     button(160, 400, 280, 56, 'Restart from Level 1', () => { this.confirm = true; }, { size: 26, lw: 2 });
     button(500, 240, 280, 140, '', () => go(Spin.from(Menu)), { draw: () => { txt('SPIN', 640, 295, 56); txt('Get new cats', 640, 350, 26); } });
     const found = CATS.filter(c => save.owned[c.id]).length;
@@ -527,7 +533,7 @@ const Menu = {
 
 const Levels = {
   draw() {
-    topBar(); txt('CHOOSE A LEVEL', W / 2, 110, 54);
+    topBar(); txt(save.round > 1 ? `ROUND ${save.round}: CHOOSE A LEVEL` : 'CHOOSE A LEVEL', W / 2, 110, 54);
     LEVELS.forEach((L, i) => {
       const x = 70 + (i % 5) * 232, y = 170 + Math.floor(i / 5) * 230, lv = i + 1, open = lv <= save.cleared + 1;
       button(x, y, 210, 205, '', () => go(Team(lv)), { disabled: !open, draw: () => {
@@ -535,11 +541,12 @@ const Levels = {
         const b = RATS[L.bosses[L.bosses.length - 1]];
         spr(b.img, x + 105, y + 150, Math.min(b.h, 100) * 0.9);
         if (!open) txt('LOCKED', x + 105, y + 180, 24);
-        else if (lv <= save.cleared) txt(`CLEARED  (+${Math.round(L.reward / 4)})`, x + 105, y + 180, 22);
-        else { coinIcon(x + 70, y + 180, 24); txt(`+${L.reward}`, x + 88, y + 181, 24, 'left'); }
+        else if (lv <= save.cleared) txt(`CLEARED  (+${Math.round(L.reward / 4 * roundMul(save.round).coin)})`, x + 105, y + 180, 22);
+        else { coinIcon(x + 70, y + 180, 24); txt(`+${Math.round(L.reward * roundMul(save.round).coin)}`, x + 88, y + 181, 24, 'left'); }
       } });
     });
     button(70, 650, 160, 50, 'Back', () => go(Menu), { size: 28 });
+    if (save.cleared >= LEVELS.length) button(390, 640, 500, 64, '', startRound, { draw: () => { txt(`START ROUND ${save.round + 1}`, 640, 662, 32); txt('Keep your cats and coins. Rats get much stronger.', 640, 690, 18); } });
     button(1010, 640, 200, 64, '', () => go(Spin.from(Levels)), { draw: () => { txt('SPIN', 1110, 662, 32); txt('Get new cats', 1110, 690, 18); } });
   },
 };
@@ -564,7 +571,7 @@ function Team(lv) {
   const at = i => prev(...SLOTS[i]);
   return {
     draw() {
-      topBar(); txt(`LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
+      topBar(); txt(save.round > 1 ? `ROUND ${save.round}  LEVEL ${lv}` : `LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
       txt(sel == null ? 'Tap a cat to add it. Tap a cat on the left, then a place, to move it.' : (slots[sel] ? 'Tap another place to move it there, or tap it again to take it out.' : 'Tap a cat on the right to put it here.'),
         W / 2 + 40, 678, 22, 'center', '#666');
       hbox(30, 125, 570, 505, { lw: 2 }); txt('FRONT: melee', 360, 608, 22); txt('BACK: ranged + Nurse', 175, 608, 22);
@@ -618,7 +625,7 @@ function Battle(lv, ids, slots) {
       dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0 };
   });
   const minions = L.minions.slice(); for (let i = minions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [minions[i], minions[j]] = [minions[j], minions[i]]; }
-  B = { lv, L, mult, dmgMult: Math.pow(1.1, lv - 1), t: 0, cats, rats: [], projs: [], fx: [], floats: [], clouds: [], clones: [], queue: minions, spawnT: 1.2,
+  B = { lv, L, mult, dmgMult: Math.pow(1.1, lv - 1), round: save.round || 1, R: roundMul(save.round || 1, lv), t: 0, cats, rats: [], projs: [], fx: [], floats: [], clouds: [], clones: [], queue: minions, spawnT: 1.2,
     bosses: L.bosses.slice(), bossesLeft: L.bosses.length, bossOn: false, heals: ids.filter(i => i === 'nurse').length, hadNurse: ids.includes('nurse'),
     healSel: null, shield: 0, shieldT: 0, earned: 0, over: null, paused: false, speed: 1, banner: null, silent: false };
   const s = {
@@ -641,8 +648,9 @@ function makeRat(key, x, y, o = {}) {
   const d = RATS[key], boss = !!d.boss && !o.fake;
   let hp = d.hp * (boss ? (B.lv > 5 ? 1 + 0.4 * (B.lv - 5) : 1) * (B.L.bossMul || 1) : B.mult * (B.L.hpMul || 1));
   if (key === 'rainbow' && B.L.rainbowHp) hp = B.L.rainbowHp;
+  if (!o.fake) hp *= B.R.hp;
   if (o.fake) hp = 1;
-  const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * (boss ? (B.L.bossDmg || 1) : B.dmgMult * (B.L.dmgMul || 1)), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
+  const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * B.R.dmg * (boss ? (B.L.bossDmg || 1) : B.dmgMult * (B.L.dmgMul || 1)), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
     tgt: null, yOff: (Math.random() - 0.5) * 70, xOff: Math.random() * 50, h: d.h, w: d.h * iw(d.img) / ih(d.img), ph: Math.random() * 6,
     fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, fleeing: false, stared: false, dashed: false, timer: 0, t2: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
   B.rats.push(r); return r;
@@ -673,7 +681,7 @@ function hurtRat(r, dmg, o = {}) {
 function killRat(r, o = {}) {
   r.dead = true; r.deadT = 0; r.hp = 0;
   if (r.d.boss && !r.fake) { B.bossesLeft--; }
-  if (!r.fake) { save.coins += r.d.coins; B.earned += r.d.coins; float(r.x, r.y - r.h - 46, `+${r.d.coins}`, 22); SFX.coin(); }
+  if (!r.fake) { const k = Math.round(r.d.coins * B.R.coin); save.coins += k; B.earned += k; float(r.x, r.y - r.h - 46, `+${k}`, 22); SFX.coin(); }
   if (r.d.boss && !r.fake) SFX.bossDie(); else if (r.fake) SFX.poof(); else if (!o.flee && !o.eaten) SFX.die();
   if (o.flee) { r.dead = false; r.fleeing = true; r.flash = 0; }
   else if (!o.eaten) addFx(0.5, (f, k) => { for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, rr = 10 + k * 34; ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(f.x + rr * Math.cos(a), f.y + rr * Math.sin(a) * 0.7, 7 * (1 - k * 0.5), 0, Math.PI * 2); ctx.stroke(); } }, { x: r.x, y: r.y - r.h * 0.4 });
@@ -709,7 +717,7 @@ function updateBattle(dt) {
     if (B.spawnT <= 0) {
       const n = Math.min(B.queue.length, 1 + Math.floor(Math.random() * 3));
       for (let k = 0; k < n; k++) makeRat(B.queue.shift(), 1330 + k * 60, 250 + Math.random() * 400);
-      B.spawnT = (B.L.gap || 3.5) * n;
+      B.spawnT = (B.L.gap || 3.5) * n * B.R.gap;
     }
   } else if (B.bosses.length) {
     const minionsLeft = B.rats.some(r => !r.dead && !r.fleeing && !r.d.boss);
@@ -807,7 +815,7 @@ function rainbowStart(r) {
   const [label] = RAINBOW[r.phase]; float(r.x, r.y - r.h - 50, label, 26);
   if (r.phase === 0) { // fire on the whole front row
     const front = B.cats.filter(c => alive(c) && c.col === 'front' && !airborne(c));
-    front.forEach(c => hurtCat(c, 18)); shake(8);
+    front.forEach(c => hurtCat(c, 18 * B.R.dmg)); shake(8);
     addFx(0.7, (f, q) => { for (let i = 0; i < 9; i++) { const x = f.x - 60 - (q * 380) * (i / 9 + 0.3), y = f.y + Math.sin(i * 2 + q * 12) * 40; ctx.fillStyle = i % 2 ? '#ff5a4e' : '#ffb03a'; ctx.beginPath(); ctx.arc(x, y, 14 - i, 0, 7); ctx.fill(); } }, { x: r.x - r.w * 0.4, y: r.y - r.h * 0.55 });
     SFX.fire();
   }
@@ -818,7 +826,7 @@ function rainbowStart(r) {
 function rainbowBolt(r) { // yellow lightning: a flying Angel first, else a random cat
   const live = B.cats.filter(alive); if (!live.length) return;
   const t = live.find(airborne) || live[Math.floor(Math.random() * live.length)];
-  hurtCat(t, 10); SFX.zap(); shake(4);
+  hurtCat(t, 10 * B.R.dmg); SFX.zap(); shake(4);
   bolt(t.x, t.y - t.h * 0.5, '#ffd84a');
 }
 function bolt(x, y, color) {
@@ -924,7 +932,7 @@ function rainbowBeam(r) { // a fat rainbow beam at a back-row cat (the Angel in 
   warn(r, [t], 0.6, 'BEAM!');
   later(0.6, () => { if (r.dead || t.dead) return;
     const hx = r.x - r.w * 0.4, hy = r.y - r.h * 0.6, tx = t.x, ty = t.y - t.h * 0.5; SFX.beam(); shake(10);
-    hurtCat(t, 20); impact(tx, ty, 1);
+    hurtCat(t, 20 * B.R.dmg); impact(tx, ty, 1);
     addFx(0.6, (f, q) => { const a = Math.atan2(ty - hy, tx - hx), L = Math.hypot(tx - hx, ty - hy), wob = Math.sin(q * 40) * 3;
       ctx.save(); ctx.translate(hx, hy); ctx.rotate(a); ctx.globalAlpha = q > 0.7 ? (1 - q) / 0.3 : 1;
       RAINBOW_STRIPES.forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(0, (i - 3.5) * 7 + wob, L, 7); });
@@ -1059,11 +1067,14 @@ function splash(x, y, dmg) {
   addFx(0.5, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 0; i < 10; i++) { const a = Math.PI + i * Math.PI / 9, rr = 14 + q * 90; ctx.beginPath(); ctx.arc(x + rr * Math.cos(a) * 1.3, y + rr * Math.sin(a) + q * q * 50, 5, 0, 7); ctx.stroke(); } ctx.beginPath(); ctx.ellipse(x, y + 30, 120, 22, 0, 0, 7); ctx.stroke(); });
 }
 
+function startRound() { // next round: levels lock again from level 1, cats and coins stay
+  save.round = (save.round || 1) + 1; save.cleared = 0; persist(); SFX.buy(); go(Levels);
+}
 function endBattle(win) {
   if (B.over) return;
   const L = B.L, first = B.lv > save.cleared;
   let bonus = 0;
-  if (win) { bonus = first ? L.reward : Math.round(L.reward / 4); /* replays pay a quarter so farming old levels stays slow */ save.coins += bonus; if (first) save.cleared = B.lv; }
+  if (win) { bonus = Math.round((first ? L.reward : L.reward / 4) * B.R.coin); /* replays pay a quarter so farming old levels stays slow */ save.coins += bonus; if (first) save.cleared = B.lv; }
   persist();
   B.over = { win, bonus, earned: B.earned, t: 0 };
   if (!B.silent) setMusic(null);
@@ -1075,7 +1086,7 @@ function drawBattle() {
   const b = B;
   topBar({ pause: () => { if (!b.over) b.paused = true; } });
   button(140, 18, 150, 44, b.speed === 2 ? 'Speed x2' : 'Speed x1', () => { b.speed = b.speed === 2 ? 1 : 2; }, { size: 26, on: b.speed === 2 });
-  txt(`LEVEL ${b.lv}`, W / 2, 32, 40);
+  txt(b.round > 1 ? `ROUND ${b.round}  LEVEL ${b.lv}` : `LEVEL ${b.lv}`, W / 2, 32, 40);
   const boss = b.rats.find(r => !r.dead && r.d.boss && !r.fake);
   if (boss) {
     hpBar(W / 2, 62, boss.hp / boss.max, 500, 16);
@@ -1120,14 +1131,15 @@ function drawBattle() {
     else lines.push('You keep the coins from the rats.');
     const btns = [];
     if (o.win && b.lv < LEVELS.length) btns.push(['Next level', () => go(Team(b.lv + 1))]);
+    if (o.win && b.lv === LEVELS.length) btns.push([`Round ${b.round + 1}`, startRound]);
     if (o.win && window.EmilyShare) btns.push(['Share', () => EmilyShare.open()]);
     if (!o.win) btns.push(['Try again', () => go(Team(b.lv))]);
     btns.push(['Menu', () => go(Menu)]);
-    overlay(o.win ? (b.lv === LEVELS.length ? 'YOU BEAT ALL 10 LEVELS!' : 'VICTORY!') : 'THE RATS WON...', lines, btns);
+    overlay(o.win ? (b.lv === LEVELS.length ? (b.round > 1 ? `YOU BEAT ROUND ${b.round}!` : 'YOU BEAT ALL 10 LEVELS!') : 'VICTORY!') : 'THE RATS WON...', lines, btns);
     // picture of the win screen, with the game's address, for the Share button
     if (o.win && !o.snapped && window.EmilyShare && !b.silent) { o.snapped = true;
       EmilyShare.snap({ canvas: cv, game: 'Meow Brigade', path: 'cat-rat-battle/',
-        text: b.lv === LEVELS.length ? 'I beat all 10 levels of Meow Brigade!' : `I beat Level ${b.lv} of Meow Brigade!` }); }
+        text: (b.lv === LEVELS.length ? 'I beat all 10 levels of Meow Brigade' : `I beat Level ${b.lv} of Meow Brigade`) + (b.round > 1 ? ` in Round ${b.round}!` : '!') }); }
   }
 }
 function overlay(title, lines, btns) {
@@ -1299,15 +1311,15 @@ window.__meow = {
   give(n) { save.coins += n; persist(); }, unlockAll() { save.cleared = LEVELS.length; CATS.forEach(c => { save.owned[c.id] = Math.max(save.owned[c.id] || 0, 5); }); persist(); },
   reset() { save = freshSave(); persist(); go(Menu); },
   team: (lv) => go(Team(lv)), fight: (lv, ids) => go(Battle(lv, ids)), renderAudio, music: () => Music,
-  sim(lv, ids, maxT = 400) { // run a whole battle without drawing; returns the result
-    const keep = save.coins, keepC = save.cleared, s = Battle(lv, ids); B.silent = true; let t = 0;
+  sim(lv, ids, maxT = 400, round) { // run a whole battle without drawing; returns the result
+    const keep = save.coins, keepC = save.cleared, keepR = save.round; if (round) save.round = round; const s = Battle(lv, ids); B.silent = true; let t = 0;
     while (!B.over && t < maxT) { // the player taps a Nurse heal on any cat under 30%
       if (B.heals > 0) { const c = B.cats.find(c => alive(c) && c.hp < c.max * 0.3); if (c) { c.hp = Math.min(c.max, c.hp + c.max / 2); B.heals--; } }
       updateBattle(STEP); t += STEP;
     }
     const hp = B.cats.reduce((a, c) => a + c.hp, 0) / B.cats.reduce((a, c) => a + c.max, 0);
     const out = { win: !!(B.over && B.over.win), t: Math.round(t), hpLeft: Math.round(hp * 100) };
-    save.coins = keep; save.cleared = keepC; persist(); B = null; return out;
+    save.coins = keep; save.cleared = keepC; save.round = keepR; persist(); B = null; return out;
   },
 };
 
