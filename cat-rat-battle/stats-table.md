@@ -110,18 +110,18 @@
 
 模拟结果（最好的队伍各打 24 次，玩家在猫血低于 30% 时用 Nurse）：
 
-| 关卡 | 队伍 | 第 4 版赢 | 第 5 版赢 | 第 5 版剩血 |
+| 关卡 | 队伍 | 改之前赢 | 第 5 版赢 | 第 5 版剩血 |
 |---|---|---|---|---|
-| 1 | Cat、Cool cat、Bad cat | 94% | 96% | 42%（原来 48%） |
-| 2 | Cat ×2、Cool cat、Bad cat | 94% | 67% | 17% |
-| 3 | Cat、Rizz、Cool cat、Daisy、Nurse | 88% | 92% | 19% |
+| 1 | Cat、Cool cat、Bad cat | 100% | 96% | 42%（原来 48%） |
+| 2 | Cat ×2、Cool cat、Bad cat | 100% | 67% | 17% |
+| 3 | Cat、Rizz、Cool cat、Daisy、Nurse | 94% | 92% | 19% |
 | 4 | Cat、Bleh、Water、Ghost、Nurse | 100% | 79% | 6% |
-| 5 | Cat kid、Bleh、Water、Ghost、Nurse | 94% | 71% | 12% |
+| 5 | Cat kid、Bleh、Water、Ghost、Nurse | 100% | 71% | 12% |
 | 6 | Cat kid、Senpai、Poison、Water、Nurse | 81% | 58% | 19% |
 | 7 | Cat kid、Senpai、Fairy、Water、Nurse | 94% | 67% | 12% |
-| 8 | Cat kid、Senpai、Fairy、Witch、Nurse | 75% | 63% | 14% |
-| 9 | Cat kid、Senpai、Witch、Fairy、Military | 81% | 67% | 13% |
-| 10 | Devil、Senpai、Witch、Fairy、Military | 84% | 67% | 21% |
+| 8 | Cat kid、Senpai、Fairy、Witch、Nurse | 69% | 63% | 14% |
+| 9 | Cat kid、Senpai、Witch、Fairy、Military | 38% | 67% | 13% |
+| 10 | Devil、Senpai、Witch、Fairy、Military | 94% | 67% | 21% |
 
 随便组的队伍在第 2 关以后基本都是 0%。
 
