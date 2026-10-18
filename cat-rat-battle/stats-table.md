@@ -112,7 +112,7 @@
 
 | 关卡 | 队伍 | 改之前赢 | 第 5 版赢 | 第 5 版剩血 |
 |---|---|---|---|---|
-| 1 | Cat、Cool cat、Bad cat | 100% | 96% | 42%（原来 48%） |
+| 1 | Cat、Cool cat、Bad cat | 100% | 96% | 42% |
 | 2 | Cat ×2、Cool cat、Bad cat | 100% | 67% | 17% |
 | 3 | Cat、Rizz、Cool cat、Daisy、Nurse | 94% | 92% | 19% |
 | 4 | Cat、Bleh、Water、Ghost、Nurse | 100% | 79% | 6% |
