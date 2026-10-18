@@ -1,6 +1,8 @@
-# Meow Brigade：全部数值总表（第 2 版，已整体调平衡）
+# Meow Brigade：全部数值总表（第 3 版，和第一版游戏一致）
 
-“每秒伤害”是把冷却算进去后平均每秒打多少。**粗体**是这一版改过的数字，括号里是原来的。
+“每秒伤害”是把冷却算进去后平均每秒打多少。
+
+**第 3 版**：做第一版游戏时，用真正的游戏代码跑模拟，又调了几处：Basic rat 和 Ball rat 变强一点，Rat Queen 叫小兵变慢，Ghost cat 被打中的几率从 30% 改成 50%，每关老鼠进场间隔不同（第 1 关 2.5 秒到第 6 关 2.3 秒不等），第 6 关起小兵血量每关 +25%（攻击还是每关 +10%），Boss 血量每关 +40%。**粗体**是这一版改过的数字，括号里是原来的。
 
 ## 平衡思路
 - 每个稀有度一个档次，越贵越强：Common 约每秒 2，Rare 约 5 或有特殊技能，Epic 约 8，Legendary 约 13，Secret 约 20。
@@ -21,7 +23,7 @@
 | Rare | Rizz cat | 前排 | 130 | 盯住一只老鼠 4 秒，老鼠逃跑算死；Boss 无效 | 秒杀 | 4 秒 | 约每 4 秒杀 1 只 |
 | Rare | Water | 后排 | 90 | 至少 3 条水线的小扇形，穿透多只 | 近 6 / 中 4 / 远 2 | **1.5 秒**（1） | 每只 1.3 到 4 |
 | Rare | Bleh | 前排 | 130 | 舌头卷来吃掉，咀嚼吞下 | 普通老鼠秒杀，Boss 30 | 8 秒 | Boss 约 4 |
-| Rare | Ghost cat | **前排**（后排） | **130**（78） | 快速戳，飞着躲，老鼠只有 30% 打中；召 4 个分身，每个 5 秒 | 1，**每秒 3 下**（4） | 分身**每 20 秒**（10） | 约 6（含分身） |
+| Rare | Ghost cat | **前排**（后排） | **130**（78） | 快速戳，飞着躲，老鼠只有 **50%** 打中；召 4 个分身，每个 5 秒 | 1，**每秒 3 下**（4） | 分身**每 20 秒**（10） | 约 6（含分身） |
 | Rare | Nurse | 后排 | 90 | 点受伤的猫，头上出 HEAL，回一半血 | 回 50% | 每场 1 次 | 0 |
 | Epic | Senpai | 前排 | 160 | 笔戳 | **8**（5） | **1 秒**（3） | 8 |
 | Epic | Cat kid | 前排 | 160 | 头撞，自己扣 2 | **20**（15） | **2.5 秒**（3） | 8 |
@@ -38,10 +40,10 @@
 
 | 老鼠 | 类型 | 血量 | 攻击 | 伤害 | 打死给金币 |
 |---|---|---|---|---|---|
-| Basic rat | 小兵 | **20**（30） | 咬前面的猫 | **2**（3），每秒 1 次 | 5 |
-| Ball rat | 小兵 | **30**（40） | 甩尾巴球，砸前排相邻 2 只 | 每秒 **2**（3），2 只都扣 | 8 |
+| Basic rat | 小兵 | **25** | 咬前面的猫 | **3**，每秒 1 次 | 5 |
+| Ball rat | 小兵 | **35** | 甩尾巴球，砸前排相邻 2 只 | 每秒 **3**，2 只都扣 | 8 |
 | Spike rat | 小兵 | **35**（40） | 尖鼻冲刺，之后正常刺 | 冲刺 **15**（20），之后每秒 **3**（4） | **12**（10） |
-| Rat Queen | 第 1 关 Boss | **100**（150） | 咬；每 10 秒叫 2 只 Basic rat | **5**（8），每秒 1 次 | **30** |
+| Rat Queen | 第 1 关 Boss | **100**（150） | 咬；**每 12 秒叫 1 只** Basic rat | **4**（8），每秒 1 次 | **30** |
 | Legged Rat | 第 2 关 Boss | **150**（250） | 踩；每 8 秒跳起砸整个前排 | 每秒 **5**（8），砸 **6**（10） | **50** |
 | Clone Rat | 第 3 关 Boss | **200**（350） | 咬；每 12 秒变 2 个一碰就消失的假分身 | **6**（10），每秒 1 次 | **70** |
 | Long Rat | 第 4 关 Boss | **500**（430） | 长脖子越过前排咬后排 | 12，每 4 秒 | **90** |
@@ -78,17 +80,20 @@
 | 7 | 约 4300 | 1 次 Legendary |
 | 10 | 约 10000 | 再加重打，够买 1 只 Secret |
 
-## 模拟结果（用 src/balance_sim.py，每支队伍打 30 次）
+## 模拟结果（第一版游戏代码，玩家血低于 30% 时用 Nurse 治疗）
 | 关卡 | 队伍 | 赢 | 赢完剩血 |
 |---|---|---|---|
-| 1 | Cat、Cool cat、Daisy | 100% | 22% |
-| 2 | Cat、Bad cat、Cool cat、Daisy | 100% | 31% |
-| 3 | Cat、Rizz、Cool cat、Daisy、Nurse | 97% | 35% |
-| 4 | Cat、Bleh、Water、Ghost、Nurse | 100% | 44% |
+| 1 | Cat、Cool cat、Daisy | 100% | 58% |
+| 2 | Cat、Bad cat、Cool cat、Daisy | 100% | 35% |
+| 3 | Cat、Rizz、Cool cat、Daisy、Nurse | 81% | 21% |
+| 4 | Cat、Bleh、Water、Ghost、Nurse | 100% | 36% |
 | 5 | 同上，只有 Rare | 0% | 0% |
-| 5 | Cat kid、Bleh、Water、Ghost、Nurse（1 只 Epic） | 100% | 37% |
-| 5 | Cat kid、Senpai、Bleh、Poison、Nurse（3 只 Epic） | 100% | 33% |
-| 5 | Cat kid、Bleh、Water、Fairy、Nurse（有 Legendary） | 100% | 57% |
-| 5 | Cat kid、Ghost、Water、Military、Nurse（有 Legendary） | 100% | 67% |
+| 5 | Cat kid、Bleh、Water、Ghost、Nurse（1 只 Epic） | 94% | 37% |
+| 6 | Cat kid、Senpai、Water、Poison、Nurse | 75% | 22% |
+| 7 | Cat kid、Senpai、Water、Fairy、Nurse | 100% | 48% |
+| 8 | Cat kid、Senpai、Witch、Fairy、Nurse | 100% | 57% |
+| 9 | Cat kid、Senpai、Witch、Fairy、Military | 100% | 38% |
+| 10 | Cat kid、Senpai、Witch、Fairy、Military | 58% | 14% |
+| 10 | 同上，把 Senpai 换成 Devil cat | 100% | 76% |
 
-剩血越少越难。只带 1 只 Cat 打第 1 关会输，所以开局的 100 金币是必要的。
+第 6 到 10 关是第一次跑数字，真玩以后还可能要调。

@@ -38,3 +38,16 @@ arrow keys, **D F J K**, or by tapping the lane. Every hit makes the stick dance
 - PERFECT / GOOD / OK / MISS timing, combo, health bar, S to D rank and best scores saved on the device
 
 Everything, including the hand-drawn art, is in the one HTML file. Open it in a browser, or visit `/disco-funkin/` on GitHub Pages.
+
+## Meow Brigade
+
+[`cat-rat-battle/index.html`](cat-rat-battle/index.html) is an auto-battle game drawn from hand sketches, all in black and white.
+Up to 5 cats stand in a formation (melee in front, ranged and Nurse behind) and fight waves of rats on their own.
+Tap a hurt cat and then **HEAL** to use a Nurse heal.
+
+- 10 levels, each ending with a boss (Rat Queen, Legged Rat, Clone Rat, Long Rat, Rainbow Rat)
+- 20 cats with their own attacks; win coins and spin the Common, Rare, Epic and Legendary wheels, or buy the two Secret cats
+- Progress is saved on the device
+
+The game loads its art from `cat-rat-battle/assets/` and its font from `cat-rat-battle/src/fonts/`, so serve the whole folder
+(GitHub Pages: `/cat-rat-battle/`). Design notes and numbers are in `cat-rat-battle/stats-table.md`.
