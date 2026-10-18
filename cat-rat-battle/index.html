@@ -891,7 +891,7 @@ function endBattle(win) {
 function drawBattle() {
   const b = B;
   topBar({ pause: () => { if (!b.over) b.paused = true; } });
-  button(140, 18, 90, 44, b.speed === 2 ? 'x2' : 'x1', () => { b.speed = b.speed === 2 ? 1 : 2; }, { size: 28, on: b.speed === 2 });
+  button(140, 18, 150, 44, b.speed === 2 ? 'Speed x2' : 'Speed x1', () => { b.speed = b.speed === 2 ? 1 : 2; }, { size: 26, on: b.speed === 2 });
   txt(`LEVEL ${b.lv}`, W / 2, 32, 40);
   const boss = b.rats.find(r => !r.dead && r.d.boss && !r.fake);
   if (boss) {
