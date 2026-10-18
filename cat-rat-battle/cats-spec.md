@@ -37,7 +37,7 @@ Up to 5 cats on the field, duplicates allowed: rolling the same cat again gives 
 ## Legendary (all back row)
 | Cat | Attack | Damage | Range / cooldown |
 |---|---|---|---|
-| Fairy cat | Waves its magic wand; lightning strikes a rat from above | 10 per strike (Rainbow Rat's lightning is 8) | Long range, 0.75 s cooldown |
+| Fairy cat | Waves its magic wand; lightning strikes a rat from above | 20 per strike (Rainbow Rat's lightning is 8) | Long range, 1.5 s cooldown |
 | Military cat | Shoots bullets from its gun | 3 per bullet | Rapid fire, 4.5 per second |
 | Witch cat | Throws a potion that smashes and splashes | 15 to each rat in the splash + slows them | 3 s cooldown |
 

@@ -55,6 +55,7 @@
 const W = 1280, H = 720, INK = '#222', GREY = '#aaa', RED = 'rgb(255,165,165)';
 const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET'];
 const SPIN_COST = [50, 100, 500, 2000], SECRET_COST = 6000;
+let FAIRY_DMG = 20; // 1.5 s cooldown (Jason), so each bolt hits twice as hard to keep levels 7-10 winnable
 const DEVIL = { cd: 3.5, dmg: 40, boss: 40, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
 // row: where the cat stands. Front = melee, back = ranged and Nurse.
 const CATS = [
@@ -73,7 +74,7 @@ const CATS = [
   { id: 'catkid', name: 'Cat kid', r: 2, row: 'front', hp: 160, img: 'cat_catkid', h: 100, desc: 'Headbutt: 20 damage every 2.5 s. Hurts itself 2.' },
   { id: 'catcat', name: 'Cat cat', r: 2, row: 'back', hp: 115, img: 'cat_catcat2', h: 112, desc: 'Kicks a football: 22 damage every 2.5 s. Sometimes misses.' },
   { id: 'poison', name: 'Poison cat', r: 2, row: 'back', hp: 115, img: 'cat_poison', h: 100, desc: 'Poison cloud for 8 s: 4 damage a second to every rat inside.' },
-  { id: 'fairy', name: 'Fairy cat', r: 3, row: 'back', hp: 140, img: 'cat_fairy', h: 105, desc: 'Wand lightning: 10 damage every 0.75 s.' },
+  { id: 'fairy', name: 'Fairy cat', r: 3, row: 'back', hp: 140, img: 'cat_fairy', h: 105, desc: 'Wand lightning: 20 damage every 1.5 s.' },
   { id: 'military', name: 'Military cat', r: 3, row: 'back', hp: 140, img: 'cat_military', h: 95, desc: 'Machine gun: 3 damage, 4.5 bullets a second.' },
   { id: 'witch', name: 'Witch cat', r: 3, row: 'back', hp: 140, img: 'cat_witch', h: 115, desc: 'Potion splash: 15 damage to every rat nearby and slows them, every 3 s.' },
   { id: 'angel', name: 'Angel cat', r: 4, row: 'back', hp: 210, img: 'cat_angel', h: 90, desc: 'Flies up, sings a holy meow and hits every rat for 30. If a boss hits it in the air, it falls and starts again.' },
@@ -826,7 +827,7 @@ function updateCat(c, dt) {
     case 'daisy': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.52, 0.12), speed: 480, dmg: 2, kind: 'petal', spin: true }); SFX.petal(); c.cd = 1; } else c.cd = 0.1; } break;
     case 'catcat': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.9), speed: 620, dmg: 22, kind: 'ball', spin: true, miss: Math.random() < 0.1 }); SFX.kickBall(); c.cd = 2.5; } else c.cd = 0.1; } break;
     case 'military': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.99, 0.37), speed: 1100, dmg: 3, kind: 'bullet' }); c.cd = 0.22; SFX.gun(); } else c.cd = 0.1; } break;
-    case 'fairy': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = center(r); bolt(x, y); hurtRat(r, 10); sparks(...anchor(c, 0.95, 0.33)); SFX.lightning(); c.cd = 0.75; } else c.cd = 0.1; } break;
+    case 'fairy': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = center(r); bolt(x, y); hurtRat(r, FAIRY_DMG); sparks(...anchor(c, 0.95, 0.33)); SFX.lightning(); c.cd = 1.5; } else c.cd = 0.1; } break;
     case 'witch': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.65), dur: 0.7, dmg: 15, kind: 'potion', arc: true, spin: true }); SFX.throwPotion(); c.cd = 3; } else c.cd = 0.1; } break;
     case 'water': if (ready()) { const r = nearestRat(c); if (r) { waterFan(c, r); SFX.water(); c.cd = 1.5; } else c.cd = 0.1; } break;
     case 'poison': if (ready()) { const r = nearestRat(c); if (r) { poisonCloud(c, r); SFX.poison(); c.cd = 12; } else c.cd = 0.1; } break;
