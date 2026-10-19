@@ -290,12 +290,12 @@ const LEVELS = [
     hints: [[650, 'Ride the moving platforms']],
   },
   {
-    name: 'Level 11', speed: 295, cp: 2200,
+    name: 'Level 11', speed: 275, cp: 2200,
     c: { bg: '#FFE6DE', faint: '#F8BCA9', mid: '#F06B4A', ground: '#7A2A17' },
     segs: [[-600, 1700, BASE], [1230, 770, BASE], [2150, 750, 230], [3020, 780, BASE], [3950, 1150, BASE]],
     blocks: [[1900, 30, 40], [3700, 30, 50]],
-    spikes: [[450, 3], [1700, 5], [2700, 4], [3250, 6], [4400, 4]],
-    enemies: [['hedgehog', 800], ['hedgehog', 1450], ['hedgehog', 2450], ['hedgehog', 3500], ['hedgehog', 4150], ['hedgehog', 4700]],
+    spikes: [[450, 2], [1700, 3], [2700, 3], [3250, 4], [4400, 3]],
+    enemies: [['hedgehog', 800], ['hedgehog', 2450], ['hedgehog', 3500], ['hedgehog', 4700]],
     door: 4900,
     hints: [[260, "Spikes and hedgehogs: don't touch!"]],
   },
@@ -384,7 +384,7 @@ function foeBox(L, f, t) {
   const u = t - f.tm;
   let x = f.m, y = f.ground - f.h;
   if (f.kind === 'snail') x = f.m - 30 * u;
-  else if (f.kind === 'hedgehog') x = f.m + 45 * Math.sin(2 * Math.PI * (u / 2.0 + f.ph));
+  else if (f.kind === 'hedgehog') x = f.m + 28 * Math.sin(2 * Math.PI * (u / 2.6 + f.ph));
   else if (f.kind === 'frog') {
     const k = ((u / 1.6 + f.ph) % 1 + 1) % 1;
     if (k < 0.5) { const q = k / 0.5; y -= 4 * 75 * q * (1 - q); }
@@ -457,7 +457,7 @@ function step(L, p, wantJump) {
     if (f.stomp && p.vy > 0 && prevBottom <= b.y + 10) {
       p.kills |= 1 << i; p.vy = STOMP_V; p.used = true; p.grounded = false; p.stomped = i;
     } else {
-      const m = 4;   // a little forgiving at the edges
+      const m = f.kind === 'hedgehog' ? 8 : 4;   // a little forgiving at the edges
       if (p.x + S > b.x + m && p.x < b.x + b.w - m && p.y > b.y + m && p.y - S < b.y + b.h) p.dead = true;
     }
   });
@@ -800,12 +800,12 @@ function updateSky(dt) {
   const k = view.scale, left = view.camX, right = view.camX + view.w / k;
   if (L().boss) { crows = crows.filter(c => c.wx > left - 150 && c.wx < right + 150); updatePoops(dt); return; }
   spawnLowCrows(dt);
-  if (crowTimer <= 0 && crows.filter(c => !c.low).length < 2) {
+  if (crowTimer <= 0 && crows.filter(c => !c.low).length < 3) {
     const kind = Math.random(), base = { y: 0.1 + Math.random() * 0.25, s: 0.8 + Math.random() * 0.5, ph: Math.random() * 6 };
     if (kind < 0.55) crows.push({ ...base, wx: right + 60, dir: -1, v: 60 + Math.random() * 70 });             // heading towards you
     else if (kind < 0.8) crows.push({ ...base, wx: right + 60, dir: 1, v: 110 + Math.random() * 70 });       // same way, you overtake it
     else crows.push({ ...base, wx: left - 60, dir: 1, v: SPEED + 90 + Math.random() * 80 });                 // same way, it overtakes you
-    crowTimer = 4 + Math.random() * 6;
+    crowTimer = 2 + Math.random() * 3;
   }
   for (const c of crows) {
     c.ph += dt * 9;
@@ -819,12 +819,12 @@ function updateSky(dt) {
 }
 // Low crows fly at jump height towards the block. Jumping into one knocks it out of the sky;
 // missing it does nothing. They only come where the ground is clear, so chasing one is safe.
-let lowTimer = 3, tutorialCrow = true;
-function clearAt(Lv, a, b) {
+let lowTimer = 1.5, tutorialCrow = true;
+function clearAt(Lv, a, b, loose) {
   const top = topAt(Lv, a);
   for (let x = a; x <= b; x += 10) if (topAt(Lv, x) !== top || !Lv.segs.some(([sx, w]) => x >= sx && x < sx + w)) return false;
   const hit = o => o.x < b && o.x + o.w > a;
-  return !Lv.solids.some(o => o.kind !== 'ground' && hit(o)) && !Lv.springs.some(hit) && !Lv.bricks.some(hit)
+  return (loose || !Lv.solids.some(o => o.kind !== 'ground' && hit(o))) && !Lv.springs.some(hit) && !Lv.bricks.some(hit)
       && !Lv.foes.some(f => f.m > a - 200 && f.m < b + 200) && !Lv.movers.some(m => m.cx + m.w / 2 + m.amp > a && m.cx - m.w / 2 - m.amp < b);
 }
 function spawnLowCrow(Lv, mx, tut) {
@@ -837,9 +837,12 @@ function spawnLowCrows(dt) {
   if (levelIdx === 0 && tutorialCrow && !crows.some(c => c.tutorial) && p.x > 520 && p.x < 900) { spawnLowCrow(Lv, 1060, true); return; }
   lowTimer -= dt;
   if (lowTimer > 0 || crows.some(c => c.low && !c.dead)) return;
-  lowTimer = 5 + Math.random() * 4;
-  const mx = p.x + 650 + Math.random() * 200;
-  if (clearAt(Lv, mx - 120, mx + 260)) spawnLowCrow(Lv, mx, false);
+  // Best is open ground; otherwise over a block, where the jump you make anyway hits it.
+  const x0 = p.x + 650 + Math.random() * 150, spots = [];
+  for (let mx = x0; mx < x0 + 400; mx += 20) spots.push(mx);
+  const mx = spots.find(m => clearAt(Lv, m - 80, m + 160)) ?? spots.find(m => clearAt(Lv, m - 40, m + 40, true));
+  if (mx != null) { spawnLowCrow(Lv, mx, false); lowTimer = 1.5 + Math.random() * 1.5; }
+  else lowTimer = 0.25;   // try again a little further on
 }
 function bonkCrows() {
   for (const c of crows) {
@@ -908,7 +911,7 @@ let poops = [];
 function crowDrops(c, dt) {
   if (L().noDrops) return;
   const k = view.scale, sy = view.h * c.y, wy = BASE + (sy - view.groundY) / k;
-  c.dropIn = (c.dropIn ?? 0.8 + Math.random() * 2) - dt;
+  c.dropIn = (c.dropIn ?? 1.5 + Math.random() * 3) - dt;   // more crows now, so each drops a bit less
   let drop = c.dropIn <= 0;
   if (!drop && !c.aimed && p && (mode === 'play')) {
     const fallT = Math.sqrt(Math.max(0, 2 * (p.y - S - wy) / POOP_G));
@@ -917,7 +920,7 @@ function crowDrops(c, dt) {
   }
   if (drop) {
     poops.push({ x: c.wx, y: wy + 4, vx: c.dir * c.v * 0.4, vy: 0, landed: false, life: 4 });
-    c.dropIn = 1.5 + Math.random() * 3;
+    c.dropIn = 3 + Math.random() * 4;
   }
 }
 function updatePoops(dt) {
