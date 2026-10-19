@@ -224,7 +224,7 @@ const points = cards => cards.reduce((a, c) => a + c.r, 0);
 
 function newGame(totals, n) {
   const d = shuffle(newDeck()), g = { hands: [], disc: [[], [], [], []], board: [null, null, null, null], last: [null, null, null, null],
-    moves: 0, turn: 0, n, totals: totals || [0, 0, 0, 0], over: false, res: null };
+    moves: 0, turn: 0, n, totals: totals || [0, 0, 0, 0], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
   for (let p = 0; p < 4; p++) g.hands.push(sortHand(d.slice(p * 13, p * 13 + 13)));
   g.turn = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
   return g;
@@ -234,7 +234,10 @@ function apply(g, p, i) {
   const c = g.hands[p][i], play = fits(g, c);
   g.hands[p].splice(i, 1);
   if (play) { const b = g.board[c.s]; g.board[c.s] = b ? [Math.min(b[0], c.r), Math.max(b[1], c.r)] : [7, 7]; g.last[p] = c; }
-  else g.disc[p].push(c);
+  else {
+    if (g.cant) for (let s = 0; s < 4; s++) { const b = g.board[s]; (b ? [b[0] - 1, b[1] + 1] : [7]).forEach(r => { if (r >= 1 && r <= 13) g.cant[p].add(s * 13 + r); }); }
+    g.disc[p].push(c);
+  }
   g.moves++;
   g.turn = (p + 1) % 4;
   if (g.moves === 52) { g.over = true; g.res = score(g); }
@@ -262,67 +265,85 @@ function score(g) {
 }
 
 /* ======================= bots ======================= */
-// Easy: any card. Normal: plays cards that lead to its own cards, drops its smallest card.
-// Hard: really holds the 7s and edge cards so rivals get stuck, and keeps cards it can still reach.
+// Easy: any card. Normal: thinks about the others too: plays cards only it can follow, holds cards
+// that would open a suit for them, and puts down a big card when that leaves their cards stuck behind it.
+// Hard: plays every choice out many times (see lookAhead) and reads who could not follow.
 function chooseMove(g, p, level) {
-  const h = g.hands[p], ok = h.map((c, i) => i).filter(i => fits(g, h[i]));
+  const h = g.hands[p], ok = h.map((c, i) => i).filter(i => fits(g, h[i])), all = h.map((c, i) => i);
   const best = (list, f) => list.reduce((a, i) => (f(i) > f(a) ? i : a), list[0]);
-  if (level === 0) return (ok.length ? ok : h.map((c, i) => i))[Math.floor(Math.random() * (ok.length || h.length))];
-  if (level === 2) return lookAhead(g, p, ok.length ? ok : h.map((c, i) => i));
-  if (ok.length) return best(ok, i => playValue(g, h, h[i], level) + (level === 1 ? Math.random() * 3 : Math.random() * 0.1));
-  return best(h.map((c, i) => i), i => -keepValue(g, h, h[i], level) + Math.random() * 0.1);
+  if (level === 0) return (ok.length ? ok : all)[Math.floor(Math.random() * (ok.length || h.length))];
+  if (level === 2) return lookAhead(g, p, ok.length ? ok : all);
+  const v = view(g, p), noise = level === 1 ? 1.2 : 0.05;
+  if (ok.length) return best(ok, i => smartPlay(g, h[i], v) + Math.random() * noise);
+  return best(all, i => -smartKeep(g, h[i], v) + Math.random() * noise);
 }
-function playValue(g, h, c, level) {
-  const mine = h.filter(x => x.s === c.s && x !== c);
-  let follow, near, edge;
-  if (c.r === 7) { follow = mine.length; near = mine.some(x => x.r === 6 || x.r === 8); edge = false; }
-  else { const dir = c.r < 7 ? -1 : 1; follow = mine.filter(x => (x.r - c.r) * dir > 0).length; near = mine.some(x => x.r === c.r + dir); edge = c.r === 1 || c.r === 13; }
-  let v = follow * 2 + (near ? 3 : 0) + c.r * 0.05;
-  if (!follow && !edge) v -= level === 2 ? 6 : 3; // only opens cards for the others
-  if (c.r === 7 && level === 2) v -= 3 - Math.min(follow, 3); // hold the seven
-  if (level === 2) v += Math.max(0, c.r - 7) * 0.15 + (edge ? 1 : 0); // get rid of big cards when it is free
-  return v;
+// What player p can know: their own hand, their own face-down cards and the table. The rest is "unseen".
+const key = c => c.s * 13 + c.r;
+function view(g, p) {
+  const mine = new Array(53).fill(false), unseen = new Array(53).fill(true);
+  g.hands[p].forEach(c => { mine[key(c)] = true; unseen[key(c)] = false; });
+  g.disc[p].forEach(c => { unseen[key(c)] = false; });
+  g.board.forEach((b, s) => { if (b) for (let r = b[0]; r <= b[1]; r++) unseen[s * 13 + r] = false; });
+  return { mine, unseen };
+}
+// A good card to play leads on to my own cards (only I can follow it) and opens nothing for the others.
+function smartPlay(g, c, v) {
+  let val = 0.1 * c.r;
+  for (const d of c.r === 7 ? [-1, 1] : [c.r < 7 ? -1 : 1]) {
+    const next = c.r + d; if (next < 1 || next > 13) continue; // A and K open nothing
+    let myPts = 0, opp = 0;
+    for (let r = next; r >= 1 && r <= 13; r += d) { const k = c.s * 13 + r; if (v.mine[k]) myPts += r; else if (v.unseen[k]) opp++; }
+    const kn = c.s * 13 + next;
+    if (v.mine[kn]) val += 3; else if (v.unseen[kn]) val -= 2.5; // the next card is a gift to whoever holds it
+    val += 0.25 * myPts - (myPts ? 0.15 : 0.35) * opp;
+  }
+  return val;
+}
+// Cost of putting a card face down: its points, plus my own cards behind it that get stuck too,
+// minus the rivals' cards behind it that can never be played now (put down a 10 and nobody plays J, Q, K).
+function smartKeep(g, c, v) {
+  const d = c.r < 7 ? -1 : 1; let cost = c.r, oppPts = 0;
+  for (let r = c.r + d; r >= 1 && r <= 13; r += d) { const k = c.s * 13 + r; if (v.mine[k]) cost += 0.9 * r; else if (v.unseen[k]) oppPts += r; }
+  cost -= 0.35 * oppPts;
+  const b = g.board[c.s], edge = b && (d < 0 ? b[0] - 1 : b[1] + 1);
+  if (edge && Math.abs(c.r - edge) === 1 && v.unseen[c.s * 13 + edge]) cost += 2; // likely playable soon
+  return cost;
 }
 // Hard: for each possible move, deal the cards it can't see to the others at random many times,
 // play the rest of the game out with Normal bots, and pick the move that scores best on average.
-const ROLLOUTS = 60;
+// Hard: for each possible move, deal the cards it can't see to the others many times, play the rest
+// of the game out with good bots, and pick the move that scores best on average. When dealing it
+// remembers who had to put a card down: that player had none of the cards that fitted at that moment.
+const ROLLOUTS = 80;
 function lookAhead(g, p, moves) {
   if (moves.length === 1) return moves[0];
-  const seen = new Set(), key = c => c.s * 13 + c.r;
-  g.hands[p].forEach(c => seen.add(key(c))); g.disc[p].forEach(c => seen.add(key(c)));
-  g.board.forEach((b, s) => { if (b) for (let r = b[0]; r <= b[1]; r++) seen.add(s * 13 + r); });
-  const unseen = newDeck().filter(c => !seen.has(key(c)));
+  const v = view(g, p), unseen = newDeck().filter(c => v.unseen[key(c)]);
+  const opps = [0, 1, 2, 3].filter(q => q !== p), cant = (q, c) => g.cant && g.cant[q].has(key(c));
   const total = moves.map(() => 0);
   for (let k = 0; k < ROLLOUTS; k++) {
-    const pool = shuffle(unseen.slice()); let at = 0;
+    const cap = {}, give = {}; opps.forEach(q => { cap[q] = g.hands[q].length + g.disc[q].length; give[q] = []; });
+    const pool = shuffle(unseen.slice()).map(c => [c, opps.filter(q => !cant(q, c)).length]).sort((a, b) => a[1] - b[1]);
+    pool.forEach(([c]) => {
+      let qs = opps.filter(q => cap[q] > 0 && !cant(q, c)); if (!qs.length) qs = opps.filter(q => cap[q] > 0);
+      let r = Math.random() * qs.reduce((a, q) => a + cap[q], 0), q = qs[0];
+      for (const x of qs) { r -= cap[x]; if (r < 0) { q = x; break; } }
+      give[q].push(c); cap[q]--;
+    });
     const hands = [], disc = [];
     for (let q = 0; q < 4; q++) {
       if (q === p) { hands.push(g.hands[p]); disc.push(g.disc[p]); continue; }
-      hands.push(pool.slice(at, at += g.hands[q].length)); disc.push(pool.slice(at, at += g.disc[q].length));
+      hands.push(give[q].slice(0, g.hands[q].length)); disc.push(give[q].slice(g.hands[q].length));
     }
     moves.forEach((i, m) => {
       const s = { hands: hands.map(h => h.slice()), disc: disc.map(d => d.slice()), board: g.board.map(b => b && b.slice()),
         last: g.last.slice(), moves: g.moves, turn: p, over: false, res: null };
       apply(s, p, i);
-      while (!s.over) apply(s, s.turn, chooseMove(s, s.turn, 1));
+      while (!s.over) apply(s, s.turn, chooseMove(s, s.turn, 3));
       total[m] += s.res.rows[p].score;
     });
   }
   return moves[total.indexOf(Math.max(...total))];
 }
-// How much a bot wants to keep a card when it has to put one face down.
-function keepValue(g, h, c, level) {
-  let v = c.r;
-  if (level < 2) return v;
-  const b = g.board[c.s], dir = c.r < 7 ? -1 : 1;
-  if (b) { // can I reach it with my own cards? Then keep it.
-    const from = dir < 0 ? b[0] - 1 : b[1] + 1; let ok = true;
-    for (let r = from; r !== c.r; r += dir) if (!h.some(x => x.s === c.s && x.r === r)) { ok = false; break; }
-    if (ok) v += 14; else v -= 2; // a card in the way of a rival's run blocks them: cheap to keep it hidden
-  }
-  return v;
-}
-
 /* ======================= input ======================= */
 let hits = [], lastHits = [];
 function button(x, y, w, h, label, fn, o = {}) {
