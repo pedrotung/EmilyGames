@@ -38,8 +38,6 @@
   .card h2 { margin: 0 0 8px; font-weight: 400; font-size: 34px; }
   .card p { margin: 8px 0; }
   .card button { font: inherit; border: 3px solid #222; background: #f39c12; color: #fff; border-radius: 12px; padding: 4px 32px; margin-top: 8px; }
-  #rotate { display: none; }
-  @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
 </style>
 </head>
 <body>
@@ -48,7 +46,6 @@
 <div class="ov" id="homeOv" hidden>
   <div class="card" role="dialog" aria-label="Full screen"><div id="homeTxt"></div><button id="homeOk">OK</button></div>
 </div>
-<div class="ov" id="rotate"><div class="card" id="rotateTxt"><h2>Turn your phone sideways</h2><p>HOLD THE SEVEN is played in landscape.</p></div></div>
 
 <script>
 'use strict';
@@ -88,7 +85,7 @@ const TXT = {
     ],
     fsTitle: 'FULL SCREEN', fsBody: "This browser can't hide its toolbars for a web page. To play full screen, add the game to your home screen:",
     fsIos: '<b>iPhone / iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the menu, then <b>Add to Home screen</b>.',
-    fsThen: 'Then open HOLD THE SEVEN from the new icon.', rotT: 'Turn your phone sideways', rotB: 'HOLD THE SEVEN is played in landscape.',
+    fsThen: 'Then open HOLD THE SEVEN from the new icon.',
   },
   zh: {
     title: '憋七', tagline: '从 7 开始往两边接龙，堵住对手，别被憋住！',
@@ -124,7 +121,7 @@ const TXT = {
     ],
     fsTitle: '全屏', fsBody: '这个浏览器不能为网页隐藏工具栏。想全屏玩，请把游戏加到主屏幕：',
     fsIos: '<b>iPhone / iPad（Safari）：</b>点分享按钮，再点<b>添加到主屏幕</b>。<br><b>安卓（Chrome）：</b>点菜单，再点<b>添加到主屏幕</b>。',
-    fsThen: '然后从新图标打开憋七。', rotT: '请把手机横过来', rotB: '憋七要横屏玩。',
+    fsThen: '然后从新图标打开憋七。',
   },
 };
 const T = k => TXT[save.lang][k];
@@ -138,9 +135,14 @@ function store() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 /* ======================= canvas ======================= */
 const W = 1280, H = 720, GAMES = 5;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+// A phone held upright (WeChat and some browsers never turn the page) gets the table turned
+// sideways instead, so the player just turns the phone. Taps are turned back in toCanvas().
+let turned = false;
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), s = Math.min(innerWidth / W, innerHeight / H);
+  turned = innerHeight > innerWidth && matchMedia('(pointer: coarse)').matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), s = turned ? Math.min(innerHeight / W, innerWidth / H) : Math.min(innerWidth / W, innerHeight / H);
   cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px';
+  cv.style.transform = turned ? 'rotate(90deg)' : '';
   cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
   ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
 }
@@ -353,7 +355,11 @@ function button(x, y, w, h, label, fn, o = {}) {
   txt(label, x + w / 2, y + h / 2 + 1, o.size || 28, 'center', off ? '#cfd8d3' : (o.color || '#fff'), { shadow: false });
   if (!off) hits.push({ x, y, w, h, fn });
 }
-function toCanvas(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+function toCanvas(e) {
+  const r = cv.getBoundingClientRect();
+  if (turned) return [(e.clientY - r.top) / r.height * W, (r.right - e.clientX) / r.width * H];
+  return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H];
+}
 cv.addEventListener('pointerdown', e => {
   e.preventDefault(); au();
   if (fsCan && !fsOn() && !triedAutoFs && matchMedia('(pointer: coarse)').matches) { triedAutoFs = true; toggleFullscreen(); }
@@ -377,18 +383,21 @@ function toggleFullscreen() {
     document.getElementById('homeTxt').innerHTML = `<h2>${T('fsTitle')}</h2><p>${T('fsBody')}</p><p>${T('fsIos')}</p><p>${T('fsThen')}</p>`;
     document.getElementById('homeOv').hidden = false; return;
   }
-  try { const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  try {
+    const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' });
+    const lock = () => { try { const l = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (l && l.catch) l.catch(() => {}); } catch (e) {} };
+    if (r && r.then) r.then(lock, () => {}); else lock(); // Android: turn the screen to landscape in full screen
+  } catch (e) {}
 }
 document.getElementById('homeOk').addEventListener('click', () => { document.getElementById('homeOv').hidden = true; });
 function setLang(l) {
   save.lang = l; store(); document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
-  document.getElementById('rotateTxt').innerHTML = `<h2>${T('rotT')}</h2><p>${T('rotB')}</p>`;
 }
 
-function topBar(mid) {
-  button(14, 12, 110, 42, '⌂ ' + T('home'), () => { location.href = '../index.html'; }, { fill: 'rgba(0,0,0,.3)', size: 24 });
-  if (!standalone) button(W - 14 - 160, 12, 160, 42, '⛶ ' + (fsOn() ? T('exitFull') : T('full')), toggleFullscreen, { fill: 'rgba(0,0,0,.3)', size: fsOn() ? 20 : 24 });
-  if (mid) { const w = textW(mid, 22) + 30; box(W / 2 - w / 2, 12, w, 42, 12, 'rgba(0,0,0,.3)', 'rgba(255,255,255,.5)'); txt(mid, W / 2, 34, 22); }
+// Buttons and cards are big because on a phone the whole 1280x720 table shrinks to about half size.
+function topBar() {
+  button(14, 10, 150, 72, '⌂ ' + T('home'), () => { location.href = '../index.html'; }, { fill: 'rgba(0,0,0,.3)', size: 32 });
+  if (!standalone) button(W - 14 - 190, 10, 190, 72, '⛶ ' + (fsOn() ? T('exitFull') : T('full')), toggleFullscreen, { fill: 'rgba(0,0,0,.3)', size: fsOn() ? 26 : 30 });
 }
 function felt() {
   const g = ctx.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.7);
@@ -423,20 +432,21 @@ const Title = {
     txt(T('title'), W / 2, save.lang === 'zh' ? 340 : 352, save.lang === 'zh' ? 86 : 88);
     txt(T('tagline'), W / 2, 418, 28);
     const levels = ['easy', 'normal', 'hard'];
-    if (COVER) { button(520, 470, 240, 70, T('play'), startMatch, { fill: '#f39c12', size: 40 }); return; }
-    const lw = textW(T('bots'), 26) + 12; let x = W / 2 - (lw + 3 * 110 + 20) / 2;
-    txt(T('bots'), x, 482, 26, 'left'); x += lw;
-    levels.forEach((k, i) => { button(x + i * 115, 462, 105, 40, T(k), () => { save.diff = i; store(); }, { fill: save.diff === i ? '#f39c12' : 'rgba(0,0,0,.25)', size: 24 }); });
-    button(520, 520, 240, 70, T('play'), startMatch, { fill: '#f39c12', size: 40 });
-    button(520, 606, 240, 54, T('how'), () => { this.howOpen = true; }, { size: 28 });
-    button(24, 660, 150, 44, `${T('sound')}: ${save.sound ? T('on') : T('off')}`, () => { save.sound = !save.sound; store(); }, { fill: 'rgba(0,0,0,.3)', size: 22 });
-    button(W - 24 - 220, 660, 220, 44, '🌐 ' + T('language') + ': ' + (save.lang === 'zh' ? '中文' : 'English'), () => { this.langOpen = !this.langOpen; }, { fill: 'rgba(0,0,0,.3)', size: 22 });
+    if (COVER) { button(490, 470, 300, 84, T('play'), startMatch, { fill: '#f39c12', size: 44 }); return; }
+    const lw = textW(T('bots'), 30) + 14; let x = W / 2 - (lw + 3 * 140 - 10) / 2;
+    txt(T('bots'), x, 484, 30, 'left'); x += lw;
+    levels.forEach((k, i) => { button(x + i * 140, 455, 130, 58, T(k), () => { save.diff = i; store(); }, { fill: save.diff === i ? '#f39c12' : 'rgba(0,0,0,.25)', size: 30 }); });
+    button(490, 528, 300, 84, T('play'), startMatch, { fill: '#f39c12', size: 44 });
+    button(490, 628, 300, 70, T('how'), () => { this.howOpen = true; }, { size: 32 });
+    button(16, 632, 200, 70, `${T('sound')}: ${save.sound ? T('on') : T('off')}`, () => { save.sound = !save.sound; store(); }, { fill: 'rgba(0,0,0,.3)', size: 28 });
+    const LX = W - 16 - 290;
+    button(LX, 632, 290, 70, '🌐 ' + T('language') + ': ' + (save.lang === 'zh' ? '中文' : 'English'), () => { this.langOpen = !this.langOpen; }, { fill: 'rgba(0,0,0,.3)', size: 28 });
     if (this.langOpen) {
-      box(W - 24 - 220, 548, 220, 104, 14, '#fffdf6', '#fff', 3);
+      box(LX, 470, 290, 150, 16, '#fffdf6', '#fff', 3);
       [['en', 'English'], ['zh', '中文']].forEach(([l, name], i) => {
-        const y = 552 + i * 48; if (save.lang === l) box(W - 24 - 216, y, 212, 44, 10, '#f39c12');
-        txt((save.lang === l ? '✓ ' : '') + name, W - 24 - 110, y + 23, 26, 'center', save.lang === l ? '#fff' : '#333', { shadow: false });
-        hits.push({ x: W - 24 - 220, y, w: 220, h: 48, fn: () => { setLang(l); this.langOpen = false; } });
+        const y = 476 + i * 70; if (save.lang === l) box(LX + 5, y, 280, 66, 12, '#f39c12');
+        txt((save.lang === l ? '✓ ' : '') + name, LX + 145, y + 34, 32, 'center', save.lang === l ? '#fff' : '#333', { shadow: false });
+        hits.push({ x: LX, y, w: 290, h: 70, fn: () => { setLang(l); this.langOpen = false; } });
       });
     }
     if (this.howOpen) howPanel(() => { this.howOpen = false; });
@@ -447,8 +457,8 @@ function howPanel(close) {
   ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
   box(150, 50, 980, 620, 24, '#fffdf6', '#f1c40f', 5);
   txt(T('howTitle'), W / 2, 100, 48, 'center', '#e67e22');
-  T('howLines').forEach((l, i) => txt(l, 200, 160 + i * 40, 25, 'left', '#333'));
-  button(540, 600, 200, 52, T('close'), close, { fill: '#f39c12' });
+  T('howLines').forEach((l, i) => txt(l, 180, 150 + i * 39, 27, 'left', '#333'));
+  button(530, 588, 220, 70, T('close'), close, { fill: '#f39c12', size: 32 });
 }
 
 /* ======================= match + game screen ======================= */
@@ -456,10 +466,16 @@ let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultA
 const BOT_WAIT = 750, FLY_MS = 320;
 function startMatch() { G = newGame(null, 1); go(Play); }
 function nextGame() { G = G.n >= GAMES ? newGame(null, 1) : newGame(G.totals, G.n + 1); go(Play); }
-const BX = 290, BY = 178, BDX = 54, BDY = 78;
+// Bots sit in a strip along the top (left to right in turn order), the table fills the middle,
+// your hand runs along the bottom with your info on the left and the big buttons on the right.
+// On phones (Jason) the played cards overlap like a hand of cards, showing just their corners,
+// so each card can be drawn bigger. Add ?phone to the address to see that layout on a computer.
+const PHONE = /phone/.test(location.search) || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600);
+const [BX, BY, BDX, BDY, CW, CH] = PHONE ? [212, 94, 64, 96, 88, 118] : [150, 100, 78, 100, 72, 96];
 const slotPos = (s, r) => [BX + (r - 1) * BDX, BY + s * BDY];
-const PILE = [[196, 556], [165, 400], [790, 68], [1070, 400]]; // each player's face-down cards
-const SEAT = [[640, 640], [115, 440], [640, 85], [1165, 440]]; // where each player's cards come from
+const botX = p => 186 + (p - 1) * 295;
+const pileAt = p => p === 0 ? [16 + G.disc[0].length * 12, 676] : [botX(p) + 150 + G.disc[p].length * 6, 52]; // where the next face-down card lands
+const SEAT = [[640, 600], [228, 49], [523, 49], [818, 49]]; // where each player's cards come from
 
 const Play = {
   enter() {
@@ -468,7 +484,7 @@ const Play = {
   },
   draw(t) {
     felt();
-    topBar(`${TXT[save.lang].gameOf(G.n, GAMES)}  ·  ${T('yourTotal')}: ${fmt(G.totals[0])}`);
+    topBar();
     drawBoard();
     drawBots();
     drawYou();
@@ -477,8 +493,8 @@ const Play = {
     if (!fly && !G.over && G.turn !== 0 && t >= botAt) botMove(t);
     if (fly) {
       const k = Math.min(1, (t - fly.t0) / FLY_MS), e = 1 - (1 - k) * (1 - k);
-      const x = fly.x0 + (fly.x1 - fly.x0) * e, y = fly.y0 + (fly.y1 - fly.y0) * e, w = fly.w0 + (50 - fly.w0) * e;
-      drawCard(fly.c, x, y, w, w * 1.4, { back: fly.down ? 'down' : null });
+      const x = fly.x0 + (fly.x1 - fly.x0) * e, y = fly.y0 + (fly.y1 - fly.y0) * e, w = fly.w0 + (fly.w1 - fly.w0) * e;
+      drawCard(fly.c, x, y, w, w * 1.36, { back: fly.down ? 'down' : null });
     }
     if (G.over && !fly) {
       if (!resultAt) { resultAt = t; G.res.rows[0].win ? SFX.win() : SFX.lose(); }
@@ -495,6 +511,12 @@ const Play = {
         if (sel === i) humanMove(); else { sel = i; SFX.tap(); }
         return;
       }
+    }
+    // tapping a glowing space on the table plays the card from your hand that goes there
+    const s = Math.floor((y - BY) / BDY), r = Math.floor((x - BX) / BDX) + 1;
+    if (s >= 0 && s < 4 && r >= 1 && r <= 13) {
+      const i = G.hands[0].findIndex(c => c.s === s && c.r === r && fits(G, c));
+      if (i >= 0) { sel = i; humanMove(); return; }
     }
     sel = -1;
   },
@@ -514,62 +536,69 @@ const canPick = i => fits(G, G.hands[0][i]) || !anyFits(0);
 
 function drawBoard() {
   for (let s = 0; s < 4; s++) {
-    txt(SUIT[s], BX - 32, BY + s * BDY + 36, 36, 'center', isRed(s) ? '#ff8a8a' : '#fff', { font: CARD_FONT });
+    txt(SUIT[s], BX - 38, BY + s * BDY + Math.min(CH, BDY) / 2, 46, 'center', isRed(s) ? '#ff8a8a' : '#fff', { font: CARD_FONT });
     const b = G.board[s];
+    // left to right, so on phones each card covers only the plain right side of the one before it
     for (let r = 1; r <= 13; r++) {
       const [x, y] = slotPos(s, r);
-      if (b && r >= b[0] && r <= b[1]) { drawCard({ s, r }, x, y, 50, 70); continue; }
+      if (b && r >= b[0] && r <= b[1]) { drawCard({ s, r }, x, y, CW, CH); continue; }
       const next = G.moves === 0 ? s === 0 && r === 7 : b ? r === b[0] - 1 || r === b[1] + 1 : r === 7;
-      ctx.save(); ctx.setLineDash(next ? [] : [5, 4]);
-      if (next) { ctx.shadowColor = YELLOW; ctx.shadowBlur = 10; }
-      box(x, y, 50, 70, 7, next ? 'rgba(255,224,102,.12)' : null, next ? YELLOW : 'rgba(255,255,255,.22)', next ? 2.5 : 1.5);
-      ctx.restore();
-      txt(RK[r], x + 25, y + 36, 18, 'center', next ? YELLOW : 'rgba(255,255,255,.3)', { shadow: false });
+      if (next) { // a space you can play into glows
+        ctx.save(); ctx.shadowColor = YELLOW; ctx.shadowBlur = 12;
+        box(x, y, CW, CH, 9, 'rgba(20,90,55,.9)', YELLOW, 3); ctx.restore();
+        txt(RK[r], x + Math.min(CW, BDX) / 2, y + Math.min(CH, BDY) / 2 + 1, 30, 'center', YELLOW, { shadow: false });
+      } else if (PHONE) txt(RK[r], x + 18, y + 24, 24, 'center', 'rgba(255,255,255,.3)', { shadow: false });
+      else {
+        ctx.save(); ctx.setLineDash([5, 4]); box(x, y, CW, CH, 9, null, 'rgba(255,255,255,.22)', 1.5); ctx.restore();
+        txt(RK[r], x + CW / 2, y + CH / 2 + 1, 26, 'center', 'rgba(255,255,255,.3)', { shadow: false });
+      }
     }
   }
 }
 function drawBots() {
-  const names = T('names');
-  // left and right
-  [[1, 30], [3, 1080]].forEach(([p, x]) => {
-    avatar(p, x + 85, 282, 31, G.turn === p && !G.over);
-    txt(names[p], x + 85, 332, 26);
-    txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, x + 85, 360, 19);
-    for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, x + 63, 388 + i * 9, 44, 62, { back: 'red' });
-    for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, PILE[p][0], PILE[p][1] + i * 6, 32, 45, { back: 'down' });
-  });
-  // top
-  const p = 2;
-  avatar(p, 477, 87, 27, G.turn === p && !G.over);
-  txt(names[p], 514, 74, 23, 'left');
-  txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, 514, 101, 18, 'left');
-  for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, 690 + i * 12, 62, 36, 50, { back: 'red' });
-  for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, PILE[p][0] + i * 7, PILE[p][1], 28, 40, { back: 'down' });
+  const names = T('names'), L = TXT[save.lang];
+  for (let p = 1; p <= 3; p++) {
+    const x = botX(p), on = G.turn === p && !G.over;
+    box(x, 8, 285, 84, 18, on ? 'rgba(255,224,102,.18)' : 'rgba(0,0,0,.2)', on ? YELLOW : 'rgba(255,255,255,.25)', 2);
+    avatar(p, x + 42, 50, 30, on);
+    txt(names[p], x + 82, 31, 28, 'left');
+    // cards in hand (red back + number) and face-down cards (a dark pile + number)
+    drawCard(null, x + 82, 52, 24, 34, { back: 'red' }); txt(String(G.hands[p].length), x + 112, 70, 26, 'left');
+    const n = G.disc[p].length;
+    for (let i = 0; i < n; i++) drawCard(null, x + 150 + i * 6, 52, 24, 34, { back: 'down' });
+    if (!n) box(x + 150, 52, 24, 34, 4, null, 'rgba(255,255,255,.35)', 1.5);
+    txt(String(n), x + 182 + Math.max(n - 1, 0) * 6, 70, 26, 'left');
+  }
 }
 function drawYou() {
   const L = TXT[save.lang], my = points(G.disc[0]), zone = zoneOf(my), mine = G.turn === 0 && !G.over && !fly;
-  avatar(0, 58, 588, 31, mine);
-  txt(T('you'), 100, 575, 26, 'left'); txt(L.faceDown(G.disc[0].length), 100, 603, 19, 'left');
-  for (let i = 0; i < G.disc[0].length; i++) drawCard(null, PILE[0][0] + i * 7, PILE[0][1], 32, 45, { back: 'down' });
-  txt(T('yourPoints'), 24, 640, 20, 'left');
-  const pw = textW(T('yourPoints'), 20); txt(String(my), 30 + pw, 640, 26, 'left', '#fff', { bold: true });
-  badge(zone, 44 + pw + textW(String(my), 26), 640, 16);
-  // points bar 0-15-30-45+
-  const bx = 24, by = 662, bw = 200, g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+  avatar(0, 46, 578, 30, mine);
+  txt(T('you'), 86, 566, 30, 'left');
+  txt(`${L.gameOf(G.n, GAMES)} · ${fmt(G.totals[0])}`, 86, 598, 21, 'left');
+  txt(T('yourPoints'), 14, 634, 24, 'left');
+  const pw = textW(T('yourPoints'), 24); txt(String(my), 20 + pw, 634, 30, 'left', '#fff', { bold: true });
+  badge(zone, 32 + pw + textW(String(my), 30), 634, 18);
+  // points bar: green 0-15, orange 16-30, red over 30
+  const bx = 14, by = 654, bw = 214, g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
   g.addColorStop(0, '#27ae60'); g.addColorStop(0.33, '#27ae60'); g.addColorStop(0.333, '#e67e22'); g.addColorStop(0.66, '#e67e22'); g.addColorStop(0.663, '#c0392b'); g.addColorStop(1, '#c0392b');
-  box(bx, by, bw, 14, 7, g, '#fff', 2);
-  box(bx + Math.min(my / 45, 1) * (bw - 6), by - 5, 6, 24, 3, '#fff');
-  ['0', '15', '30', '45+'].forEach((s, i) => txt(s, bx + [4, 66, 133, 190][i], by + 30, 14, 'center', 'rgba(255,255,255,.8)', { shadow: false }));
+  box(bx, by, bw, 12, 6, g, '#fff', 2);
+  box(bx + Math.min(my / 45, 1) * (bw - 6), by - 5, 6, 22, 3, '#fff');
+  // your face-down pile
+  const nd = G.disc[0].length;
+  for (let i = 0; i < nd; i++) drawCard(null, 16 + i * 12, 676, 26, 36, { back: 'down' });
+  if (!nd) box(16, 676, 26, 36, 4, null, 'rgba(255,255,255,.35)', 1.5);
+  txt(L.faceDown(nd), 52 + Math.max(nd - 1, 0) * 12, 695, 21, 'left');
 
   // hand
-  const h = G.hands[0], n = h.length, step = n > 1 ? Math.min(62, 640 / (n - 1)) : 0, w0 = 78 + (n - 1) * step, x0 = 640 - w0 / 2;
+  const h = G.hands[0], n = h.length, HW = 108, HH = 150, AX = 244, AW = 802;
+  const step = n > 1 ? Math.min(72, (AW - HW) / (n - 1)) : 0, x0 = AX + (AW - (HW + (n - 1) * step)) / 2;
   const stuck = mine && !anyFits(0);
   handRects = [];
   h.forEach((c, i) => {
-    const ok = mine && canPick(i), y = 596 - (sel === i ? 26 : 0);
+    const ok = mine && canPick(i), y = 552 - (sel === i ? 24 : 0);
     if (fly && fly.p === 0 && fly.i === i) return;
-    drawCard(c, x0 + i * step, y, 78, 110, { glow: ok && !stuck, dim: mine && stuck && sel !== i || (!mine && G.turn !== 0 && false) });
-    handRects.push({ x: x0 + i * step, y, w: i === n - 1 ? 78 : step, h: 124, ok });
+    drawCard(c, x0 + i * step, y, HW, HH, { glow: ok && !stuck, dim: mine && stuck && sel !== i });
+    handRects.push({ x: x0 + i * step, y, w: i === n - 1 ? HW : step, h: 170, ok });
   });
 
   // message line + buttons
@@ -578,26 +607,26 @@ function drawYou() {
     line = G.moves === 0 ? T('firstMove') : stuck ? T('noFit') : T('yourTurn'); col = YELLOW;
     if (stuck && sel >= 0) { const c = h[sel], np = my + c.r; line += ' ' + L.wouldBe(cname(c), np, T(zoneOf(np)) + ' x' + ZONE_X[zoneOf(np)]); }
   }
-  if (stuck) { const w = textW(line, 23) + 40; box(W / 2 - w / 2, 488, w, 40, 14, 'rgba(142,68,173,.85)', '#fff', 3); txt(line, W / 2, 509, 23, 'center', '#fff'); }
-  else if (line) txt(line, W / 2, 536, 28, 'center', col);
+  if (stuck) { const w = Math.min(textW(line, 26) + 40, 1000); box(W / 2 - w / 2, 499, w, 44, 14, 'rgba(142,68,173,.9)', '#fff', 3); txt(line, W / 2, 522, 26, 'center', '#fff'); }
+  else if (line) txt(line, W / 2, 522, 30, 'center', col);
   const selOk = sel >= 0 && sel < n && canPick(sel);
-  button(1050, 584, 95, 52, T('hint'), () => { sel = chooseMove(G, 0, 2); }, { disabled: !mine, size: 26 });
-  button(1155, 584, 110, 52, T('playBtn'), humanMove, { fill: '#f39c12', disabled: !mine || stuck || !selOk, size: 26 });
-  button(1050, 648, 215, 52, T('discard'), humanMove, { fill: '#8e44ad', disabled: !mine || !stuck || !selOk, size: 26 });
+  // one big button: PLAY, or DISCARD when nothing fits
+  button(1058, 548, 208, 86, stuck ? T('discard') : T('playBtn'), humanMove, { fill: stuck ? '#8e44ad' : '#f39c12', disabled: !mine || !selOk, size: 36 });
+  button(1058, 646, 208, 66, T('hint'), () => { sel = chooseMove(G, 0, 2); }, { disabled: !mine, size: 30 });
 }
 
 function humanMove() {
   if (sel < 0 || G.turn !== 0 || fly || !canPick(sel)) return;
-  const r = handRects[sel]; startFly(0, sel, r.x, r.y, 78); sel = -1;
+  const r = handRects[sel]; startFly(0, sel, r.x, r.y, 108); sel = -1;
 }
 function botMove() {
   const p = G.turn, i = chooseMove(G, p, save.diff);
-  startFly(p, i, SEAT[p][0] - 22, SEAT[p][1] - 31, 44);
+  startFly(p, i, SEAT[p][0] - 22, SEAT[p][1] - 30, 44);
 }
 function startFly(p, i, x0, y0, w0) {
   const c = G.hands[p][i], play = fits(G, c), names = T('names');
-  const [x1, y1] = play ? slotPos(c.s, c.r) : [PILE[p][0] + (p === 0 ? G.disc[0].length * 7 : 0), PILE[p][1]];
-  fly = { p, i, c, x0, y0, w0, x1, y1, down: !play || false, t0: performance.now(), done: () => {
+  const [x1, y1] = play ? slotPos(c.s, c.r) : pileAt(p), w1 = play ? CW : p === 0 ? 26 : 24;
+  fly = { p, i, c, x0, y0, w0, w1, x1, y1, down: !play || false, t0: performance.now(), done: () => {
     apply(G, p, i);
     if (play) (c.r === 7 ? SFX.seven : SFX.play)(); else SFX.down();
     msg = p === 0 ? '' : play ? TXT[save.lang].played(names[p], cname(c)) : TXT[save.lang].putDown(names[p]);
@@ -654,10 +683,10 @@ function drawResult(sc) {
       : `I played HOLD THE SEVEN: ${fmt(you.score)} in Game ${G.n}.`;
     EmilyShare.snap({ canvas: cv, game: 'HOLD THE SEVEN', path: 'hold-the-seven/', text });
   }
-  const by = Math.min(ty + (last ? 52 : 34), 626);
-  if (window.EmilyShare) button(330, by, 190, 52, T('share'), () => EmilyShare.open(), { fill: '#2980b9' });
-  button(545, by, 190, 52, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12' });
-  button(760, by, 190, 52, T('menu'), () => go(Title), { fill: '#7f8c8d' });
+  const by = Math.min(ty + (last ? 50 : 30), 612);
+  if (window.EmilyShare) button(305, by, 210, 68, T('share'), () => EmilyShare.open(), { fill: '#2980b9', size: 32 });
+  button(535, by, 210, 68, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12', size: 32 });
+  button(765, by, 210, 68, T('menu'), () => go(Title), { fill: '#7f8c8d', size: 32 });
 }
 
 /* ======================= loop ======================= */
