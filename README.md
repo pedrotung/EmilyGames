@@ -16,7 +16,7 @@ and icons for this.
 
 ## Sharing a win
 
-When you clear a game (every level in Meow Brigade, a song in Disco Funkin', all 7 levels in Colour Jump) the game keeps a
+When you clear a game (every level in Meow Brigade, a song in Disco Funkin', each season in Colour Jump) the game keeps a
 picture of the screen with the game's web address on it, and a **Share** button opens a panel: share the picture through
 the phone's own share menu, open X, Facebook, WhatsApp, Telegram, Reddit or Weibo with the game link, save the picture, or
 copy the link. Web pages cannot post for you, so you always tap to share. The code is in [`share.js`](share.js); each page
@@ -29,6 +29,8 @@ Your block runs forward on its own; tap **JUMP** (or press Space) to clear gaps 
 then walk through the coloured door into the next level.
 
 - 7 levels in rainbow colours, each door with its own transition, rainbow and fireworks at the end
+- Season 2: 7 more levels with springs, moving platforms, crumbling bricks, enemies to stomp or dodge, checkpoints, and a King Crow boss
+- Pick your player and any level you have reached on the start screen
 - 90s rave background music and voice-style effects, all synthesised in the browser
 - Clouds, crows and their droppings (land on your head: "Ew!"; step in one on the ground: you slip forward), pause menu with Restart level / Back to Level 1
 
