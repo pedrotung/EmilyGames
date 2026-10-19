@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>HOLD THE SEVEN</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Hold The Seven">
+<meta name="theme-color" content="#1d6a43">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="description" content="Sevens, the card game: build the suits out from the 7s, block the bots and don't get stuck with points. Free in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="HOLD THE SEVEN">
+<meta property="og:description" content="Sevens, the card game: build the suits out from the 7s, block the bots and don't get stuck with points. Free in your browser.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/hold-the-seven/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/hold-the-seven/cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
+<style>
+  /* One 1280x720 canvas scaled to fit the screen; the whole game is drawn on it. */
+  @font-face {
+    font-family: "Patrick Hand";
+    src: url(fonts/patrick-hand-latin-400-normal.woff2) format("woff2"),
+         url(fonts/patrick-hand-latin-400-normal.woff) format("woff");
+    font-display: swap;
+  }
+  html, body { margin: 0; height: 100%; background: #0f4529; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; touch-action: none; }
+  .ov { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .7);
+    font: 24px "Patrick Hand", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; color: #222; text-align: center; padding: 16px; }
+  .ov[hidden] { display: none; }
+  .card { border: 3px solid #fff; border-radius: 14px; padding: 18px 24px; max-width: 520px; background: #fffdf6; }
+  .card h2 { margin: 0 0 8px; font-weight: 400; font-size: 34px; }
+  .card p { margin: 8px 0; }
+  .card button { font: inherit; border: 3px solid #222; background: #f39c12; color: #fff; border-radius: 12px; padding: 4px 32px; margin-top: 8px; }
+  #rotate { display: none; }
+  @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="HOLD THE SEVEN card game"></canvas>
+
+<div class="ov" id="homeOv" hidden>
+  <div class="card" role="dialog" aria-label="Full screen"><div id="homeTxt"></div><button id="homeOk">OK</button></div>
+</div>
+<div class="ov" id="rotate"><div class="card" id="rotateTxt"><h2>Turn your phone sideways</h2><p>HOLD THE SEVEN is played in landscape.</p></div></div>
+
+<script>
+'use strict';
+/* ======================= words (English, plus Chinese when the player picks it) ======================= */
+const TXT = {
+  en: {
+    title: 'HOLD THE SEVEN', tagline: "Build the suits from the 7s. Block your rivals. Don't get stuck!",
+    bots: 'Bots:', easy: 'Easy', normal: 'Normal', hard: 'Hard', play: 'PLAY', how: 'How to Play', language: 'Language',
+    home: 'Home', full: 'Full screen', exitFull: 'Exit full screen', sound: 'Sound', on: 'On', off: 'Off',
+    gameOf: (n, m) => `Game ${n} / ${m}`, yourTotal: 'Your total', you: 'You', names: ['You', 'Foxy', 'Rex', 'Panda'],
+    cardsLeft: n => `${n} cards`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
+    yourTurn: 'Your turn! Play a glowing card.', firstMove: 'You have the 7♠. Play it to start!',
+    noFit: 'No card fits! Pick one to put face down.', wouldBe: (c, p, z) => `(${c} = ${p}: ${z})`,
+    thinking: n => `${n} is thinking...`, played: (n, c) => `${n} played ${c}`, putDown: n => `${n} put a card face down`,
+    starts: n => `${n} has the 7♠ and starts.`,
+    hint: 'HINT', playBtn: 'PLAY', discard: 'DISCARD',
+    SAFE: 'SAFE', WARNING: 'WARNING', BUSTED: 'BUSTED', FLAWLESS: 'FLAWLESS', LUCKY: 'LUCKY SEVEN', SHUTOUT: 'SHUTOUT', WINNER: 'WINNER',
+    youWin: 'You Win!', youTie: 'You share the win!', wins: n => `${n} wins!`, tie: n => `${n} share the win!`,
+    cleanLine: 'FLAWLESS: 0 cards face down, winnings x2', luckyLine: c => `LUCKY SEVEN: 0 face down and the last card was ${c}, winnings x3`,
+    shutLine: n => `SHUTOUT: ${n} played no cards at all, x12!`,
+    colPlayer: 'Player', colCards: 'Face-down cards', colPoints: 'Points', colZone: 'Zone', colX: 'x', colScore: 'Score', none: 'none',
+    totalAfter: n => `Match total after Game ${n}:`, share: 'Share', next: 'Next Game', newMatch: 'New Match', menu: 'Menu',
+    matchOver: 'Match over!', place: p => ['You finished 1st!', 'You finished 2nd.', 'You finished 3rd.', 'You finished 4th.'][p],
+    howTitle: 'How to Play', close: 'Close',
+    howLines: [
+      '4 players, 13 cards each. Whoever has the 7♠ plays it first.',
+      'On your turn, play a card next to one on the table in the same suit',
+      '(7♠ is down, so 6♠ or 8♠ fit), or start a new suit with any 7.',
+      'If a card fits, you must play one. If nothing fits, put one card face down.',
+      'When all cards are gone, everyone shows their face-down cards.',
+      'Points: A = 1, 2-10 = number, J = 11, Q = 12, K = 13.',
+      'Fewest points wins and takes the other players\' points:',
+      '  SAFE 0-15 = x1, WARNING 16-30 = x2, BUSTED over 30 = x4, SHUTOUT (all 13 down) = x12.',
+      'FLAWLESS: the winner put no cards face down: winnings x2.',
+      'LUCKY SEVEN: FLAWLESS and your last card is a 7: winnings x3.',
+      'Tip: hold on to your 7s. Playing one opens a whole suit for everyone!',
+    ],
+    fsTitle: 'FULL SCREEN', fsBody: "This browser can't hide its toolbars for a web page. To play full screen, add the game to your home screen:",
+    fsIos: '<b>iPhone / iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the menu, then <b>Add to Home screen</b>.',
+    fsThen: 'Then open HOLD THE SEVEN from the new icon.', rotT: 'Turn your phone sideways', rotB: 'HOLD THE SEVEN is played in landscape.',
+  },
+  zh: {
+    title: '憋七', tagline: '从 7 开始往两边接龙，堵住对手，别被憋住！',
+    bots: '机器人：', easy: '简单', normal: '普通', hard: '困难', play: '开始', how: '玩法说明', language: 'Language',
+    home: '首页', full: '全屏', exitFull: '退出全屏', sound: '声音', on: '开', off: '关',
+    gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', names: ['你', '狐狸', '小狗', '熊猫'],
+    cardsLeft: n => `${n} 张牌`, faceDown: n => `扣了 ${n} 张`, yourPoints: '你的扣分：',
+    yourTurn: '轮到你了！出一张发光的牌。', firstMove: '你有黑桃 7，先出它！',
+    noFit: '没有牌能接！选一张牌扣下。', wouldBe: (c, p, z) => `（${c} 扣下后 = ${p} 分：${z}）`,
+    thinking: n => `${n}在想……`, played: (n, c) => `${n}出了 ${c}`, putDown: n => `${n}扣了一张牌`,
+    starts: n => `${n}有黑桃 7，先出。`,
+    hint: '提示', playBtn: '出牌', discard: '扣牌',
+    SAFE: '安全', WARNING: '警戒', BUSTED: '爆牌', FLAWLESS: '净手', LUCKY: '倒拉七', SHUTOUT: '关春天', WINNER: '赢家',
+    youWin: '你赢了！', youTie: '你和别人并列赢！', wins: n => `${n}赢了！`, tie: n => `${n}并列赢！`,
+    cleanLine: '净手：一张没扣，赢的积分 x2', luckyLine: c => `倒拉七：一张没扣，最后一张是 ${c}，赢的积分 x3`,
+    shutLine: n => `关春天：${n}一张牌都没出，x12！`,
+    colPlayer: '玩家', colCards: '扣的牌', colPoints: '扣分', colZone: '区', colX: '倍数', colScore: '得分', none: '无',
+    totalAfter: n => `第 ${n} 局后总分：`, share: '分享', next: '下一局', newMatch: '再来一场', menu: '首页',
+    matchOver: '比赛结束！', place: p => ['你得了第 1 名！', '你得了第 2 名。', '你得了第 3 名。', '你得了第 4 名。'][p],
+    howTitle: '玩法说明', close: '关闭',
+    howLines: [
+      '4 个人，每人 13 张牌。谁有黑桃 7 谁先出。',
+      '轮到你时，出一张和桌上同花色、点数相邻的牌',
+      '（桌上有黑桃 7，就可以接黑桃 6 或 8），或者出任意一张 7 开新花色。',
+      '有牌能接就必须出。没有能接的牌，就扣下一张（别人看不到）。',
+      '所有牌出完后，大家亮出扣下的牌，算扣分。',
+      '扣分：A = 1，2-10 按点数，J = 11，Q = 12，K = 13。',
+      '扣分最少的人赢，拿走其他人的分数：',
+      '  安全 0-15 = x1，警戒 16-30 = x2，爆牌 30 以上 = x4，关春天（13 张全扣）= x12。',
+      '净手：赢家一张牌都没扣，赢的积分 x2。',
+      '倒拉七：净手，而且最后一张出的是 7，赢的积分 x3。',
+      '小技巧：憋住你的 7！出了 7 就给所有人开了一整个花色。',
+    ],
+    fsTitle: '全屏', fsBody: '这个浏览器不能为网页隐藏工具栏。想全屏玩，请把游戏加到主屏幕：',
+    fsIos: '<b>iPhone / iPad（Safari）：</b>点分享按钮，再点<b>添加到主屏幕</b>。<br><b>安卓（Chrome）：</b>点菜单，再点<b>添加到主屏幕</b>。',
+    fsThen: '然后从新图标打开憋七。', rotT: '请把手机横过来', rotB: '憋七要横屏玩。',
+  },
+};
+const T = k => TXT[save.lang][k];
+
+/* ======================= save ======================= */
+const SAVE_KEY = 'holdTheSeven';
+let save = { lang: 'en', diff: 1, sound: true, best: null };
+try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) {}
+function store() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+/* ======================= canvas ======================= */
+const W = 1280, H = 720, GAMES = 5;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), s = Math.min(innerWidth / W, innerHeight / H);
+  cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px';
+  cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
+  ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+const FONT = '"Patrick Hand", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+const CARD_FONT = 'Georgia, "Times New Roman", serif';
+const YELLOW = '#ffe066';
+function txt(s, x, y, size = 28, align = 'center', color = '#fff', o = {}) {
+  ctx.font = `${o.bold ? 'bold ' : ''}${size}px ${o.font || FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (o.shadow !== false && color === '#fff') { ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillText(s, x, y + 2); }
+  ctx.fillStyle = color; ctx.fillText(s, x, y);
+}
+function textW(s, size, font = FONT) { ctx.font = `${size}px ${font}`; return ctx.measureText(s).width; }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function box(x, y, w, h, r, fill, stroke, lw = 2) {
+  rr(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+
+/* ======================= cards ======================= */
+const SUIT = ['♠', '♥', '♣', '♦'], RK = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const isRed = s => s === 1 || s === 3;
+const cname = c => RK[c.r] + SUIT[c.s];
+function drawCard(c, x, y, w, h, o = {}) {
+  ctx.save();
+  if (o.rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.rot); ctx.translate(-x - w / 2, -y - h / 2); }
+  const r = w * 0.13;
+  if (o.glow) { ctx.shadowColor = YELLOW; ctx.shadowBlur = 16; box(x - 3, y - 3, w + 6, h + 6, r + 3, YELLOW); ctx.shadowBlur = 0; }
+  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+  if (o.back) {
+    box(x, y, w, h, r, '#fff');
+    ctx.shadowColor = 'transparent';
+    ctx.save(); rr(x + 3, y + 3, w - 6, h - 6, r * 0.7); ctx.clip();
+    ctx.fillStyle = o.back === 'down' ? '#2c3e50' : '#a93226'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = o.back === 'down' ? '#3d566e' : '#c0392b'; ctx.lineWidth = 3;
+    for (let i = -h; i < w + h; i += 9) { ctx.beginPath(); ctx.moveTo(x + i, y); ctx.lineTo(x + i + h, y + h); ctx.stroke(); }
+    ctx.restore();
+  } else {
+    box(x, y, w, h, r, '#fffdf6', '#2a2a2a', 1.5);
+    ctx.shadowColor = 'transparent';
+    const col = isRed(c.s) ? '#d42a2a' : '#222', k = w / 50;
+    txt(RK[c.r], x + 4 * k, y + 11 * k, (c.r === 10 ? 15 : 17) * k, 'left', col, { bold: true, font: CARD_FONT });
+    txt(SUIT[c.s], x + 4 * k, y + 27 * k, 13 * k, 'left', col, { font: CARD_FONT });
+    txt(SUIT[c.s], x + w - 4 * k, y + h - 14 * k, 24 * k, 'right', col, { font: CARD_FONT });
+  }
+  if (o.dim) { box(x, y, w, h, r, 'rgba(0,0,0,.42)'); }
+  ctx.restore();
+}
+
+/* ======================= sound ======================= */
+let AC = null;
+function au() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (AC && AC.state === 'suspended') AC.resume(); }
+function tone(f, d, type = 'triangle', v = 0.15, at = 0) {
+  if (!save.sound || !AC) return;
+  const t = AC.currentTime + at, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d + 0.02);
+}
+const SFX = {
+  play: () => { tone(660, 0.08, 'triangle', 0.12); tone(990, 0.06, 'sine', 0.06, 0.03); },
+  down: () => { tone(160, 0.14, 'square', 0.06); tone(110, 0.16, 'sine', 0.12, 0.02); },
+  tap: () => tone(880, 0.04, 'sine', 0.06),
+  seven: () => [523, 659, 784].forEach((f, i) => tone(f, 0.12, 'triangle', 0.1, i * 0.06)),
+  win: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.12, i * 0.11)),
+  lose: () => [392, 349, 311, 262].forEach((f, i) => tone(f, 0.22, 'sawtooth', 0.05, i * 0.16)),
+};
+
+/* ======================= rules ======================= */
+function newDeck() { const d = []; for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) d.push({ s, r }); return d; }
+function shuffle(a, rnd = Math.random) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const sortHand = h => h.sort((a, b) => a.s - b.s || a.r - b.r);
+function fits(g, c) {
+  if (g.moves === 0) return c.s === 0 && c.r === 7; // 7♠ first
+  const b = g.board[c.s];
+  return b ? c.r === b[0] - 1 || c.r === b[1] + 1 : c.r === 7;
+}
+const zoneOf = pts => pts > 30 ? 'BUSTED' : pts > 15 ? 'WARNING' : 'SAFE';
+const ZONE_X = { SAFE: 1, WARNING: 2, BUSTED: 4 };
+const ZONE_COL = { SAFE: '#27ae60', WARNING: '#e67e22', BUSTED: '#c0392b', FLAWLESS: '#f1c40f', LUCKY: '#e74c3c', SHUTOUT: '#111', WINNER: '#2980b9' };
+const points = cards => cards.reduce((a, c) => a + c.r, 0);
+
+function newGame(totals, n) {
+  const d = shuffle(newDeck()), g = { hands: [], disc: [[], [], [], []], board: [null, null, null, null], last: [null, null, null, null],
+    moves: 0, turn: 0, n, totals: totals || [0, 0, 0, 0], over: false, res: null };
+  for (let p = 0; p < 4; p++) g.hands.push(sortHand(d.slice(p * 13, p * 13 + 13)));
+  g.turn = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
+  return g;
+}
+// One move: play a card that fits, or (only when nothing fits) put one face down.
+function apply(g, p, i) {
+  const c = g.hands[p][i], play = fits(g, c);
+  g.hands[p].splice(i, 1);
+  if (play) { const b = g.board[c.s]; g.board[c.s] = b ? [Math.min(b[0], c.r), Math.max(b[1], c.r)] : [7, 7]; g.last[p] = c; }
+  else g.disc[p].push(c);
+  g.moves++;
+  g.turn = (p + 1) % 4;
+  if (g.moves === 52) { g.over = true; g.res = score(g); }
+  return play;
+}
+// Fewest face-down points wins (Jason). Ties: fewer face-down cards, then the winners share.
+// Each loser pays points x zone (x12 when all 13 went face down), times x2 if a winner is FLAWLESS
+// or x3 for LUCKY SEVEN (no cards face down and the last card played was a 7).
+function score(g) {
+  const pts = g.disc.map(points), cnt = g.disc.map(d => d.length);
+  const lo = Math.min(...pts), loCnt = Math.min(...[0, 1, 2, 3].filter(p => pts[p] === lo).map(p => cnt[p]));
+  const winners = [0, 1, 2, 3].filter(p => pts[p] === lo && cnt[p] === loCnt);
+  const clean = cnt[winners[0]] === 0;
+  const lucky = clean && winners.some(p => g.last[p] && g.last[p].r === 7);
+  const bonus = lucky ? 3 : clean ? 2 : 1;
+  const rows = [0, 1, 2, 3].map(p => {
+    const win = winners.includes(p), zone = zoneOf(pts[p]), shut = cnt[p] === 13;
+    const zx = shut ? 12 : ZONE_X[zone];
+    return { p, win, pts: pts[p], cards: g.disc[p].slice(), zone, shut, zx, loss: win ? 0 : pts[p] * zx * bonus,
+      badge: win ? (lucky && g.last[p] && g.last[p].r === 7 ? 'LUCKY' : clean ? 'FLAWLESS' : 'WINNER') : shut ? 'SHUTOUT' : zone, last: g.last[p] };
+  });
+  const pot = rows.reduce((a, r) => a + r.loss, 0), share = Math.floor(pot / winners.length);
+  rows.forEach(r => { r.score = r.win ? share + (r.p === winners[0] ? pot - share * winners.length : 0) : -r.loss; });
+  return { rows, winners, clean, lucky, bonus, pot };
+}
+
+/* ======================= bots ======================= */
+// Easy: any card. Normal: plays cards that lead to its own cards, drops its smallest card.
+// Hard: really holds the 7s and edge cards so rivals get stuck, and keeps cards it can still reach.
+function chooseMove(g, p, level) {
+  const h = g.hands[p], ok = h.map((c, i) => i).filter(i => fits(g, h[i]));
+  const best = (list, f) => list.reduce((a, i) => (f(i) > f(a) ? i : a), list[0]);
+  if (level === 0) return (ok.length ? ok : h.map((c, i) => i))[Math.floor(Math.random() * (ok.length || h.length))];
+  if (level === 2) return lookAhead(g, p, ok.length ? ok : h.map((c, i) => i));
+  if (ok.length) return best(ok, i => playValue(g, h, h[i], level) + (level === 1 ? Math.random() * 3 : Math.random() * 0.1));
+  return best(h.map((c, i) => i), i => -keepValue(g, h, h[i], level) + Math.random() * 0.1);
+}
+function playValue(g, h, c, level) {
+  const mine = h.filter(x => x.s === c.s && x !== c);
+  let follow, near, edge;
+  if (c.r === 7) { follow = mine.length; near = mine.some(x => x.r === 6 || x.r === 8); edge = false; }
+  else { const dir = c.r < 7 ? -1 : 1; follow = mine.filter(x => (x.r - c.r) * dir > 0).length; near = mine.some(x => x.r === c.r + dir); edge = c.r === 1 || c.r === 13; }
+  let v = follow * 2 + (near ? 3 : 0) + c.r * 0.05;
+  if (!follow && !edge) v -= level === 2 ? 6 : 3; // only opens cards for the others
+  if (c.r === 7 && level === 2) v -= 3 - Math.min(follow, 3); // hold the seven
+  if (level === 2) v += Math.max(0, c.r - 7) * 0.15 + (edge ? 1 : 0); // get rid of big cards when it is free
+  return v;
+}
+// Hard: for each possible move, deal the cards it can't see to the others at random many times,
+// play the rest of the game out with Normal bots, and pick the move that scores best on average.
+const ROLLOUTS = 60;
+function lookAhead(g, p, moves) {
+  if (moves.length === 1) return moves[0];
+  const seen = new Set(), key = c => c.s * 13 + c.r;
+  g.hands[p].forEach(c => seen.add(key(c))); g.disc[p].forEach(c => seen.add(key(c)));
+  g.board.forEach((b, s) => { if (b) for (let r = b[0]; r <= b[1]; r++) seen.add(s * 13 + r); });
+  const unseen = newDeck().filter(c => !seen.has(key(c)));
+  const total = moves.map(() => 0);
+  for (let k = 0; k < ROLLOUTS; k++) {
+    const pool = shuffle(unseen.slice()); let at = 0;
+    const hands = [], disc = [];
+    for (let q = 0; q < 4; q++) {
+      if (q === p) { hands.push(g.hands[p]); disc.push(g.disc[p]); continue; }
+      hands.push(pool.slice(at, at += g.hands[q].length)); disc.push(pool.slice(at, at += g.disc[q].length));
+    }
+    moves.forEach((i, m) => {
+      const s = { hands: hands.map(h => h.slice()), disc: disc.map(d => d.slice()), board: g.board.map(b => b && b.slice()),
+        last: g.last.slice(), moves: g.moves, turn: p, over: false, res: null };
+      apply(s, p, i);
+      while (!s.over) apply(s, s.turn, chooseMove(s, s.turn, 1));
+      total[m] += s.res.rows[p].score;
+    });
+  }
+  return moves[total.indexOf(Math.max(...total))];
+}
+// How much a bot wants to keep a card when it has to put one face down.
+function keepValue(g, h, c, level) {
+  let v = c.r;
+  if (level < 2) return v;
+  const b = g.board[c.s], dir = c.r < 7 ? -1 : 1;
+  if (b) { // can I reach it with my own cards? Then keep it.
+    const from = dir < 0 ? b[0] - 1 : b[1] + 1; let ok = true;
+    for (let r = from; r !== c.r; r += dir) if (!h.some(x => x.s === c.s && x.r === r)) { ok = false; break; }
+    if (ok) v += 14; else v -= 2; // a card in the way of a rival's run blocks them: cheap to keep it hidden
+  }
+  return v;
+}
+
+/* ======================= input ======================= */
+let hits = [], lastHits = [];
+function button(x, y, w, h, label, fn, o = {}) {
+  const off = o.disabled;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowOffsetY = 4;
+  box(x, y, w, h, Math.min(14, h / 3), off ? '#6c7a73' : (o.fill || '#2980b9'), off ? '#cfd8d3' : '#fff', 3); ctx.restore();
+  txt(label, x + w / 2, y + h / 2 + 1, o.size || 28, 'center', off ? '#cfd8d3' : (o.color || '#fff'), { shadow: false });
+  if (!off) hits.push({ x, y, w, h, fn });
+}
+function toCanvas(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); au();
+  if (fsCan && !fsOn() && !triedAutoFs && matchMedia('(pointer: coarse)').matches) { triedAutoFs = true; toggleFullscreen(); }
+  const [x, y] = toCanvas(e);
+  for (let i = lastHits.length - 1; i >= 0; i--) { const b = lastHits[i]; if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { SFX.tap(); b.fn(); return; } }
+  if (scr.tap) scr.tap(x, y);
+});
+addEventListener('keydown', e => { if (scr.key) scr.key(e); });
+
+/* ======================= full screen ======================= */
+// Fullscreen API where the browser has it (Android, iPad, computers). iPhone Safari has none,
+// so the button explains Add to Home Screen instead (see manifest.webmanifest).
+const root = document.documentElement;
+const fsCan = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+let triedAutoFs = false;
+function toggleFullscreen() {
+  if (fsOn()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  if (!fsCan) {
+    document.getElementById('homeTxt').innerHTML = `<h2>${T('fsTitle')}</h2><p>${T('fsBody')}</p><p>${T('fsIos')}</p><p>${T('fsThen')}</p>`;
+    document.getElementById('homeOv').hidden = false; return;
+  }
+  try { const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+document.getElementById('homeOk').addEventListener('click', () => { document.getElementById('homeOv').hidden = true; });
+function setLang(l) {
+  save.lang = l; store(); document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+  document.getElementById('rotateTxt').innerHTML = `<h2>${T('rotT')}</h2><p>${T('rotB')}</p>`;
+}
+
+function topBar(mid) {
+  button(14, 12, 110, 42, '⌂ ' + T('home'), () => { location.href = '../index.html'; }, { fill: 'rgba(0,0,0,.3)', size: 24 });
+  if (!standalone) button(W - 14 - 160, 12, 160, 42, '⛶ ' + (fsOn() ? T('exitFull') : T('full')), toggleFullscreen, { fill: 'rgba(0,0,0,.3)', size: fsOn() ? 20 : 24 });
+  if (mid) { const w = textW(mid, 22) + 30; box(W / 2 - w / 2, 12, w, 42, 12, 'rgba(0,0,0,.3)', 'rgba(255,255,255,.5)'); txt(mid, W / 2, 34, 22); }
+}
+function felt() {
+  const g = ctx.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.7);
+  g.addColorStop(0, '#2f8a5b'); g.addColorStop(0.55, '#1d6a43'); g.addColorStop(1, '#0f4529');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function badge(k, x, y, size = 18, align = 'left') {
+  const s = T(k), w = textW(s, size) + 18, h = size + 8, bx = align === 'center' ? x - w / 2 : x;
+  box(bx, y - h / 2, w, h, h / 2, ZONE_COL[k], k === 'FLAWLESS' ? '#333' : '#fff', 2);
+  txt(s, bx + w / 2, y + 1, size, 'center', k === 'FLAWLESS' ? '#333' : '#fff', { shadow: false });
+  return w;
+}
+function avatar(p, x, y, r, ring) {
+  if (ring) { ctx.save(); ctx.shadowColor = YELLOW; ctx.shadowBlur = 22; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.fillStyle = YELLOW; ctx.fill(); ctx.restore(); }
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = p === 0 ? '#9be7ff' : '#f4d35e'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  txt(['😺', '🦊', '🐶', '🐼'][p], x, y + 2, r * 1.1, 'center', '#000', { shadow: false });
+}
+
+/* ======================= title screen ======================= */
+const COVER = /cover/.test(location.search); // clean title picture for the share card
+let scr = null;
+function go(s) { scr = s; if (s.enter) s.enter(); }
+const Title = {
+  langOpen: false, howOpen: false,
+  enter() { this.langOpen = false; this.howOpen = false; },
+  draw(t) {
+    felt(); if (!COVER) topBar();
+    [[-14, 470, 120], [-5, 555, 100], [5, 640, 100], [14, 725, 120]].forEach(([a, x, y], s) => {
+      const bob = Math.sin(t / 600 + s) * 4;
+      drawCard({ s, r: 7 }, x - 10, y - 15 + bob, 98, 137, { rot: a * Math.PI / 180 });
+    });
+    txt(T('title'), W / 2, save.lang === 'zh' ? 340 : 352, save.lang === 'zh' ? 86 : 88);
+    txt(T('tagline'), W / 2, 418, 28);
+    const levels = ['easy', 'normal', 'hard'];
+    if (COVER) { button(520, 470, 240, 70, T('play'), startMatch, { fill: '#f39c12', size: 40 }); return; }
+    const lw = textW(T('bots'), 26) + 12; let x = W / 2 - (lw + 3 * 110 + 20) / 2;
+    txt(T('bots'), x, 482, 26, 'left'); x += lw;
+    levels.forEach((k, i) => { button(x + i * 115, 462, 105, 40, T(k), () => { save.diff = i; store(); }, { fill: save.diff === i ? '#f39c12' : 'rgba(0,0,0,.25)', size: 24 }); });
+    button(520, 520, 240, 70, T('play'), startMatch, { fill: '#f39c12', size: 40 });
+    button(520, 606, 240, 54, T('how'), () => { this.howOpen = true; }, { size: 28 });
+    button(24, 660, 150, 44, `${T('sound')}: ${save.sound ? T('on') : T('off')}`, () => { save.sound = !save.sound; store(); }, { fill: 'rgba(0,0,0,.3)', size: 22 });
+    button(W - 24 - 220, 660, 220, 44, '🌐 ' + T('language') + ': ' + (save.lang === 'zh' ? '中文' : 'English'), () => { this.langOpen = !this.langOpen; }, { fill: 'rgba(0,0,0,.3)', size: 22 });
+    if (this.langOpen) {
+      box(W - 24 - 220, 548, 220, 104, 14, '#fffdf6', '#fff', 3);
+      [['en', 'English'], ['zh', '中文']].forEach(([l, name], i) => {
+        const y = 552 + i * 48; if (save.lang === l) box(W - 24 - 216, y, 212, 44, 10, '#f39c12');
+        txt((save.lang === l ? '✓ ' : '') + name, W - 24 - 110, y + 23, 26, 'center', save.lang === l ? '#fff' : '#333', { shadow: false });
+        hits.push({ x: W - 24 - 220, y, w: 220, h: 48, fn: () => { setLang(l); this.langOpen = false; } });
+      });
+    }
+    if (this.howOpen) howPanel(() => { this.howOpen = false; });
+  },
+  tap() { this.langOpen = false; },
+};
+function howPanel(close) {
+  ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
+  box(150, 50, 980, 620, 24, '#fffdf6', '#f1c40f', 5);
+  txt(T('howTitle'), W / 2, 100, 48, 'center', '#e67e22');
+  T('howLines').forEach((l, i) => txt(l, 200, 160 + i * 40, 25, 'left', '#333'));
+  button(540, 600, 200, 52, T('close'), close, { fill: '#f39c12' });
+}
+
+/* ======================= match + game screen ======================= */
+let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultAt = 0, howInGame = false;
+const BOT_WAIT = 750, FLY_MS = 320;
+function startMatch() { G = newGame(null, 1); go(Play); }
+function nextGame() { G = G.n >= GAMES ? newGame(null, 1) : newGame(G.totals, G.n + 1); go(Play); }
+const BX = 290, BY = 178, BDX = 54, BDY = 78;
+const slotPos = (s, r) => [BX + (r - 1) * BDX, BY + s * BDY];
+const SEAT = [[640, 640], [115, 440], [640, 85], [1165, 440]]; // where each player's cards come from
+
+const Play = {
+  enter() {
+    sel = -1; fly = null; resultAt = 0; howInGame = false; this.snapped = false;
+    msg = G.turn === 0 ? '' : TXT[save.lang].starts(T('names')[G.turn]); botAt = performance.now() + BOT_WAIT + 500;
+  },
+  draw(t) {
+    felt();
+    topBar(`${TXT[save.lang].gameOf(G.n, GAMES)}  ·  ${T('yourTotal')}: ${fmt(G.totals[0])}`);
+    drawBoard();
+    drawBots();
+    drawYou();
+    // bots move on a timer; the flying card finishes each move
+    if (fly && t >= fly.t0 + FLY_MS) { const f = fly; fly = null; f.done(); }
+    if (!fly && !G.over && G.turn !== 0 && t >= botAt) botMove(t);
+    if (fly) {
+      const k = Math.min(1, (t - fly.t0) / FLY_MS), e = 1 - (1 - k) * (1 - k);
+      const x = fly.x0 + (fly.x1 - fly.x0) * e, y = fly.y0 + (fly.y1 - fly.y0) * e, w = fly.w0 + (50 - fly.w0) * e;
+      drawCard(fly.c, x, y, w, w * 1.4, { back: fly.down ? 'down' : null });
+    }
+    if (G.over && !fly) {
+      if (!resultAt) { resultAt = t; G.res.rows[0].win ? SFX.win() : SFX.lose(); }
+      if (t - resultAt > 700) drawResult(this);
+    }
+    if (howInGame) howPanel(() => { howInGame = false; });
+  },
+  tap(x, y) {
+    if (G.over || G.turn !== 0 || fly) return;
+    for (let i = handRects.length - 1; i >= 0; i--) {
+      const r = handRects[i];
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        if (!r.ok) return;
+        if (sel === i) humanMove(); else { sel = i; SFX.tap(); }
+        return;
+      }
+    }
+    sel = -1;
+  },
+  key(e) {
+    if (G.over || G.turn !== 0 || fly) return;
+    const n = G.hands[0].length;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const ok = [...Array(n).keys()].filter(i => canPick(i)); if (!ok.length) return;
+      const at = ok.indexOf(sel); sel = ok[(at + (e.key === 'ArrowRight' ? 1 : ok.length - 1) + (at < 0 ? 1 : 0)) % ok.length];
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && sel >= 0) humanMove();
+  },
+};
+const fmt = v => (v > 0 ? '+' : '') + v;
+const anyFits = p => G.hands[p].some(c => fits(G, c));
+const canPick = i => fits(G, G.hands[0][i]) || !anyFits(0);
+
+function drawBoard() {
+  for (let s = 0; s < 4; s++) {
+    txt(SUIT[s], BX - 32, BY + s * BDY + 36, 36, 'center', isRed(s) ? '#ff8a8a' : '#fff', { font: CARD_FONT });
+    const b = G.board[s];
+    for (let r = 1; r <= 13; r++) {
+      const [x, y] = slotPos(s, r);
+      if (b && r >= b[0] && r <= b[1]) { drawCard({ s, r }, x, y, 50, 70); continue; }
+      const next = G.moves === 0 ? s === 0 && r === 7 : b ? r === b[0] - 1 || r === b[1] + 1 : r === 7;
+      ctx.save(); ctx.setLineDash(next ? [] : [5, 4]);
+      if (next) { ctx.shadowColor = YELLOW; ctx.shadowBlur = 10; }
+      box(x, y, 50, 70, 7, next ? 'rgba(255,224,102,.12)' : null, next ? YELLOW : 'rgba(255,255,255,.22)', next ? 2.5 : 1.5);
+      ctx.restore();
+      txt(RK[r], x + 25, y + 36, 18, 'center', next ? YELLOW : 'rgba(255,255,255,.3)', { shadow: false });
+    }
+  }
+}
+function drawBots() {
+  const names = T('names');
+  // left and right
+  [[1, 30], [3, 1080]].forEach(([p, x]) => {
+    avatar(p, x + 85, 282, 31, G.turn === p && !G.over);
+    txt(names[p], x + 85, 332, 26);
+    txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, x + 85, 360, 19);
+    for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, x + 63, 388 + i * 9, 44, 62, { back: 'red' });
+    for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, x + (p === 1 ? 135 : -10), 400 + i * 6, 32, 45, { back: 'down' });
+  });
+  // top
+  const p = 2;
+  avatar(p, 477, 87, 27, G.turn === p && !G.over);
+  txt(names[p], 514, 74, 23, 'left');
+  txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, 514, 101, 18, 'left');
+  for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, 690 + i * 12, 62, 36, 50, { back: 'red' });
+  for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, 790 + i * 7, 68, 28, 40, { back: 'down' });
+}
+function drawYou() {
+  const L = TXT[save.lang], my = points(G.disc[0]), zone = zoneOf(my), mine = G.turn === 0 && !G.over && !fly;
+  avatar(0, 58, 588, 31, mine);
+  txt(T('you'), 100, 575, 26, 'left'); txt(L.faceDown(G.disc[0].length), 100, 603, 19, 'left');
+  txt(T('yourPoints'), 24, 640, 20, 'left');
+  const pw = textW(T('yourPoints'), 20); txt(String(my), 30 + pw, 640, 26, 'left', '#fff', { bold: true });
+  badge(zone, 44 + pw + textW(String(my), 26), 640, 16);
+  // points bar 0-15-30-45+
+  const bx = 24, by = 662, bw = 200, g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+  g.addColorStop(0, '#27ae60'); g.addColorStop(0.33, '#27ae60'); g.addColorStop(0.333, '#e67e22'); g.addColorStop(0.66, '#e67e22'); g.addColorStop(0.663, '#c0392b'); g.addColorStop(1, '#c0392b');
+  box(bx, by, bw, 14, 7, g, '#fff', 2);
+  box(bx + Math.min(my / 45, 1) * (bw - 6), by - 5, 6, 24, 3, '#fff');
+  ['0', '15', '30', '45+'].forEach((s, i) => txt(s, bx + [4, 66, 133, 190][i], by + 30, 14, 'center', 'rgba(255,255,255,.8)', { shadow: false }));
+
+  // hand
+  const h = G.hands[0], n = h.length, step = n > 1 ? Math.min(62, 680 / (n - 1)) : 0, w0 = 78 + (n - 1) * step, x0 = 640 - w0 / 2;
+  const stuck = mine && !anyFits(0);
+  handRects = [];
+  h.forEach((c, i) => {
+    const ok = mine && canPick(i), y = 596 - (sel === i ? 26 : 0);
+    if (fly && fly.p === 0 && fly.i === i) return;
+    drawCard(c, x0 + i * step, y, 78, 110, { glow: ok && !stuck, dim: mine && stuck && sel !== i || (!mine && G.turn !== 0 && false) });
+    handRects.push({ x: x0 + i * step, y, w: i === n - 1 ? 78 : step, h: 124, ok });
+  });
+
+  // message line + buttons
+  let line = msg, col = '#fff';
+  if (mine) {
+    line = G.moves === 0 ? T('firstMove') : stuck ? T('noFit') : T('yourTurn'); col = YELLOW;
+    if (stuck && sel >= 0) { const c = h[sel], np = my + c.r; line += ' ' + L.wouldBe(cname(c), np, T(zoneOf(np)) + ' x' + ZONE_X[zoneOf(np)]); }
+  }
+  if (stuck) { const w = textW(line, 23) + 40; box(W / 2 - w / 2, 488, w, 40, 14, 'rgba(142,68,173,.85)', '#fff', 3); txt(line, W / 2, 509, 23, 'center', '#fff'); }
+  else if (line) txt(line, W / 2, 536, 28, 'center', col);
+  const selOk = sel >= 0 && sel < n && canPick(sel);
+  button(1050, 584, 95, 52, T('hint'), () => { sel = chooseMove(G, 0, 2); }, { disabled: !mine, size: 26 });
+  button(1155, 584, 110, 52, T('playBtn'), humanMove, { fill: '#f39c12', disabled: !mine || stuck || !selOk, size: 26 });
+  button(1050, 648, 215, 52, T('discard'), humanMove, { fill: '#8e44ad', disabled: !mine || !stuck || !selOk, size: 26 });
+}
+
+function humanMove() {
+  if (sel < 0 || G.turn !== 0 || fly || !canPick(sel)) return;
+  const r = handRects[sel]; startFly(0, sel, r.x, r.y, 78); sel = -1;
+}
+function botMove() {
+  const p = G.turn, i = chooseMove(G, p, save.diff);
+  startFly(p, i, SEAT[p][0] - 22, SEAT[p][1] - 31, 44);
+}
+function startFly(p, i, x0, y0, w0) {
+  const c = G.hands[p][i], play = fits(G, c), names = T('names');
+  const [x1, y1] = play ? slotPos(c.s, c.r) : [SEAT[p][0] - 25, SEAT[p][1] - 35];
+  fly = { p, i, c, x0, y0, w0, x1, y1, down: !play || false, t0: performance.now(), done: () => {
+    apply(G, p, i);
+    if (play) (c.r === 7 ? SFX.seven : SFX.play)(); else SFX.down();
+    msg = p === 0 ? '' : play ? TXT[save.lang].played(names[p], cname(c)) : TXT[save.lang].putDown(names[p]);
+    botAt = performance.now() + BOT_WAIT;
+  } };
+  if (!play && p !== 0) fly.down = true;
+}
+
+/* ======================= results ======================= */
+function drawResult(sc) {
+  const L = TXT[save.lang], R = G.res, names = T('names'), you = R.rows[0];
+  ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
+  box(170, 34, 940, 656, 24, '#fffdf6', '#f1c40f', 5);
+  const wn = R.winners.map(p => names[p]).join(' & ');
+  const head = you.win ? (R.winners.length > 1 ? T('youTie') : T('youWin')) : R.winners.length > 1 ? L.tie(wn) : L.wins(wn);
+  txt(head, W / 2, 84, 56, 'center', you.win ? '#e67e22' : '#2980b9');
+  // bonus lines
+  const lines = [];
+  if (R.lucky) { const w = R.rows.find(r => r.badge === 'LUCKY'); lines.push(['LUCKY', L.luckyLine(cname(w.last))]); }
+  else if (R.clean) lines.push(['FLAWLESS', T('cleanLine')]);
+  R.rows.filter(r => r.shut).forEach(r => lines.push(['SHUTOUT', L.shutLine(names[r.p])]));
+  lines.forEach(([k, s], i) => txt(s, W / 2, 132 + i * 30, 23, 'center', '#333'));
+  const hy = 132 + Math.max(lines.length, 1) * 30;
+  const cols = [210, 360, 625, 712, 852, 930];
+  [T('colPlayer'), T('colCards'), T('colPoints'), T('colZone'), T('colX'), T('colScore')].forEach((s, i) => txt(s, cols[i], hy, 20, 'left', '#888'));
+  const order = [0, 1, 2, 3];
+  order.forEach((p, i) => {
+    const r = R.rows[p], y = hy + 22 + i * 80;
+    box(202, y, 876, 74, 12, r.win ? '#fff3c4' : '#f1ece0');
+    avatar(p, 230, y + 37, 20);
+    txt(names[p], 258, y + 37, 28, 'left', '#333');
+    if (!r.cards.length) txt(T('none'), cols[1] + 4, y + 37, 24, 'left', '#999');
+    const step = r.cards.length > 1 ? Math.min(38, 200 / (r.cards.length - 1)) : 0;
+    r.cards.forEach((c, j) => drawCard(c, cols[1] + j * step, y + 2, 50, 70));
+    txt(String(r.pts), cols[2] + 8, y + 38, 32, 'left', '#333');
+    badge(r.badge, cols[3], y + 37, 17);
+    if (!r.win) txt(r.zx + (R.bonus > 1 ? ' x' + R.bonus : ''), cols[4], y + 38, 24, 'left', '#333');
+    txt(fmt(r.score), cols[5], y + 38, 36, 'left', r.score > 0 ? '#27ae60' : r.score < 0 ? '#c0392b' : '#333');
+  });
+  // match totals (added once)
+  if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); }
+  const ty = hy + 22 + 4 * 80 + 22;
+  txt(L.totalAfter(G.n) + ' ' + [0, 1, 2, 3].map(p => `${names[p]} ${fmt(G.totals[p])}`).join(' · '), W / 2, ty, 22, 'center', '#777');
+  const last = G.n >= GAMES;
+  if (last) {
+    const place = [1, 2, 3].filter(p => G.totals[p] > G.totals[0]).length;
+    txt(T('matchOver') + ' ' + T('place')(place), W / 2, ty + 30, 26, 'center', '#e67e22');
+  }
+  // picture of the result for the Share button, taken once the panel is drawn
+  if (!sc.snapped && window.EmilyShare) {
+    sc.snapped = true;
+    const text = R.lucky && you.win ? `LUCKY SEVEN! I won Game ${G.n} of HOLD THE SEVEN with ${fmt(you.score)}!`
+      : you.win ? `I won Game ${G.n} of HOLD THE SEVEN with ${fmt(you.score)}!`
+      : `I played HOLD THE SEVEN: ${fmt(you.score)} in Game ${G.n}.`;
+    EmilyShare.snap({ canvas: cv, game: 'HOLD THE SEVEN', path: 'hold-the-seven/', text });
+  }
+  const by = Math.min(ty + (last ? 52 : 34), 626);
+  if (window.EmilyShare) button(330, by, 190, 52, T('share'), () => EmilyShare.open(), { fill: '#2980b9' });
+  button(545, by, 190, 52, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12' });
+  button(760, by, 190, 52, T('menu'), () => go(Title), { fill: '#7f8c8d' });
+}
+
+/* ======================= loop ======================= */
+function frame(now) {
+  hits = [];
+  ctx.clearRect(0, 0, W, H);
+  scr.draw(now);
+  lastHits = hits;
+  requestAnimationFrame(frame);
+}
+setLang(save.lang);
+go(Title);
+requestAnimationFrame(frame);
+
+// Test hooks: __h7.sim(n, levels) plays n bot-only games and checks the rules.
+window.__h7 = {
+  get G() { return G; }, go: name => go({ Title, Play }[name]),
+  sim(n = 200, levels = [2, 1, 1, 1]) {
+    const tot = [0, 0, 0, 0], wins = [0, 0, 0, 0]; let clean = 0, lucky = 0, shut = 0, bad = 0;
+    for (let k = 0; k < n; k++) {
+      const g = newGame(null, 1);
+      while (!g.over) {
+        const p = g.turn, i = chooseMove(g, p, levels[p]), must = g.hands[p].some(c => fits(g, c));
+        if (must && !fits(g, g.hands[p][i])) bad++;
+        apply(g, p, i);
+      }
+      const r = g.res; if (r.rows.reduce((a, x) => a + x.score, 0) !== 0) bad++;
+      r.rows.forEach(x => { tot[x.p] += x.score; if (x.win) wins[x.p]++; if (x.shut) shut++; });
+      if (r.clean) clean++; if (r.lucky) lucky++;
+    }
+    return { avg: tot.map(v => Math.round(v / n)), wins, clean, lucky, shut, bad };
+  },
+  finish() { // bots play every seat to the end of this game (for screenshots)
+    while (!G.over) apply(G, G.turn, chooseMove(G, G.turn, 2));
+  },
+  luckyDemo() { // a finished game where you won with LUCKY SEVEN (for screenshots)
+    for (let k = 0; k < 5000; k++) {
+      const g = newGame(null, 1);
+      while (!g.over) apply(g, g.turn, chooseMove(g, g.turn, 1));
+      if (g.res.lucky && g.res.rows[0].badge === 'LUCKY') { G = g; go(Play); return k; }
+    }
+  },
+  setLang, startMatch,
+};
+</script>
+</body>
+</html>

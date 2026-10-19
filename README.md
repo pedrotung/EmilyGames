@@ -16,7 +16,7 @@ and icons for this.
 
 ## Sharing a win
 
-When you clear a game (every level in Meow Brigade, a song in Disco Funkin', each season in Colour Jump) the game keeps a
+When you clear a game (every level in Meow Brigade, a song in Disco Funkin', each season in Colour Jump, every game of HOLD THE SEVEN) the game keeps a
 picture of the screen with the game's web address on it, and a **Share** button opens a panel: share the picture through
 the phone's own share menu, open X, Facebook, WhatsApp, Telegram, Reddit or Weibo with the game link, save the picture, or
 copy the link. Web pages cannot post for you, so you always tap to share. The code is in [`share.js`](share.js); each page
@@ -64,3 +64,14 @@ Tap a hurt cat and then **HEAL** to use a Nurse heal.
 
 The game loads its art from `cat-rat-battle/assets/` and its font from `cat-rat-battle/src/fonts/`, so serve the whole folder
 (GitHub Pages: `/cat-rat-battle/`). Design notes and numbers are in `cat-rat-battle/stats-table.md`.
+
+## HOLD THE SEVEN
+
+[`hold-the-seven/index.html`](hold-the-seven/index.html) is Sevens (憋七), the card game, for you against three bots.
+Whoever has the 7♠ starts; build each suit out from its 7, and when nothing fits put a card face down.
+Fewest face-down points wins and takes the others' points (Safe x1, Warning x2, Busted x4, Shutout x12;
+FLAWLESS x2 when the winner put nothing face down, LUCKY SEVEN x3 when the last card was also a 7).
+
+- 5 games per match with a running total; Easy, Normal and Hard bots (Hard plays each move out many times before choosing)
+- English by default, with a Language button (English / 中文) on the title screen
+- Everything is drawn on one canvas; the font is in `hold-the-seven/fonts/`. Test hooks: `__h7.sim(n, levels)`, `__h7.luckyDemo()`
