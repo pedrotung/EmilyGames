@@ -290,12 +290,12 @@ const LEVELS = [
     hints: [[650, 'Ride the moving platforms']],
   },
   {
-    name: 'Level 11', speed: 275, cp: 2200,
+    name: 'Level 11', speed: 285, cp: 2200,
     c: { bg: '#FFE6DE', faint: '#F8BCA9', mid: '#F06B4A', ground: '#7A2A17' },
     segs: [[-600, 1700, BASE], [1230, 770, BASE], [2150, 750, 230], [3020, 780, BASE], [3950, 1150, BASE]],
     blocks: [[1900, 30, 40], [3700, 30, 50]],
-    spikes: [[450, 2], [1700, 3], [2700, 3], [3250, 4], [4400, 3]],
-    enemies: [['hedgehog', 800], ['hedgehog', 2450], ['hedgehog', 3500], ['hedgehog', 4700]],
+    spikes: [[450, 3], [1700, 4], [2700, 4], [3250, 5], [4400, 3]],
+    enemies: [['hedgehog', 800], ['hedgehog', 1450], ['hedgehog', 2450], ['hedgehog', 3500], ['hedgehog', 4700]],
     door: 4900,
     hints: [[260, "Spikes and hedgehogs: don't touch!"]],
   },
@@ -384,7 +384,7 @@ function foeBox(L, f, t) {
   const u = t - f.tm;
   let x = f.m, y = f.ground - f.h;
   if (f.kind === 'snail') x = f.m - 30 * u;
-  else if (f.kind === 'hedgehog') x = f.m + 28 * Math.sin(2 * Math.PI * (u / 2.6 + f.ph));
+  else if (f.kind === 'hedgehog') x = f.m + 36 * Math.sin(2 * Math.PI * (u / 2.3 + f.ph));
   else if (f.kind === 'frog') {
     const k = ((u / 1.6 + f.ph) % 1 + 1) % 1;
     if (k < 0.5) { const q = k / 0.5; y -= 4 * 75 * q * (1 - q); }
@@ -457,7 +457,7 @@ function step(L, p, wantJump) {
     if (f.stomp && p.vy > 0 && prevBottom <= b.y + 10) {
       p.kills |= 1 << i; p.vy = STOMP_V; p.used = true; p.grounded = false; p.stomped = i;
     } else {
-      const m = f.kind === 'hedgehog' ? 8 : 4;   // a little forgiving at the edges
+      const m = f.kind === 'hedgehog' ? 6 : 4;   // a little forgiving at the edges
       if (p.x + S > b.x + m && p.x < b.x + b.w - m && p.y > b.y + m && p.y - S < b.y + b.h) p.dead = true;
     }
   });
