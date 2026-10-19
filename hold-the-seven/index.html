@@ -57,7 +57,7 @@ const TXT = {
     home: 'Home', full: 'Full screen', exitFull: 'Exit full screen', sound: 'Sound', on: 'On', off: 'Off',
     gameOf: (n, m) => `Game ${n} / ${m}`, yourTotal: 'Your total', you: 'You', names: ['You', 'Foxy', 'Rex', 'Panda'],
     cardsLeft: n => `${n} card${n === 1 ? '' : 's'}`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
-    yourTurn: 'Your turn! Play a glowing card.', firstMove: 'You have the 7♠. Play it to start!',
+    yourTurn: 'Your turn! Play a glowing card.', picked: 'Tap PLAY, pick another card, or tap the card again to put it back.', firstMove: 'You have the 7♠. Play it to start!',
     noFit: 'No card fits! Pick one to put face down.', wouldBe: (c, p, z) => `(${c} = ${p}: ${z})`,
     thinking: n => `${n} is thinking...`, played: (n, c) => `${n} played ${c}`, putDown: n => `${n} put a card face down`,
     starts: n => `${n} has the 7♠ and starts.`,
@@ -93,7 +93,7 @@ const TXT = {
     home: '首页', full: '全屏', exitFull: '退出全屏', sound: '声音', on: '开', off: '关',
     gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', names: ['你', '狐狸', '小狗', '熊猫'],
     cardsLeft: n => `${n} 张牌`, faceDown: n => `扣了 ${n} 张`, yourPoints: '你的扣分：',
-    yourTurn: '轮到你了！出一张发光的牌。', firstMove: '你有黑桃 7，先出它！',
+    yourTurn: '轮到你了！出一张发光的牌。', picked: '按“出牌”出这张；想换就点别的牌，再点一下这张就放回去。', firstMove: '你有黑桃 7，先出它！',
     noFit: '没有牌能接！选一张牌扣下。', wouldBe: (c, p, z) => `（${c} 扣下后 = ${p} 分：${z}）`,
     thinking: n => `${n}在想……`, played: (n, c) => `${n}出了 ${c}`, putDown: n => `${n}扣了一张牌`,
     starts: n => `${n}有黑桃 7，先出。`,
@@ -508,15 +508,15 @@ const Play = {
       const r = handRects[i];
       if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
         if (!r.ok) return;
-        if (sel === i) humanMove(); else { sel = i; SFX.tap(); }
+        sel = sel === i ? -1 : i; SFX.tap(); // tap again to put it back; only the PLAY button plays it
         return;
       }
     }
-    // tapping a glowing space on the table plays the card from your hand that goes there
+    // tapping a glowing space on the table picks the card from your hand that goes there
     const s = Math.floor((y - BY) / BDY), r = Math.floor((x - BX) / BDX) + 1;
     if (s >= 0 && s < 4 && r >= 1 && r <= 13) {
       const i = G.hands[0].findIndex(c => c.s === s && c.r === r && fits(G, c));
-      if (i >= 0) { sel = i; humanMove(); return; }
+      if (i >= 0) { sel = i; SFX.tap(); return; }
     }
     sel = -1;
   },
@@ -604,7 +604,7 @@ function drawYou() {
   // message line + buttons
   let line = msg, col = '#fff';
   if (mine) {
-    line = G.moves === 0 ? T('firstMove') : stuck ? T('noFit') : T('yourTurn'); col = YELLOW;
+    line = G.moves === 0 ? T('firstMove') : stuck ? T('noFit') : sel >= 0 ? T('picked') : T('yourTurn'); col = YELLOW;
     if (stuck && sel >= 0) { const c = h[sel], np = my + c.r; line += ' ' + L.wouldBe(cname(c), np, T(zoneOf(np)) + ' x' + ZONE_X[zoneOf(np)]); }
   }
   if (stuck) { const w = Math.min(textW(line, 26) + 40, 1000); box(W / 2 - w / 2, 499, w, 44, 14, 'rgba(142,68,173,.9)', '#fff', 3); txt(line, W / 2, 522, 26, 'center', '#fff'); }
