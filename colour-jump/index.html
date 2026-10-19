@@ -132,6 +132,15 @@
   .panel button.lv:disabled { background: #E2DCD2 !important; color: #A39B8F; cursor: default; }
   .panel button.lv.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--ink); }
   @media (max-height: 420px) { .panel { top: 50%; } }
+  /* Phones: the start panel fills the space left of JUMP so faces and levels are easy to tap. */
+  #startPanel.phone { gap: 8px; padding: 10px 14px 14px; }
+  #startPanel.phone h2 { font-size: 26px; }
+  #startPanel.phone p { display: none; }
+  #startPanel.phone .avatars { gap: 6px; }
+  #startPanel.phone button.av { font-size: 14px; }
+  #startPanel.phone .av img { max-width: var(--face, 100%); }
+  #startPanel.phone .levels { gap: 8px; }
+  #startPanel.phone button.lv { height: 40px; font-size: 18px; border-radius: 10px; }
 </style>
 
 </head>
@@ -566,8 +575,13 @@ const sfx = {
 const SONGS = {
   s1: { bpm: 138, chords: [[57, 60, 64], [57, 60, 65], [55, 60, 64], [55, 59, 62]], roots: [45, 41, 48, 43],   // Am, F, C, G
         stabs: [0, 3, 6, 10, 12], arp: [0, 1, 2, 1, 0, 2, 1, 2] },
-  s2: { bpm: 146, chords: [[57, 60, 65], [59, 62, 67], [59, 64, 67], [57, 60, 64]], roots: [41, 43, 40, 45],   // F, G, Em, Am
-        stabs: [0, 3, 6, 8, 11, 14], arp: [0, 2, 1, 2, 0, 1, 2, 1] },
+  // Season 2: a bouncy, swung cartoon tune in a major key (marimba melody, oom-pah bass, woodblocks).
+  s2: { bpm: 124, swing: 0.3, style: 'bouncy',
+        chords: [[60, 64, 67], [57, 60, 64], [57, 60, 65], [55, 59, 62]], roots: [48, 45, 41, 43],          // C, Am, F, G
+        melody: [[[0, 72, 2], [3, 76, 1], [4, 79, 2], [6, 76, 2], [8, 81, 2], [10, 79, 2], [12, 76, 2], [14, 72, 2]],
+                 [[0, 69, 2], [3, 72, 1], [4, 76, 2], [6, 72, 2], [8, 74, 2], [10, 76, 2], [12, 72, 4]],
+                 [[0, 77, 2], [3, 76, 1], [4, 77, 2], [6, 81, 2], [8, 79, 2], [10, 77, 2], [12, 76, 2], [14, 74, 2]],
+                 [[0, 79, 2], [3, 77, 1], [4, 74, 2], [6, 71, 2], [8, 74, 2], [10, 79, 2], [12, 79, 4, 'boing']]] },
   boss: { bpm: 156, chords: [[57, 60, 64], [57, 60, 64], [57, 60, 65], [56, 59, 64]], roots: [45, 45, 41, 40], // Am, Am, F, E
         stabs: [0, 2, 3, 6, 8, 10, 11, 14], arp: [0, 1, 2, 0, 1, 2, 0, 2] },
 };
@@ -596,6 +610,7 @@ function noiseHit(ac, noise, dest, t, type, freq, peak, decay) {
 }
 // Schedule one sixteenth note. step counts from 0; a loop is 4 bars of 16 steps.
 function musicStep(ac, dest, noise, step, t, shift, song) {
+  if (song.style === 'bouncy') return bouncyStep(ac, dest, noise, step, t, shift, song);
   const s = step % 16, bar = Math.floor(step / 16) % 4, chord = song.chords[bar].map(n => n + shift), root = song.roots[bar] + shift;
   if (s % 4 === 0) {                                   // kick
     const g = env(ac, dest, t, 0.9, 0.28), o = osc(ac, 'sine', 150, t, 0.3, g);
@@ -622,6 +637,50 @@ function musicStep(ac, dest, noise, step, t, shift, song) {
     osc(ac, 'square', hz(n), t, 0.1, f);
   }
 }
+// A woody marimba note: a sine with a quieter, fast-fading partial four times higher.
+function marimba(ac, dest, t, m, len, peak) {
+  const d = 0.12 + len * 0.07;
+  osc(ac, 'sine', hz(m), t, d, env(ac, dest, t, peak, d));
+  osc(ac, 'sine', hz(m) * 4, t, 0.05, env(ac, dest, t, peak * 0.35, 0.05));
+  osc(ac, 'triangle', hz(m), t, d, env(ac, dest, t, peak * 0.4, d * 0.7));
+}
+function bouncyStep(ac, dest, noise, step, t, shift, song) {
+  if (shift > 5) shift -= 12;                          // keep the bright marimba from getting shrill
+  const lift = ac.createGain(); lift.gain.value = 1.3; lift.connect(dest); dest = lift;   // match Season 1's loudness
+  const s = step % 16, bar = Math.floor(step / 16) % 4, loop = Math.floor(step / 64);
+  const chord = song.chords[bar].map(n => n + shift), root = song.roots[bar] + shift;
+  if (s === 0 || s === 8 || (s === 14 && bar === 3)) {   // soft kick
+    const o = osc(ac, 'sine', 120, t, 0.2, env(ac, dest, t, 0.75, 0.18));
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.1);
+  }
+  if (s === 4 || s === 12) {                           // snappy snare
+    noiseHit(ac, noise, dest, t, 'bandpass', 2200, 0.32, 0.11);
+    osc(ac, 'triangle', 190, t, 0.06, env(ac, dest, t, 0.18, 0.06));
+  }
+  noiseHit(ac, noise, dest, t, 'highpass', 8000, s % 2 ? 0.05 : 0.025, 0.035);   // shaker
+  if ([3, 6, 11, 14].includes(s)) {                    // clip-clop woodblocks
+    const f = s === 6 || s === 14 ? 1250 : 880;
+    osc(ac, 'sine', f, t, 0.05, env(ac, dest, t, 0.16, 0.045));
+  }
+  if (s % 4 === 0) {                                   // oom-pah bass: root, then the fifth
+    const n = s % 8 === 0 ? root : root + 7;
+    osc(ac, 'triangle', hz(n), t, 0.22, env(ac, dest, t, 0.42, 0.22));
+    osc(ac, 'square', hz(n), t, 0.12, env(ac, dest, t, 0.05, 0.12));
+  }
+  if (s === 14) osc(ac, 'triangle', hz(root + 4), t, 0.12, env(ac, dest, t, 0.3, 0.12));   // little walk-up
+  if (s % 4 === 2) {                                   // ukulele-style offbeat chord plucks
+    chord.forEach((n, i) => osc(ac, 'triangle', hz(n), t + i * 0.008, 0.14, env(ac, dest, t + i * 0.008, 0.06, 0.14)));
+  }
+  for (const [at, m, len, fx] of song.melody[bar]) {
+    if (at !== s) continue;
+    const n = m + shift + (loop % 2 ? 12 : 0);         // every second time round it plays an octave up
+    marimba(ac, dest, t, n, len, loop % 2 ? 0.13 : 0.17);
+    if (fx === 'boing') {                              // cartoon boing at the end of the loop
+      const o = osc(ac, 'sine', hz(n - 12), t + 0.15, 0.3, env(ac, dest, t + 0.15, 0.09, 0.3));
+      o.frequency.exponentialRampToValueAtTime(hz(n + 5), t + 0.42);
+    }
+  }
+}
 const music = {
   on: true, timer: null, step: 0, next: 0, master: null, noise: null,
   start() {
@@ -644,7 +703,8 @@ const music = {
   tick() {
     const song = currentSong();
     while (this.next < actx.currentTime + 0.12) {
-      musicStep(actx, this.master, this.noise, this.step, this.next, song === SONGS.boss ? 0 : KEY_SHIFT[levelIdx % 7], song);
+      const late = this.step % 2 && song.swing ? song.swing * 60 / song.bpm / 4 : 0;   // swung off-beats
+      musicStep(actx, this.master, this.noise, this.step, this.next + late, song === SONGS.boss ? 0 : KEY_SHIFT[levelIdx % 7], song);
       this.step++; this.next += 60 / song.bpm / 4;
     }
   },
@@ -1319,7 +1379,16 @@ function placeStart(w, h) {
   const sp = $('startPanel');
   const left = Math.round(w * 0.28 + S * view.scale * 0.6 + 20);
   const jumpLeft = w - 136, jumpTop = h - 136;  // JUMP is 104px, 24px from the right and bottom edges
-  sp.classList.toggle('compact', h <= 420);
+  sp.classList.toggle('phone', IS_PHONE);
+  sp.classList.toggle('compact', h <= 420 && !IS_PHONE);
+  if (IS_PHONE) {
+    // Use the whole width left of JUMP; shrink the faces only if the panel would not fit the height.
+    sp.style.left = '12px'; sp.style.width = (jumpLeft - 22) + 'px'; sp.style.removeProperty('--face');
+    const img = sp.querySelector('.av img'), room = h - 52 - 8;
+    if (img && sp.offsetHeight > room) sp.style.setProperty('--face', Math.max(40, img.offsetWidth - (sp.offsetHeight - room)) + 'px');
+    sp.style.top = Math.round(Math.max(52, Math.min((h - sp.offsetHeight) / 2 + 12, h - 8 - sp.offsetHeight))) + 'px';
+    return;
+  }
   // Full width is 452px; shrink to stay left of JUMP if that still leaves room for the faces.
   let outer = Math.min(452, w - left - 16);
   if (left + outer > jumpLeft && jumpLeft - left >= 340) outer = jumpLeft - left;
