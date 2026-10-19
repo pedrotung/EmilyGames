@@ -40,7 +40,7 @@
   .card p { margin: 8px 0; }
   .card button { font: inherit; border: 3px solid #222; background: #fff; color: #222; border-radius: 10px; padding: 4px 32px; margin-top: 8px; }
   #rotate { display: none; }
-  @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+  #rotate.on { display: flex; } /* tablets held upright only; phones turn the game sideways by themselves */
 </style>
 </head>
 <body>
@@ -55,7 +55,7 @@
     <button id="homeOk">OK</button>
   </div>
 </div>
-<div class="ov" id="rotate"><div class="card"><h2>Turn your phone sideways</h2><p>Meow Brigade is played in landscape.</p></div></div>
+<div class="ov" id="rotate"><div class="card"><h2>Turn your screen sideways</h2><p>Meow Brigade is played in landscape.</p></div></div>
 
 <script>
 'use strict';
@@ -171,13 +171,28 @@ function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 /* ======================= canvas + drawing helpers ======================= */
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 if (!ctx.roundRect) ctx.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); }; // older Safari
+// A phone: touch screen whose short side is small. Held upright, the game turns itself sideways
+// (canvas rotated 90 degrees) so it always plays in landscape, with no "turn your phone" message (Jason).
+const IS_PHONE = (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)) && Math.min(screen.width, screen.height) < 600;
+let rotated = false;
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), s = Math.min(innerWidth / W, innerHeight / H);
-  cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px';
+  rotated = IS_PHONE && innerHeight > innerWidth;
+  const vw = rotated ? innerHeight : innerWidth, vh = rotated ? innerWidth : innerHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), s = Math.min(vw / W, vh / H);
+  cv.style.width = W * s + 'px'; cv.style.height = H * s + 'px'; cv.style.transform = rotated ? 'rotate(90deg)' : '';
   cv.width = Math.round(W * s * dpr); cv.height = Math.round(H * s * dpr);
   ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  const tablet = matchMedia('(pointer: coarse)').matches && !IS_PHONE && innerHeight > innerWidth;
+  const ro = document.getElementById('rotate'); if (ro) ro.classList.toggle('on', tablet);
 }
-addEventListener('resize', resize); resize();
+addEventListener('resize', resize); addEventListener('orientationchange', () => setTimeout(resize, 200)); resize();
+// once full screen, also lock to landscape where the browser allows it (mostly Android Chrome)
+function lockLandscape() {
+  if (!IS_PHONE || !(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  try { const r = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  setTimeout(resize, 200);
+}
+document.addEventListener('fullscreenchange', lockLandscape); document.addEventListener('webkitfullscreenchange', lockLandscape);
 
 function srand(seed) { let s = (Math.abs(Math.floor(seed)) % 2147483646) + 1; return () => (s = s * 16807 % 2147483647) / 2147483647; }
 // Hand-drawn stroke: the path is split into short pieces and nudged a little, with a fainter second pass.
@@ -487,7 +502,12 @@ function button(x, y, w, h, label, fn, o = {}) {
   if (o.disabled) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(x + 2, y + 2, w - 4, h - 4); return; }
   hits.push({ x, y, w, h, fn });
 }
-function toCanvas(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+function toCanvas(e) {
+  const r = cv.getBoundingClientRect();
+  // turned sideways: the game's x runs down the screen and its y runs from right to left
+  if (rotated) return [(e.clientY - r.top) / r.height * W, (r.right - e.clientX) / r.width * H];
+  return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H];
+}
 cv.addEventListener('pointerdown', e => {
   e.preventDefault(); au();
   if (fsCan && !fsOn() && !triedAutoFs && matchMedia('(pointer: coarse)').matches) { triedAutoFs = true; toggleFullscreen(); }
