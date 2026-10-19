@@ -59,7 +59,7 @@ const TXT = {
     bots: 'Bots:', easy: 'Easy', normal: 'Normal', hard: 'Hard', play: 'PLAY', how: 'How to Play', language: 'Language',
     home: 'Home', full: 'Full screen', exitFull: 'Exit full screen', sound: 'Sound', on: 'On', off: 'Off',
     gameOf: (n, m) => `Game ${n} / ${m}`, yourTotal: 'Your total', you: 'You', names: ['You', 'Foxy', 'Rex', 'Panda'],
-    cardsLeft: n => `${n} cards`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
+    cardsLeft: n => `${n} card${n === 1 ? '' : 's'}`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
     yourTurn: 'Your turn! Play a glowing card.', firstMove: 'You have the 7♠. Play it to start!',
     noFit: 'No card fits! Pick one to put face down.', wouldBe: (c, p, z) => `(${c} = ${p}: ${z})`,
     thinking: n => `${n} is thinking...`, played: (n, c) => `${n} played ${c}`, putDown: n => `${n} put a card face down`,
@@ -437,6 +437,7 @@ function startMatch() { G = newGame(null, 1); go(Play); }
 function nextGame() { G = G.n >= GAMES ? newGame(null, 1) : newGame(G.totals, G.n + 1); go(Play); }
 const BX = 290, BY = 178, BDX = 54, BDY = 78;
 const slotPos = (s, r) => [BX + (r - 1) * BDX, BY + s * BDY];
+const PILE = [[196, 556], [165, 400], [790, 68], [1070, 400]]; // each player's face-down cards
 const SEAT = [[640, 640], [115, 440], [640, 85], [1165, 440]]; // where each player's cards come from
 
 const Play = {
@@ -514,7 +515,7 @@ function drawBots() {
     txt(names[p], x + 85, 332, 26);
     txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, x + 85, 360, 19);
     for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, x + 63, 388 + i * 9, 44, 62, { back: 'red' });
-    for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, x + (p === 1 ? 135 : -10), 400 + i * 6, 32, 45, { back: 'down' });
+    for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, PILE[p][0], PILE[p][1] + i * 6, 32, 45, { back: 'down' });
   });
   // top
   const p = 2;
@@ -522,12 +523,13 @@ function drawBots() {
   txt(names[p], 514, 74, 23, 'left');
   txt(`${TXT[save.lang].cardsLeft(G.hands[p].length)} · ${TXT[save.lang].faceDown(G.disc[p].length)}`, 514, 101, 18, 'left');
   for (let i = 0; i < Math.min(G.hands[p].length, 7); i++) drawCard(null, 690 + i * 12, 62, 36, 50, { back: 'red' });
-  for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, 790 + i * 7, 68, 28, 40, { back: 'down' });
+  for (let i = 0; i < Math.min(G.disc[p].length, 6); i++) drawCard(null, PILE[p][0] + i * 7, PILE[p][1], 28, 40, { back: 'down' });
 }
 function drawYou() {
   const L = TXT[save.lang], my = points(G.disc[0]), zone = zoneOf(my), mine = G.turn === 0 && !G.over && !fly;
   avatar(0, 58, 588, 31, mine);
   txt(T('you'), 100, 575, 26, 'left'); txt(L.faceDown(G.disc[0].length), 100, 603, 19, 'left');
+  for (let i = 0; i < G.disc[0].length; i++) drawCard(null, PILE[0][0] + i * 7, PILE[0][1], 32, 45, { back: 'down' });
   txt(T('yourPoints'), 24, 640, 20, 'left');
   const pw = textW(T('yourPoints'), 20); txt(String(my), 30 + pw, 640, 26, 'left', '#fff', { bold: true });
   badge(zone, 44 + pw + textW(String(my), 26), 640, 16);
@@ -539,7 +541,7 @@ function drawYou() {
   ['0', '15', '30', '45+'].forEach((s, i) => txt(s, bx + [4, 66, 133, 190][i], by + 30, 14, 'center', 'rgba(255,255,255,.8)', { shadow: false }));
 
   // hand
-  const h = G.hands[0], n = h.length, step = n > 1 ? Math.min(62, 680 / (n - 1)) : 0, w0 = 78 + (n - 1) * step, x0 = 640 - w0 / 2;
+  const h = G.hands[0], n = h.length, step = n > 1 ? Math.min(62, 640 / (n - 1)) : 0, w0 = 78 + (n - 1) * step, x0 = 640 - w0 / 2;
   const stuck = mine && !anyFits(0);
   handRects = [];
   h.forEach((c, i) => {
@@ -573,7 +575,7 @@ function botMove() {
 }
 function startFly(p, i, x0, y0, w0) {
   const c = G.hands[p][i], play = fits(G, c), names = T('names');
-  const [x1, y1] = play ? slotPos(c.s, c.r) : [SEAT[p][0] - 25, SEAT[p][1] - 35];
+  const [x1, y1] = play ? slotPos(c.s, c.r) : [PILE[p][0] + (p === 0 ? G.disc[0].length * 7 : 0), PILE[p][1]];
   fly = { p, i, c, x0, y0, w0, x1, y1, down: !play || false, t0: performance.now(), done: () => {
     apply(G, p, i);
     if (play) (c.r === 7 ? SFX.seven : SFX.play)(); else SFX.down();
