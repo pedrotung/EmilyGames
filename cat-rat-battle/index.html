@@ -493,9 +493,10 @@ const Menu = {
   enter() { this.confirm = false; },
   draw() {
     topBar();
-    txt('MEOW BRIGADE', W / 2, 130, 110); hline([[380, 190], [900, 192]], 2, 5);
+    txt('MEOW BRIGADE', W / 2, 120, 110); hline([[380, 172], [900, 174]], 2, 5);
+    txt(`ROUND ${save.round || 1}  ·  LEVEL ${Math.min(save.cleared + 1, LEVELS.length)}`, W / 2, 206, 36);
     const lv = Math.min(save.cleared + 1, LEVELS.length);
-    button(160, 240, 280, 140, '', () => go(Levels), { draw: () => { txt('PLAY', 300, 295, 56); txt(save.round > 1 ? `Round ${save.round}  Level ${lv} / ${LEVELS.length}` : `Level ${lv} / ${LEVELS.length}`, 300, 350, 26); } });
+    button(160, 240, 280, 140, '', () => go(Levels), { draw: () => { txt('PLAY', 300, 295, 56); txt(`Round ${save.round || 1} · Level ${lv} / ${LEVELS.length}`, 300, 350, 26); } });
     button(160, 400, 280, 56, 'Restart from Level 1', () => { this.confirm = true; }, { size: 26, lw: 2 });
     button(500, 240, 280, 140, '', () => go(Spin.from(Menu)), { draw: () => { txt('SPIN', 640, 295, 56); txt('Get new cats', 640, 350, 26); } });
     const found = CATS.filter(c => save.owned[c.id]).length;
@@ -525,7 +526,7 @@ const Menu = {
 
 const Levels = {
   draw() {
-    topBar(); txt(save.round > 1 ? `ROUND ${save.round}: CHOOSE A LEVEL` : 'CHOOSE A LEVEL', W / 2, 110, 54);
+    topBar(); txt(`ROUND ${save.round || 1}: CHOOSE A LEVEL`, W / 2, 110, 54);
     LEVELS.forEach((L, i) => {
       const x = 70 + (i % 5) * 232, y = 170 + Math.floor(i / 5) * 230, lv = i + 1, open = lv <= save.cleared + 1;
       button(x, y, 210, 205, '', () => go(Team(lv)), { disabled: !open, draw: () => {
@@ -563,7 +564,7 @@ function Team(lv) {
   const at = i => prev(...SLOTS[i]);
   return {
     draw() {
-      topBar(); txt(save.round > 1 ? `ROUND ${save.round}  LEVEL ${lv}` : `LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
+      topBar(); txt(`ROUND ${save.round || 1} · LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
       txt(sel == null ? 'Tap a cat to add it. Tap a cat on the left, then a place, to move it.' : (slots[sel] ? 'Tap another place to move it there, or tap it again to take it out.' : 'Tap a cat on the right to put it here.'),
         W / 2 + 40, 678, 22, 'center', '#666');
       hbox(30, 125, 570, 505, { lw: 2 }); txt('FRONT: melee', 360, 608, 22); txt('BACK: ranged + Nurse', 175, 608, 22);
@@ -1078,7 +1079,7 @@ function drawBattle() {
   const b = B;
   topBar({ pause: () => { if (!b.over) b.paused = true; } });
   button(140, 18, 150, 44, b.speed === 2 ? 'Speed x2' : 'Speed x1', () => { b.speed = b.speed === 2 ? 1 : 2; }, { size: 26, on: b.speed === 2 });
-  txt(b.round > 1 ? `ROUND ${b.round}  LEVEL ${b.lv}` : `LEVEL ${b.lv}`, W / 2, 32, 40);
+  txt(`ROUND ${b.round} · LEVEL ${b.lv}`, W / 2, 32, 40);
   const boss = b.rats.find(r => !r.dead && r.d.boss && !r.fake);
   if (boss) {
     hpBar(W / 2, 62, boss.hp / boss.max, 500, 16);
@@ -1118,7 +1119,7 @@ function drawBattle() {
 
   if (b.paused && !b.over) overlay('PAUSED', null, [['Resume', () => { b.paused = false; }], ['Quit to menu', () => { persist(); go(Menu); }]]);
   if (b.over) {
-    const o = b.over, lines = [`Coins from rats: ${o.earned}`];
+    const o = b.over, lines = [`Round ${b.round} · Level ${b.lv}`, `Coins from rats: ${o.earned}`];
     if (o.win) lines.push(`Level bonus: ${o.bonus}`);
     else lines.push('You keep the coins from the rats.');
     const btns = [];
