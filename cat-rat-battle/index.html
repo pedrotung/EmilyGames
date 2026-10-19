@@ -62,10 +62,10 @@
 /* ======================= data ======================= */
 const W = 1280, H = 720, INK = '#222', GREY = '#aaa', RED = 'rgb(255,165,165)';
 const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET', 'ROUND 2'];
-const R2 = 5; // Round 2 cats (Jason's second sheet): bought straight from the shop once you reach Round 2
+const R2 = 5, R2_GIFT = 2000; // Round 2 cats (Jason's second sheet): bought straight from the shop once you reach Round 2
 const SPIN_COST = [50, 100, 500, 2000], SECRET_COST = 6000;
 let FAIRY_DMG = 20; // 1.5 s cooldown (Jason), so each bolt hits twice as hard to keep levels 7-10 winnable
-const DEVIL = { cd: 3.5, dmg: 40, boss: 40, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
+const DEVIL = { cd: 3, dmg: 40, boss: 60, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
 // row: where the cat stands. Front = melee, back = ranged and Nurse.
 const CATS = [
   { id: 'cat', name: 'Cat', r: 0, row: 'front', hp: 100, img: 'cat_cat', h: 100, desc: 'Scratches: 5 damage every 2 s.' },
@@ -77,21 +77,21 @@ const CATS = [
   { id: 'rizz', name: 'Rizz cat', r: 1, row: 'front', hp: 130, img: 'cat_rizz', h: 100, desc: 'Walks up to a rat and stares for 4 s. The rat runs away. Bosses do not care.' },
   { id: 'water', name: 'Water', r: 1, row: 'back', hp: 90, img: 'cat_water', h: 100, desc: 'Water fan through every rat in line: 6 near, 4 mid, 2 far, every 1.5 s.' },
   { id: 'bleh', name: 'Bleh', r: 1, row: 'front', hp: 130, img: 'cat_bleh', h: 100, desc: 'Grabs a rat with its tongue and eats it, every 8 s. Bosses take 30.' },
-  { id: 'ghost', name: 'Ghost cat', r: 1, row: 'front', hp: 130, img: 'cat_ghost', h: 88, desc: 'Fast pokes, 1 damage 3 times a second. Rats hit it only 30% of the time. Makes 4 clones for 5 s every 20 s.' },
+  { id: 'ghost', name: 'Ghost cat', r: 1, row: 'front', hp: 130, img: 'cat_ghost', h: 88, desc: 'Fast pokes, 1 damage 3 times a second. Rats hit it only half the time. Makes 4 clones for 5 s every 20 s.' },
   { id: 'nurse', name: 'Nurse', r: 1, row: 'back', hp: 90, img: 'cat_nurse', h: 100, desc: 'One heal per battle: tap a hurt cat, then HEAL to give back half its HP.' },
   { id: 'senpai', name: 'Senpai', r: 2, row: 'front', hp: 160, img: 'cat_senpai2', h: 112, desc: 'Pen stab: 8 damage every 1 s.' },
   { id: 'catkid', name: 'Cat kid', r: 2, row: 'front', hp: 160, img: 'cat_catkid', h: 100, desc: 'Headbutt: 20 damage every 2.5 s. Hurts itself 2.' },
   { id: 'catcat', name: 'Cat cat', r: 2, row: 'back', hp: 115, img: 'cat_catcat2', h: 112, desc: 'Kicks a football: 22 damage every 2.5 s. Sometimes misses.' },
-  { id: 'poison', name: 'Poison cat', r: 2, row: 'back', hp: 115, img: 'cat_poison', h: 100, desc: 'Poison cloud for 8 s: 4 damage a second to every rat inside.' },
+  { id: 'poison', name: 'Poison cat', r: 2, row: 'back', hp: 115, img: 'cat_poison', h: 100, desc: 'Poison cloud every 8 s, lasts 8 s: 4 damage a second to every rat inside.' },
   { id: 'fairy', name: 'Fairy cat', r: 3, row: 'back', hp: 140, img: 'cat_fairy', h: 105, desc: 'Wand lightning: 20 damage every 1.5 s.' },
   { id: 'military', name: 'Military cat', r: 3, row: 'back', hp: 140, img: 'cat_military', h: 95, desc: 'Machine gun: 3 damage, 4.5 bullets a second.' },
   { id: 'witch', name: 'Witch cat', r: 3, row: 'back', hp: 140, img: 'cat_witch', h: 115, desc: 'Potion splash: 15 damage to every rat nearby and slows them, every 3 s.' },
   { id: 'angel', name: 'Angel cat', r: 4, row: 'back', hp: 210, img: 'cat_angel', h: 90, desc: 'Flies up, sings a holy meow and hits every rat for 30. If a boss hits it in the air, it falls and starts again.' },
-  { id: 'devil', name: 'Devil cat', r: 4, row: 'front', hp: 300, img: 'cat_devil', h: 110, desc: 'Trident stab every 3.5 s: defeats a rat at half HP or less in one hit, otherwise hits for 40. Bosses take 40.' },
+  { id: 'devil', name: 'Devil cat', r: 4, row: 'front', hp: 300, img: 'cat_devil', h: 110, desc: 'Trident stab every 3 s: defeats a rat at half HP or less in one hit, otherwise hits for 40. Bosses take 60.' },
   { id: 'vampire', name: 'Vampire cat', r: R2, price: 2000, row: 'front', hp: 260, img: 'cat_vampire', h: 128, desc: 'Walks up to a rat and drains it with its teeth: 20 damage a second, and heals a little. That rat cannot move, but other rats can still attack.' },
   { id: 'samurai', name: 'Samurai cat', r: R2, price: 2000, row: 'front', hp: 280, img: 'cat_samurai', h: 100, desc: 'Short range katana slash: 30 damage every 1.2 s.' },
   { id: 'ninja', name: 'Ninja cat', r: R2, price: 2000, row: 'back', hp: 160, img: 'cat_ninja', h: 100, desc: 'Throws ninja stars: 9 damage every 0.5 s.' },
-  { id: 'musician', name: 'Musician', r: R2, price: 2000, row: 'back', hp: 150, img: 'cat_musician', h: 100, desc: 'Flings music notes at a rat: 18 damage every 1 s.' },
+  { id: 'musician', name: 'Musician', r: R2, price: 2000, row: 'back', hp: 150, img: 'cat_musician', h: 100, desc: 'Flings music notes at a rat: 22 damage every 1 s.' },
   { id: 'artist', name: 'Artist', r: R2, price: 2000, row: 'back', hp: 150, img: 'cat_artist', h: 100, desc: 'Rainbow paint stroke every 2.5 s: 20 damage to every rat in the line, and paint blinds them for 3 s so they cannot attack.' },
   { id: 'alien', name: 'Alien cat', r: R2, price: 3000, row: 'front', hp: 320, img: 'cat_alien', h: 101, desc: 'Holds up to 3 rats with its tentacles. They cannot move and slowly suffocate: 6 damage a second each.' },
   { id: 'dragon', name: 'Dragon cat', r: R2, price: 3000, row: 'front', hp: 340, img: 'cat_dragon', h: 105, desc: 'Fire breath every 2 s: 20 damage to the rats in front, and they keep burning for 3 s.' },
@@ -118,26 +118,27 @@ const RATS = {
   rainbow: { name: 'RAINBOW RAT', img: 'rat_rainbow', h: 125, hp: 600, dmg: 5, rate: 1, speed: 45, coins: 120, boss: true },
 };
 const rep = (k, n) => Array(n).fill(k);
+// queen: [rats per call, seconds between calls] for the Rat Queen on that level.
 // tip: shown on the team screen so the player can pick counters. flank: share of Basic rats that run for the back row.
 // hpMul / dmgMul scale the small rats, bossMul / bossDmg the bosses (boss HP also grows 40% a level after level 5), gap is seconds between rats.
 const LEVELS = [
-  { minions: rep('basic', 6), bosses: ['queen'], reward: 60, bossMul: 0.8, hpMul: 1.15, dmgMul: 1.1, gap: 2.5,
+  { minions: rep('basic', 6), bosses: ['queen'], queen: [2, 10], reward: 60, bossMul: 0.8, hpMul: 1.15, dmgMul: 1.1, gap: 2.5,
     tip: 'Boss: RAT QUEEN calls more rats and screams at your front row. Cats that shoot from far away help.' },
   { minions: [...rep('basic', 6), ...rep('ball', 3)], bosses: ['legged'], reward: 120, bossMul: 0.85, hpMul: 1.07, gap: 3,
     tip: 'Boss: LEGGED RAT jumps and hits your whole front row. Put tough cats in front.' },
   { minions: [...rep('basic', 8), ...rep('ball', 4)], bosses: ['clone'], reward: 200, bossMul: 0.7, hpMul: 1.05, gap: 2.5, flank: 0.25,
     tip: 'Boss: CLONE RAT makes fake clones and claws one cat hard. Cats that hit many rats at once find the real one.' },
   { minions: [...rep('basic', 8), ...rep('ball', 6)], bosses: ['long'], reward: 350, bossMul: 1.15, hpMul: 1.15, gap: 2.2, flank: 0.25,
-    tip: 'Boss: LONG RAT bites your back row and sweeps its tail at the front. A Nurse helps.' },
+    tip: 'Boss: LONG RAT bites your back row and sweeps its tail. Melee cats cannot reach it: bring cats that shoot.' },
   { minions: [...rep('ball', 8), ...rep('spike', 6)], bosses: ['rainbow'], reward: 600, bossMul: 1.15, hpMul: 1.15, flank: 0.25,
     tip: 'Spike rats dash to your back row. RAINBOW RAT heals and shields itself. Bring strong cats.' },
-  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], reward: 800, bossMul: 0.8, hpMul: 1.04, gap: 2.3, flank: 0.3,
+  { minions: [...rep('basic', 12), ...rep('ball', 6)], bosses: ['queen', 'queen'], queen: [3, 8], reward: 800, bossMul: 0.8, hpMul: 0.85, gap: 2.3, flank: 0.3,
     tip: 'Two RAT QUEENS and lots of rats. Cats that hit many rats at once help.' },
   { minions: [...rep('basic', 8), ...rep('ball', 6), ...rep('spike', 4)], bosses: ['legged', 'clone'], reward: 1000, bossMul: 0.75, hpMul: 1.1, gap: 1.9, flank: 0.3,
     tip: 'LEGGED RAT and CLONE RAT together. Tough front row and wide attacks.' },
   { minions: [...rep('ball', 6), ...rep('spike', 12)], bosses: ['long'], reward: 1300, bossMul: 0.95, hpMul: 1.05, gap: 3, flank: 0.3,
-    tip: 'Lots of Spike rats and a LONG RAT. Your back row is in danger.' },
-  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], seq: true, reward: 1600, bossMul: 0.85, hpMul: 1.1, gap: 2, flank: 0.3,
+    tip: 'Lots of Spike rats and a LONG RAT. Melee cats cannot reach the LONG RAT: bring cats that shoot.' },
+  { minions: [...rep('basic', 6), ...rep('ball', 6), ...rep('spike', 6)], bosses: ['queen', 'legged', 'clone', 'long'], queen: [4, 6], seq: true, reward: 1600, bossMul: 0.85, hpMul: 1.1, gap: 2, flank: 0.3,
     tip: 'Four bosses, one after another. Your team has to last.' },
   { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, hpMul: 1.15, rainbowHp: 1350, phase: 3, flank: 0.3,
     tip: 'SUPER RAINBOW RAT: 1350 HP and changes colour faster.' },
@@ -147,7 +148,7 @@ const RAINBOW_STRIPES = ['#ff5a4e', '#ff9a3a', '#ffd84a', '#5ccf6a', '#4aa8ff', 
 // of that in damage. Raised 15% when the Round 2 cats came in: a team with one $2000 cat wins about a third
 // to two thirds of the time, one $3000 cat about 75%, one $5000 cat 85-100%; old Secret teams mostly lose after level 2.
 // Each round after that is 8% tougher again, and every round pays 50% more coins.
-const ROUND2 = [6.9, 8.6, 6.9, 4, 4, 3.45, 2.2, 2, 1.4, 1.5];
+const ROUND2 = [6.9, 8.6, 6.3, 4, 4.2, 3.05, 2.15, 2.15, 1.47, 1.7];
 let roundMul = (r, lv = 1) => { const k = r > 1 ? ROUND2[lv - 1] * Math.pow(1.08, r - 2) : 1;
   return { hp: k, dmg: Math.sqrt(k), gap: 1, coin: 1 + 0.5 * (r - 1) }; };
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
@@ -161,7 +162,7 @@ const SAVE_KEY = 'meowBrigade';
 // round: the round being played; maxRound: the highest reached (Round 2 cats unlock at 2); roundCleared: levels cleared in each round
 function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, round: 1, maxRound: 1, roundCleared: {}, team: ['cat'], sound: true, music: true }; }
 function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) { const o = Object.assign(freshSave(), s); o.maxRound = Math.max(o.maxRound || 1, o.round || 1); return o; } } catch (e) {}
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) { const o = Object.assign(freshSave(), s); o.maxRound = Math.max(o.maxRound || 1, o.round || 1); if (o.maxRound >= 2 && !o.r2gift) { o.r2gift = true; o.coins += R2_GIFT; } return o; } } catch (e) {}
   return freshSave();
 }
 let save = loadSave();
@@ -769,9 +770,9 @@ function updateBattle(dt) {
   }
   if (B.banner) { B.banner.t += dt; if (B.banner.t > 2.5) B.banner = null; }
   if (B.shield > 0) B.shield -= dt;
-  // Alert cat: during boss fights, an 8% chance every 5 s to shield the team for 5 s
+  // Alert cat: during boss fights, a 20% chance every 5 s to shield the team for 5 s
   if (B.rats.some(r => !r.dead && r.d.boss && !r.fake) && B.cats.some(c => alive(c) && c.d.id === 'alert')) {
-    B.shieldT += dt; if (B.shieldT >= 5) { B.shieldT = 0; if (Math.random() < 0.08 && B.shield <= 0) { B.shield = 5; float(W / 2, 200, 'SHIELD!', 40); SFX.shield(); } }
+    B.shieldT += dt; if (B.shieldT >= 5) { B.shieldT = 0; if (Math.random() < 0.2 && B.shield <= 0) { B.shield = 5; float(W / 2, 200, 'SHIELD!', 40); SFX.shield(); } }
   }
   for (const r of B.rats) updateRat(r, dt);
   for (const c of B.cats) updateCat(c, dt);
@@ -810,7 +811,8 @@ function updateRat(r, dt) {
   if (!r.fake && r.x < 1180) {
     if (k === 'queen') {
       r.timer += dt; r.t2 += dt;
-      if (r.timer >= d.summon) { r.timer = 0; summonRats(r, d.summonN); }
+      const [qn, qcd] = B.L.queen || [d.summonN, d.summon]; // later levels: more rats, more often (Jason)
+      if (r.timer >= qcd) { r.timer = 0; summonRats(r, qn); }
       if (r.t2 >= 9) { r.t2 = 0; queenScream(r); }
     }
     if (k === 'legged') {
@@ -924,7 +926,7 @@ function summonRats(r, n) { // a turning magic circle on the ground, then the ra
     ctx.beginPath(); ctx.ellipse(x, y, R * 0.7, R * 0.22, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
     for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + q * 4; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * R * 0.7, y + Math.sin(a) * R * 0.22); ctx.lineTo(x + Math.cos(a) * R, y + Math.sin(a) * R * 0.32 - 14); ctx.stroke(); }
     ctx.globalAlpha = 1; });
-  later(0.6, () => { if (r.dead) return; for (let i = 0; i < n; i++) { makeRat('basic', x, y + (i % 2 ? 50 : -50)); smoke(x, y + (i % 2 ? 50 : -50) - 20); } });
+  later(0.6, () => { if (r.dead) return; for (let i = 0; i < n; i++) { const dy = (i - (n - 1) / 2) * 48; makeRat('basic', x + (i % 2) * 30, y + dy); smoke(x + (i % 2) * 30, y + dy - 20); } });
 }
 function queenScream(r) { // sound rings roll over the front row
   const cats = frontRow(); if (!cats.length) return;
@@ -1005,7 +1007,7 @@ function updateCat(c, dt) {
     case 'fairy': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = center(r); bolt(x, y); hurtRat(r, FAIRY_DMG); sparks(...anchor(c, 0.95, 0.33)); SFX.lightning(); c.cd = 1.5; } else c.cd = 0.1; } break;
     case 'witch': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.65), dur: 0.7, dmg: 15, kind: 'potion', arc: true, spin: true }); SFX.throwPotion(); c.cd = 3; } else c.cd = 0.1; } break;
     case 'water': if (ready()) { const r = nearestRat(c); if (r) { waterFan(c, r); SFX.water(); c.cd = 1.5; } else c.cd = 0.1; } break;
-    case 'poison': if (ready()) { const r = nearestRat(c); if (r) { poisonCloud(c, r); SFX.poison(); c.cd = 12; } else c.cd = 0.1; } break;
+    case 'poison': if (ready()) { const r = nearestRat(c); if (r) { poisonCloud(c, r); SFX.poison(); c.cd = 8; } else c.cd = 0.1; } break;
     case 'bleh': if (ready()) { const r = nearestRat(c, 560); if (r) { tongue(c, r); SFX.slurp(); c.cd = 8; } else c.cd = 0.1; } break;
     case 'ghost':
       c.cloneT += dt;
@@ -1019,7 +1021,7 @@ function updateCat(c, dt) {
     case 'alien': alien(c, dt); break;
     case 'samurai': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; hurtRat(r, 30); katana(r); SFX.katana(); c.cd = 1.2; } else c.cd = 0.1; } break;
     case 'ninja': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.45), speed: 950, dmg: 9, kind: 'shuriken', spin: true }); SFX.shuriken(); c.cd = 0.5; } else c.cd = 0.1; } break;
-    case 'musician': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.35), speed: 520, dmg: 18, kind: 'note', wave: Math.random() * 6 }); SFX.note(); c.cd = 1; } else c.cd = 0.1; } break;
+    case 'musician': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.35), speed: 520, dmg: 22, kind: 'note', wave: Math.random() * 6 }); SFX.note(); c.cd = 1; } else c.cd = 0.1; } break;
     case 'artist': if (ready()) { const r = nearestRat(c); if (r) { paintStroke(c, r); SFX.paint(); c.cd = 2.5; } else c.cd = 0.1; } break;
     case 'dragon': if (ready()) { const r = nearestRat(c, 420); if (r) { fireBreath(c, r); SFX.fire(); c.cd = 2; } else c.cd = 0.1; } break;
     case 'unicat': if (ready()) { const r = nearestRat(c); if (r) { const [x, y] = hornTip(c); shoot(c, r, { from: [x, y], speed: 800, dmg: 28, kind: 'magic', spin: true }); sparks(x, y); SFX.magic(); c.cd = 1.2; } else c.cd = 0.1; } break;
@@ -1267,8 +1269,10 @@ function endBattle(win) {
   const L = B.L, first = B.lv > save.cleared;
   let bonus = 0;
   if (win) { bonus = Math.round((first ? L.reward : L.reward / 4) * B.R.coin); /* replays pay a quarter so farming old levels stays slow */ save.coins += bonus; if (first) save.cleared = B.lv; }
+  // first time Round 1 is beaten: a gift so the player can buy a Round 2 cat straight away
+  let gift = 0; if (win && B.round === 1 && B.lv === LEVELS.length && !save.r2gift) { gift = R2_GIFT; save.r2gift = true; save.coins += gift; }
   persist();
-  B.over = { win, bonus, earned: B.earned, t: 0 };
+  B.over = { win, bonus, gift, earned: B.earned, t: 0 };
   if (!B.silent) setMusic(null);
   win ? SFX.win() : SFX.lose();
 }
@@ -1322,6 +1326,7 @@ function drawBattle() {
   if (b.over) {
     const o = b.over, lines = [`Round ${b.round} · Level ${b.lv}`, `Coins from rats: ${o.earned}`];
     if (o.win) lines.push(`Level bonus: ${o.bonus}`);
+    if (o.gift) lines.push(`Round 2 gift: ${o.gift}! Buy a Round 2 cat.`);
     else lines.push('You keep the coins from the rats.');
     const btns = [];
     if (o.win && b.lv < LEVELS.length) btns.push(['Next level', () => go(Team(b.lv + 1))]);
