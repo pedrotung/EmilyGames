@@ -44,6 +44,9 @@
   .topbar .b{padding:8px 12px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
   .menu .topbar{justify-content:space-between;margin:-8px -6px 14px;}
   @media (max-width:420px){ .topbar .long{display:none;} .topbar{gap:6px;} .topbar .b{padding:8px 10px;} }
+  #fsHelpOv{z-index:50;}
+  .fs-card{max-width:360px;margin:16px;}
+  .fs-card h3{margin-bottom:6px;} .fs-card .b{margin-top:14px;width:100%;}
   .fs-help{font-size:13px;line-height:1.5;color:var(--muted);margin-top:10px;text-align:left;}
   .app{width:100%;max-width:780px;}
   .hd{text-align:center;margin-bottom:14px;}
@@ -214,7 +217,6 @@
     </div>
 
     <button class="b start" id="startBtn">Start Game</button>
-    <div class="fs-help hidden" id="fsHelp"><b>iPhone / iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>. Open Chess from the new icon and it fills the screen.<br><b>Android (Chrome):</b> tap the menu, then <b>Add to Home screen</b>.</div>
   </div>
 </div>
 
@@ -262,6 +264,14 @@
     </div>
   </div>
 </div>
+
+<!-- FULL SCREEN HELP: shown over the current page when the browser cannot go full screen -->
+<div class="promo" id="fsHelpOv"><div class="card fs-card">
+  <h3>Full screen</h3>
+  <p class="fs-help">This browser cannot switch to full screen by itself. Add Chess to your home screen and open it from the icon: it then fills the whole screen.</p>
+  <p class="fs-help"><b>iPhone / iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the &#8942; menu, then <b>Add to Home screen</b>.<br><b>In an app (WeChat and others):</b> open this page in your phone's browser first.</p>
+  <button class="b" id="fsHelpOk">OK</button>
+</div></div>
 
 <!-- PROMOTION -->
 <div class="promo" id="promo"><div class="pc" id="promoPieces"></div></div>
@@ -898,20 +908,28 @@ function setupExtras(){
     paintTheme(); });
   paintTheme();
   // Full screen: Fullscreen API on Android, iPad and computers; iPhone has none, so explain Add to Home Screen
-  const fsCan=!!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
   const standalone=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches||navigator.standalone===true;
   const fsOn=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
   const fsBtns=[...document.querySelectorAll('.fsBtn')];
   const paintFs=()=>fsBtns.forEach(b=>{ b.classList.toggle('hidden',standalone); b.innerHTML=fsOn()?'&#10005; Exit<span class="long"> full screen</span>':'&#9974; Full<span class="long"> screen</span>'; });
-  const enterFs=()=>{ try{ const r=(root.requestFullscreen||root.webkitRequestFullscreen).call(root,{navigationUI:'hide'}); if(r&&r.catch) r.catch(()=>{}); }catch(e){} };
+  const req=root.requestFullscreen||root.webkitRequestFullscreen;
+  const enterFs=()=>{ try{ const r=req.call(root,{navigationUI:'hide'}); if(r&&r.catch) r.catch(()=>{}); }catch(e){} };
+  const fsHelp=()=>$('fsHelpOv').classList.add('show');
+  $('fsHelpOk').onclick=()=>$('fsHelpOv').classList.remove('show');
+  // Jason 2026-10-20: on his phone Full jumped back to the menu. Now we always try the real API
+  // (some browsers report fullscreenEnabled=false but still allow it) and only show the help
+  // popup, on top of the current page, when nothing happened.
   fsBtns.forEach(b=>b.onclick=()=>{
     if(fsOn()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); return; }
-    if(!fsCan){ $('menu').classList.remove('hidden'); $('fsHelp').classList.remove('hidden'); return; }
-    enterFs(); });
+    if(!req) return fsHelp();
+    let r=null; try{ r=req.call(root,{navigationUI:'hide'}); }catch(e){ return fsHelp(); }
+    if(r&&r.then) r.catch(()=>fsHelp());
+    else setTimeout(()=>{ if(!fsOn()) fsHelp(); },500);
+  });
   document.addEventListener('fullscreenchange',paintFs); document.addEventListener('webkitfullscreenchange',paintFs);
   paintFs();
   // touch devices go full screen after the first tap, like the other EmilyGames
-  if(fsCan && !standalone && matchMedia('(pointer: coarse)').matches){
+  if(req && !standalone && matchMedia('(pointer: coarse)').matches){
     const once=e=>{ if(e.target.closest&&e.target.closest('a,.fsBtn')) return; document.removeEventListener('pointerup',once,true); if(!fsOn()) enterFs(); };
     document.addEventListener('pointerup',once,true);
   }
