@@ -205,8 +205,8 @@
     <div class="group" id="diffGroup">
       <span class="lab">2 · AI Level</span>
       <div class="opts" id="diffOpts">
-        <div class="opt diff sel" data-diff="0">Novice<span class="d">plays fast, makes mistakes</span></div>
-        <div class="opt diff" data-diff="1">Intermediate<span class="d">looks 2 moves ahead</span></div>
+        <div class="opt diff" data-diff="0">Novice<span class="d">plays fast, makes mistakes</span></div>
+        <div class="opt diff sel" data-diff="1">Intermediate<span class="d">looks 2 moves ahead</span></div>
         <div class="opt diff" data-diff="2">Expert<span class="d">looks 4 moves ahead</span></div>
         <div class="opt diff" data-diff="3">Master<span class="d">thinks as deep as it can</span></div>
       </div>
@@ -559,7 +559,7 @@ function chooseAIMove(s,levelIdx){
   if(L.noise>0){
     // shallow eval with noise
     let best=moves[0],bs=-Infinity;
-    for(const m of moves){ const u=doMove(s,m); const sc=(s.turn==='w'?1:-1)*evalWhite(s)+ (Math.random()*2-1)*L.noise; undoMove(s,u);
+    for(const m of moves){ const u=doMove(s,m); const sc=(s.turn==='w'?-1:1)*evalWhite(s)+ (Math.random()*2-1)*L.noise; undoMove(s,u); // score for the side that just moved
       if(sc>bs){bs=sc;best=m;} }
     return best;
   }
@@ -601,7 +601,7 @@ function pieceSVG(type,color){
          (color==='w'?'White ':'Black ')+PIECE_NAMES[type]+'" draggable="false">';
 }
 
-const G={ state:null, mode:'ai', diff:0, humanColor:'w', selected:null, legal:[], history:[],
+const G={ state:null, mode:'ai', diff:1, humanColor:'w', selected:null, legal:[], history:[],
           over:false, overMsg:'', lastMove:null, flipped:false, pending:null, hintMove:null,
           thinking:false, capturedW:[], capturedB:[], aiTimer:null, gameId:0 };
 
