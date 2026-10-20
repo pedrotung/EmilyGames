@@ -79,6 +79,7 @@ const TXT = {
       'Points: A = 1, 2-10 = number, J = 11, Q = 12, K = 13.',
       'Fewest points wins and takes the other players\' points:',
       '  SAFE 0-15 = x1, WARNING 16-30 = x2, BUSTED over 30 = x4, SHUTOUT (all 13 down) = x12.',
+      'A tie goes to whoever comes first in turn order, starting from the 7♠ player.',
       'FLAWLESS: the winner put no cards face down: winnings x2.',
       'LUCKY SEVEN: FLAWLESS and your last card is a 7: winnings x3.',
       'Tip: hold on to your 7s. Playing one opens a whole suit for everyone!',
@@ -115,6 +116,7 @@ const TXT = {
       '扣分：A = 1，2-10 按点数，J = 11，Q = 12，K = 13。',
       '扣分最少的人赢，拿走其他人的分数：',
       '  安全 0-15 = x1，警戒 16-30 = x2，爆牌 30 以上 = x4，关春天（13 张全扣）= x12。',
+      '扣分相同时，按出牌顺序从出黑桃 7 的人算起，靠前的人赢。',
       '净手：赢家一张牌都没扣，赢的积分 x2。',
       '倒拉七：净手，而且最后一张出的是 7，赢的积分 x3。',
       '小技巧：憋住你的 7！出了 7 就给所有人开了一整个花色。',
@@ -228,7 +230,7 @@ function newGame(totals, n) {
   const d = shuffle(newDeck()), g = { hands: [], disc: [[], [], [], []], board: [null, null, null, null], last: [null, null, null, null],
     moves: 0, turn: 0, n, totals: totals || [0, 0, 0, 0], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
   for (let p = 0; p < 4; p++) g.hands.push(sortHand(d.slice(p * 13, p * 13 + 13)));
-  g.turn = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
+  g.turn = g.first = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
   return g;
 }
 // One move: play a card that fits, or (only when nothing fits) put one face down.
@@ -245,13 +247,14 @@ function apply(g, p, i) {
   if (g.moves === 52) { g.over = true; g.res = score(g); }
   return play;
 }
-// Fewest face-down points wins (Jason). Ties: fewer face-down cards, then the winners share.
+// Fewest face-down points wins (Jason). On a tie the player earlier in turn order wins,
+// counting from whoever played the 7♠, so there is always exactly one winner.
 // Each loser pays points x zone (x12 when all 13 went face down), times x2 if a winner is FLAWLESS
 // or x3 for LUCKY SEVEN (no cards face down and the last card played was a 7).
 function score(g) {
   const pts = g.disc.map(points), cnt = g.disc.map(d => d.length);
-  const lo = Math.min(...pts), loCnt = Math.min(...[0, 1, 2, 3].filter(p => pts[p] === lo).map(p => cnt[p]));
-  const winners = [0, 1, 2, 3].filter(p => pts[p] === lo && cnt[p] === loCnt);
+  const lo = Math.min(...pts), order = [0, 1, 2, 3].map(k => (g.first + k) % 4);
+  const winners = [order.find(p => pts[p] === lo)];
   const clean = cnt[winners[0]] === 0;
   const lucky = clean && winners.some(p => g.last[p] && g.last[p].r === 7);
   const bonus = lucky ? 3 : clean ? 2 : 1;
@@ -338,7 +341,7 @@ function lookAhead(g, p, moves) {
     }
     moves.forEach((i, m) => {
       const s = { hands: hands.map(h => h.slice()), disc: disc.map(d => d.slice()), board: g.board.map(b => b && b.slice()),
-        last: g.last.slice(), moves: g.moves, turn: p, over: false, res: null };
+        last: g.last.slice(), moves: g.moves, turn: p, first: g.first, over: false, res: null };
       apply(s, p, i);
       while (!s.over) apply(s, s.turn, chooseMove(s, s.turn, 3));
       total[m] += s.res.rows[p].score;
@@ -457,7 +460,7 @@ function howPanel(close) {
   ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
   box(150, 50, 980, 620, 24, '#fffdf6', '#f1c40f', 5);
   txt(T('howTitle'), W / 2, 100, 48, 'center', '#e67e22');
-  T('howLines').forEach((l, i) => txt(l, 180, 150 + i * 39, 27, 'left', '#333'));
+  T('howLines').forEach((l, i) => txt(l, 180, 146 + i * 36, 27, 'left', '#333'));
   button(530, 588, 220, 70, T('close'), close, { fill: '#f39c12', size: 32 });
 }
 
