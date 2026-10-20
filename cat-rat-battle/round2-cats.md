@@ -1,5 +1,7 @@
 # Meow Brigade: Round 2 cats (all 15 set by Jason 2026-10-19; numbers to tune)
 
+**2026-10-20: Jason moved these cats to Round 4 and doubled the prices (4000 / 6000 / 10000). See stats-table.md 第 7 版.**
+
 **Built 2026-10-19. The final numbers after balancing are in stats-table.md (section 二周目猫); the table below is the plan.**
 
 Drawings: Jason's "Round 2" sheet (src/round2-sheet.png), cut by src/extract_round2.py into assets/cat_*.png and w_*.png.

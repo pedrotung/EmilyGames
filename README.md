@@ -59,7 +59,7 @@ Tap a hurt cat and then **HEAL** to use a Nurse heal.
 - 20 cats with their own attacks; win coins and spin the Common, Rare, Epic and Legendary wheels, or buy the two Secret cats
 - 8-bit music (cute menu theme, tense battle theme, faster boss theme) and a sound for every cat attack and every rat, all synthesised in the browser
 - Beat all 10 levels to unlock Round 2: same cats and coins, much stronger rats, more coins (and Round 3, 4... after that)
-- Round 2 cats: 15 more cats from Jason's second sheet. Buy them on the ROUND 2 tab of the Spin page once you reach Round 2. The Weather cat adds a WEATHER button in battle (Rain, Thunder, Wind). Back to Round 1 / Go to Round N buttons on the level page.
+- Round 4 cats: 15 more cats from Jason's second sheet (4000, 6000 or 10000 coins). Buy them on the ROUND 4 tab of the Spin page once you reach Round 4. The Weather cat adds a WEATHER button in battle (Rain, Thunder, Wind). Back to Round 1 / Go to Round N buttons on the level page.
 - Progress is saved on the device
 
 The game loads its art from `cat-rat-battle/assets/` and its font from `cat-rat-battle/src/fonts/`, so serve the whole folder

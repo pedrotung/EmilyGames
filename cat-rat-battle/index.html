@@ -61,8 +61,9 @@
 'use strict';
 /* ======================= data ======================= */
 const W = 1280, H = 720, INK = '#222', GREY = '#aaa', RED = 'rgb(255,165,165)';
-const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET', 'ROUND 2'];
-const R2 = 5, R2_GIFT = 2000; // Round 2 cats (Jason's second sheet): bought straight from the shop once you reach Round 2
+const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET', 'ROUND 4'];
+// Jason's second sheet of cats: bought straight from the shop once you reach Round 4 (moved from Round 2 by Jason 2026-10-20)
+const R2 = 5, R2_ROUND = 4, R2_GIFT = 4000;
 const SPIN_COST = [50, 100, 500, 2000], SECRET_COST = 6000;
 let FAIRY_DMG = 20; // 1.5 s cooldown (Jason), so each bolt hits twice as hard to keep levels 7-10 winnable
 const DEVIL = { cd: 3, dmg: 40, boss: 60, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
@@ -88,21 +89,21 @@ const CATS = [
   { id: 'witch', name: 'Witch cat', r: 3, row: 'back', hp: 140, img: 'cat_witch', h: 115, desc: 'Potion splash: 15 damage to every rat nearby and slows them, every 3 s.' },
   { id: 'angel', name: 'Angel cat', r: 4, row: 'back', hp: 210, img: 'cat_angel', h: 90, desc: 'Flies up, sings a holy meow and hits every rat for 30. If a boss hits it in the air, it falls and starts again.' },
   { id: 'devil', name: 'Devil cat', r: 4, row: 'front', hp: 300, img: 'cat_devil', h: 110, desc: 'Trident stab every 3 s: defeats a rat at half HP or less in one hit, otherwise hits for 40. Bosses take 60.' },
-  { id: 'vampire', name: 'Vampire cat', r: R2, price: 2000, row: 'front', hp: 260, img: 'cat_vampire', h: 128, desc: 'Walks up to a rat and drains it with its teeth: 20 damage a second, and heals a little. That rat cannot move, but other rats can still attack.' },
-  { id: 'samurai', name: 'Samurai cat', r: R2, price: 2000, row: 'front', hp: 280, img: 'cat_samurai', h: 100, desc: 'Short range katana slash: 30 damage every 1.2 s.' },
-  { id: 'ninja', name: 'Ninja cat', r: R2, price: 2000, row: 'back', hp: 160, img: 'cat_ninja', h: 100, desc: 'Throws ninja stars: 9 damage every 0.5 s.' },
-  { id: 'musician', name: 'Musician', r: R2, price: 2000, row: 'back', hp: 150, img: 'cat_musician', h: 100, desc: 'Flings music notes at a rat: 22 damage every 1 s.' },
-  { id: 'artist', name: 'Artist', r: R2, price: 2000, row: 'back', hp: 150, img: 'cat_artist', h: 100, desc: 'Rainbow paint stroke every 2.5 s: 20 damage to every rat in the line, and paint blinds them for 3 s so they cannot attack.' },
-  { id: 'alien', name: 'Alien cat', r: R2, price: 3000, row: 'front', hp: 320, img: 'cat_alien', h: 101, desc: 'Holds up to 3 rats with its tentacles. They cannot move and slowly suffocate: 6 damage a second each.' },
-  { id: 'dragon', name: 'Dragon cat', r: R2, price: 3000, row: 'front', hp: 340, img: 'cat_dragon', h: 105, desc: 'Fire breath every 2 s: 20 damage to the rats in front, and they keep burning for 3 s.' },
-  { id: 'unicat', name: 'Unicat', r: R2, price: 3000, row: 'back', hp: 200, img: 'cat_unicat', h: 100, desc: 'Flies up and shoots magic from its horn: 28 damage every 1.2 s.' },
-  { id: 'weather', name: 'Weather cat', r: R2, price: 3000, row: 'back', hp: 200, img: 'cat_weather', h: 146, desc: 'No attack. Gives you a WEATHER button in battle: Rain slows the rats, Thunder strikes them, Wind blows them back. Each lasts 10 s.' },
-  { id: 'warp', name: 'Warp cat', r: R2, price: 3000, row: 'back', hp: 180, img: 'cat_warp', h: 101, desc: 'Teleports next to a rat, hits it for 35 and warps back, every 1.3 s.' },
-  { id: 'element', name: 'Element cat', r: R2, price: 5000, row: 'back', hp: 220, img: 'cat_element', h: 98, desc: 'Long range. Shoots water (20), a star (45) or a sparkle (80) at random, every 1.3 s.' },
-  { id: 'supercat', name: 'Supercat', r: R2, price: 5000, row: 'front', hp: 450, img: 'cat_supercat', h: 100, desc: 'Flies to the strongest rat or boss and punches it: 35 damage every 1.5 s. Takes only half damage.' },
-  { id: 'jedi', name: 'Jedi cat', r: R2, price: 5000, row: 'front', hp: 420, img: 'cat_jedi', h: 99, desc: 'Lightsaber cut on close rats: 25 every 1.2 s. Every 5 s it uses the force to lift a far rat and drop it: 50 damage.' },
-  { id: 'warrior', name: 'Warrior cat', r: R2, price: 5000, row: 'front', hp: 500, img: 'cat_warrior', h: 92, desc: 'Big sword slash: 50 damage every 2 s. Shouts so the rats attack it first.' },
-  { id: 'tnt', name: 'TNT cat', r: R2, price: 5000, row: 'back', hp: 220, img: 'cat_tnt', h: 130, desc: 'Throws TNT every 4 s: the explosion hits every rat nearby for 80.' },
+  { id: 'vampire', name: 'Vampire cat', r: R2, price: 4000, row: 'front', hp: 260, img: 'cat_vampire', h: 128, desc: 'Walks up to a rat and drains it with its teeth: 20 damage a second, and heals a little. That rat cannot move, but other rats can still attack.' },
+  { id: 'samurai', name: 'Samurai cat', r: R2, price: 4000, row: 'front', hp: 280, img: 'cat_samurai', h: 100, desc: 'Short range katana slash: 30 damage every 1.2 s.' },
+  { id: 'ninja', name: 'Ninja cat', r: R2, price: 4000, row: 'back', hp: 160, img: 'cat_ninja', h: 100, desc: 'Throws ninja stars: 9 damage every 0.5 s.' },
+  { id: 'musician', name: 'Musician', r: R2, price: 4000, row: 'back', hp: 150, img: 'cat_musician', h: 100, desc: 'Flings music notes at a rat: 22 damage every 1 s.' },
+  { id: 'artist', name: 'Artist', r: R2, price: 4000, row: 'back', hp: 150, img: 'cat_artist', h: 100, desc: 'Rainbow paint stroke every 2.5 s: 20 damage to every rat in the line, and paint blinds them for 3 s so they cannot attack.' },
+  { id: 'alien', name: 'Alien cat', r: R2, price: 6000, row: 'front', hp: 320, img: 'cat_alien', h: 101, desc: 'Holds up to 3 rats with its tentacles. They cannot move and slowly suffocate: 6 damage a second each.' },
+  { id: 'dragon', name: 'Dragon cat', r: R2, price: 6000, row: 'front', hp: 340, img: 'cat_dragon', h: 105, desc: 'Fire breath every 2 s: 20 damage to the rats in front, and they keep burning for 3 s.' },
+  { id: 'unicat', name: 'Unicat', r: R2, price: 6000, row: 'back', hp: 200, img: 'cat_unicat', h: 100, desc: 'Flies up and shoots magic from its horn: 28 damage every 1.2 s.' },
+  { id: 'weather', name: 'Weather cat', r: R2, price: 6000, row: 'back', hp: 200, img: 'cat_weather', h: 146, desc: 'No attack. Gives you a WEATHER button in battle: Rain slows the rats, Thunder strikes them, Wind blows them back. Each lasts 10 s.' },
+  { id: 'warp', name: 'Warp cat', r: R2, price: 6000, row: 'back', hp: 180, img: 'cat_warp', h: 101, desc: 'Teleports next to a rat, hits it for 35 and warps back, every 1.3 s.' },
+  { id: 'element', name: 'Element cat', r: R2, price: 10000, row: 'back', hp: 220, img: 'cat_element', h: 98, desc: 'Long range. Shoots water (20), a star (45) or a sparkle (80) at random, every 1.3 s.' },
+  { id: 'supercat', name: 'Supercat', r: R2, price: 10000, row: 'front', hp: 450, img: 'cat_supercat', h: 100, desc: 'Flies to the strongest rat or boss and punches it: 35 damage every 1.5 s. Takes only half damage.' },
+  { id: 'jedi', name: 'Jedi cat', r: R2, price: 10000, row: 'front', hp: 420, img: 'cat_jedi', h: 99, desc: 'Lightsaber cut on close rats: 25 every 1.2 s. Every 5 s it uses the force to lift a far rat and drop it: 50 damage.' },
+  { id: 'warrior', name: 'Warrior cat', r: R2, price: 10000, row: 'front', hp: 500, img: 'cat_warrior', h: 92, desc: 'Big sword slash: 50 damage every 2 s. Shouts so the rats attack it first.' },
+  { id: 'tnt', name: 'TNT cat', r: R2, price: 10000, row: 'back', hp: 220, img: 'cat_tnt', h: 130, desc: 'Throws TNT every 4 s: the explosion hits every rat nearby for 80.' },
 ];
 // Weather cat powers: how long each one waits before it can be used again (each lasts WEATHER_TIME s)
 const WEATHER = { thunder: { name: 'Thunder', cd: 40 }, rain: { name: 'Rain', cd: 25 }, wind: { name: 'Wind', cd: 15 } }, WEATHER_TIME = 10;
@@ -144,12 +145,13 @@ const LEVELS = [
     tip: 'SUPER RAINBOW RAT: 1350 HP and changes colour faster.' },
 ];
 const RAINBOW_STRIPES = ['#ff5a4e', '#ff9a3a', '#ffd84a', '#5ccf6a', '#4aa8ff', '#5a6bff', '#b06bff'];
-// Round 2 and later (after beating level 10): rats and bosses get ROUND2[level] times the HP and the square root
-// of that in damage. Raised 15% when the Round 2 cats came in: a team with one $2000 cat wins about a third
-// to two thirds of the time, one $3000 cat about 75%, one $5000 cat 85-100%; old Secret teams mostly lose after level 2.
-// Each round after that is 8% tougher again, and every round pays 50% more coins.
-const ROUND2 = [6.9, 8.6, 6.3, 4, 4.2, 3.05, 2.15, 2.15, 1.47, 1.7];
-let roundMul = (r, lv = 1) => { const k = r > 1 ? ROUND2[lv - 1] * Math.pow(1.08, r - 2) : 1;
+// Round 2 and later (after beating level 10): rats and bosses get k times the HP and the square root of k in damage.
+// Rounds 2-3: k = ROUND2[level], tuned so the best first cats (Devil x2, Fairy x2, Witch) win most levels of Round 2 and
+// about half of Round 3. Round 4 on (where the new cats can be bought): k = ROUND4[level], tuned so a team
+// with one new cat wins about that much. Round 3 is 10% tougher than Round 2, and each round after Round 4 8% tougher again; every round pays 50% more coins.
+const ROUND2 = [6.3, 7.2, 5.85, 3.33, 3.47, 2.48, 1.8, 1.67, 1.15, 1.15];
+const ROUND4 = [6.9, 8.6, 6.3, 4, 4.2, 3.05, 2.15, 2.15, 1.47, 1.7];
+let roundMul = (r, lv = 1) => { const k = r <= 1 ? 1 : r < R2_ROUND ? ROUND2[lv - 1] * Math.pow(1.1, r - 2) : ROUND4[lv - 1] * Math.pow(1.08, r - R2_ROUND);
   return { hp: k, dmg: Math.sqrt(k), gap: 1, coin: 1 + 0.5 * (r - 1) }; };
 const GHOST_DODGE = 0.5; // rats hit the flying Ghost cat only half the time
 const slotsFor = lv => lv === 1 ? 3 : lv === 2 ? 4 : 5;
@@ -159,10 +161,10 @@ const RAINBOW = [['RED: FIRE', '#ff5a4e'], ['YELLOW: LIGHTNING', '#ffd84a'], ['G
 
 /* ======================= save ======================= */
 const SAVE_KEY = 'meowBrigade';
-// round: the round being played; maxRound: the highest reached (Round 2 cats unlock at 2); roundCleared: levels cleared in each round
+// round: the round being played; maxRound: the highest reached (Round 4 cats unlock at R2_ROUND); roundCleared: levels cleared in each round
 function freshSave() { return { coins: 100, owned: { cat: 1 }, cleared: 0, round: 1, maxRound: 1, roundCleared: {}, team: ['cat'], sound: true, music: true }; }
 function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) { const o = Object.assign(freshSave(), s); o.maxRound = Math.max(o.maxRound || 1, o.round || 1); if (o.maxRound >= 2 && !o.r2gift) { o.r2gift = true; o.coins += R2_GIFT; } return o; } } catch (e) {}
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.owned) { const o = Object.assign(freshSave(), s); o.maxRound = Math.max(o.maxRound || 1, o.round || 1); if (o.maxRound >= R2_ROUND && !o.r4gift) { o.r4gift = true; o.coins += R2_GIFT; } return o; } } catch (e) {}
   return freshSave();
 }
 let save = loadSave();
@@ -642,8 +644,8 @@ function Team(lv) {
         } });
       });
       txt(`${count()} / ${N} cats`, 315, 150, 26);
-      // Round 2 cats join the grid once Round 2 is reached; then the tiles get smaller (7 x 5)
-      const list = CATS.filter(d => d.r !== R2 || (save.maxRound || 1) >= 2 || save.owned[d.id]), big = list.length > 20;
+      // Round 4 cats join the grid once Round 4 is reached; then the tiles get smaller (7 x 5)
+      const list = CATS.filter(d => d.r !== R2 || (save.maxRound || 1) >= R2_ROUND || save.owned[d.id]), big = list.length > 20;
       const cols = big ? 7 : 5, tw = big ? 88 : 120, th = big ? 98 : 120, sx = big ? 92 : 128, sy = big ? 102 : 128;
       list.forEach((d, i) => {
         const x = 625 + (i % cols) * sx, y = 125 + Math.floor(i / cols) * sy, own = save.owned[d.id] || 0, f = free(d.id);
@@ -1289,8 +1291,8 @@ function endBattle(win) {
   const L = B.L, first = B.lv > save.cleared;
   let bonus = 0;
   if (win) { bonus = Math.round((first ? L.reward : L.reward / 4) * B.R.coin); /* replays pay a quarter so farming old levels stays slow */ save.coins += bonus; if (first) save.cleared = B.lv; }
-  // first time Round 1 is beaten: a gift so the player can buy a Round 2 cat straight away
-  let gift = 0; if (win && B.round === 1 && B.lv === LEVELS.length && !save.r2gift) { gift = R2_GIFT; save.r2gift = true; save.coins += gift; }
+  // first time Round 3 is beaten: a gift so the player can buy a Round 4 cat straight away
+  let gift = 0; if (win && B.round === R2_ROUND - 1 && B.lv === LEVELS.length && !save.r4gift) { gift = R2_GIFT; save.r4gift = true; save.coins += gift; }
   persist();
   B.over = { win, bonus, gift, earned: B.earned, t: 0 };
   if (!B.silent) setMusic(null);
@@ -1346,7 +1348,7 @@ function drawBattle() {
   if (b.over) {
     const o = b.over, lines = [`Round ${b.round} · Level ${b.lv}`, `Coins from rats: ${o.earned}`];
     if (o.win) lines.push(`Level bonus: ${o.bonus}`);
-    if (o.gift) lines.push(`Round 2 gift: ${o.gift}! Buy a Round 2 cat.`);
+    if (o.gift) lines.push(`Round ${R2_ROUND} gift: ${o.gift}! Buy a Round ${R2_ROUND} cat.`);
     else lines.push('You keep the coins from the rats.');
     const btns = [];
     if (o.win && b.lv < LEVELS.length) btns.push(['Next level', () => go(Team(b.lv + 1))]);
@@ -1509,9 +1511,9 @@ const Spin = {
     if (save.coins < cost && !this.spinning) txt('Not enough coins yet. Win levels to earn more.', 970, 650, 24);
   },
   pick: null,
-  drawRound2() { // Round 2 cats: no wheel, buy the one you want once you have reached Round 2
-    const open = (save.maxRound || 1) >= 2, d0 = this.pick;
-    if (!open) txt('LOCKED: beat all 10 levels to reach Round 2, then you can buy these cats.', W / 2, 168, 28);
+  drawRound2() { // Round 4 cats: no wheel, buy the one you want once you have reached Round 4
+    const open = (save.maxRound || 1) >= R2_ROUND, d0 = this.pick;
+    if (!open) txt(`LOCKED: beat Rounds 1, 2 and 3 to reach Round ${R2_ROUND}, then you can buy these cats.`, W / 2, 168, 28);
     else if (d0) wrapText(`${d0.name}: ${d0.desc}`, W / 2, 158, 1180, 22, 26);
     else txt('Buy any cat you like. Tap a cat to see what it does.', W / 2, 168, 28, 'center', '#555');
     CATS.filter(c => c.r === R2).forEach((d, i) => {
@@ -1542,10 +1544,10 @@ const MyCats = {
   info: null, page: 0,
   draw() {
     topBar(); txt('MY CATS', W / 2, 40, 44);
-    // page 0: the five Round 1 rarities; page 1: Round 2 cats in rows by price
-    const rows = this.page ? [2000, 3000, 5000].map(p => [`$${p}`, CATS.filter(c => c.r === R2 && c.price === p)]) : RARITY.slice(0, R2).map((s, ri) => [s, CATS.filter(c => c.r === ri)]);
-    button(260, 660, 200, 48, 'ROUND 1 CATS', () => { this.page = 0; }, { size: 24, on: !this.page });
-    button(480, 660, 200, 48, 'ROUND 2 CATS', () => { this.page = 1; }, { size: 24, on: !!this.page });
+    // page 0: the five Round 1 rarities; page 1: Round 4 cats in rows by price
+    const rows = this.page ? [4000, 6000, 10000].map(p => [`$${p}`, CATS.filter(c => c.r === R2 && c.price === p)]) : RARITY.slice(0, R2).map((s, ri) => [s, CATS.filter(c => c.r === ri)]);
+    button(260, 660, 200, 48, 'FIRST CATS', () => { this.page = 0; }, { size: 24, on: !this.page });
+    button(480, 660, 200, 48, 'ROUND 4 CATS', () => { this.page = 1; }, { size: 24, on: !!this.page });
     rows.forEach(([s, list], ri) => {
       const y = 100 + ri * 112; txt(s, 120, y + 52, 26);
       list.forEach((d, i) => {
@@ -1562,7 +1564,7 @@ const MyCats = {
       const d = this.info;
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(0, 0, W, H); hits = [];
       ctx.fillStyle = '#fff'; ctx.fillRect(290, 120, 700, 480); hbox(290, 120, 700, 480, { lw: 4 });
-      txt(d.name, W / 2, 165, 46); txt(`${d.price ? `ROUND 2 ($${d.price})` : RARITY[d.r]}  -  ${d.row === 'front' ? 'front row (melee)' : 'back row'}  -  ${d.hp} HP  -  you have ${save.owned[d.id]}`, W / 2, 210, 24);
+      txt(d.name, W / 2, 165, 46); txt(`${d.price ? `ROUND ${R2_ROUND} ($${d.price})` : RARITY[d.r]}  -  ${d.row === 'front' ? 'front row (melee)' : 'back row'}  -  ${d.hp} HP  -  you have ${save.owned[d.id]}`, W / 2, 210, 24);
       spr(d.img, W / 2, 420, 180); wrapText(d.desc, W / 2, 465, 600, 28, 34);
       button(540, 530, 200, 54, 'Close', () => { this.info = null; }, { size: 30 });
     }
@@ -1587,7 +1589,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && scr
 // Test hooks for automated checks.
 window.__meow = {
   get save() { return save; }, get battle() { return B; }, go: n => go({ Menu, Levels, Spin, MyCats }[n]),
-  give(n) { save.coins += n; persist(); }, unlockAll() { save.cleared = LEVELS.length; save.maxRound = Math.max(save.maxRound || 1, 2); CATS.forEach(c => { save.owned[c.id] = Math.max(save.owned[c.id] || 0, 5); }); persist(); },
+  give(n) { save.coins += n; persist(); }, unlockAll() { save.cleared = LEVELS.length; save.maxRound = Math.max(save.maxRound || 1, R2_ROUND); CATS.forEach(c => { save.owned[c.id] = Math.max(save.owned[c.id] || 0, 5); }); persist(); },
   reset() { save = freshSave(); persist(); go(Menu); },
   team: (lv) => go(Team(lv)), fight: (lv, ids) => go(Battle(lv, ids)), renderAudio, music: () => Music,
   sim(lv, ids, maxT = 400, round) { // run a whole battle without drawing; returns the result
