@@ -11,10 +11,10 @@
 <meta name="apple-mobile-web-app-title" content="Colour Jump">
 <meta name="theme-color" content="#FCE3E3">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="description" content="A one-button jump game through 14 colourful levels, with a King Crow boss at the end. Free in your browser.">
+<meta name="description" content="A one-button jump game through 14 colourful levels with springs, moving platforms, crumbling bridges and critters. Free in your browser.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Colour Jump">
-<meta property="og:description" content="A one-button jump game through 14 colourful levels, with a King Crow boss at the end. Free in your browser.">
+<meta property="og:description" content="A one-button jump game through 14 colourful levels with springs, moving platforms, crumbling bridges and critters. Free in your browser.">
 <meta property="og:url" content="https://pedrotung.github.io/EmilyGames/colour-jump/">
 <meta property="og:image" content="https://pedrotung.github.io/EmilyGames/colour-jump/share-card.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -278,7 +278,7 @@ const LEVELS = [
     blocks: [[300, 30, 40], [1600, 30, 40], [2900, 30, 50], [3100, 30, 40], [3550, 30, 40], [4150, 30, 50], [4500, 30, 60]],
     springs: [520, 1250, 2370, 3200, 4380],
     door: 4800,
-    hints: [[380, 'Springs bounce you up high']],
+    hints: [[380, 'Jump ON springs to bounce up high']],
   },
   {
     name: 'Level 9', speed: 280, cp: 2750,
@@ -290,13 +290,18 @@ const LEVELS = [
     hints: [[330, 'Land on snails to squash them']],
   },
   {
-    name: 'Level 10', speed: 290, cp: 2300, noDrops: true,
+    name: 'Level 10', speed: 300, cp: 3350, noDrops: true,
     c: { bg: '#FDFBD3', faint: '#EDE48A', mid: '#CDBE12', ground: '#5F5508' },
-    segs: [[-600, 1500, BASE], [1250, 550, BASE], [2200, 500, 230], [3400, 600, BASE], [4400, 900, BASE]],
-    blocks: [[400, 30, 40], [1500, 30, 40], [2500, 30, 40], [3600, 30, 50], [3800, 30, 40], [4650, 30, 40], [4900, 60, 40]],
-    movers: [[1075, 130, 250, 50, 2.6], [2000, 130, 240, 60, 2.2], [2900, 130, 220, 40, 2.4], [3200, 130, 240, 40, 2.0], [4200, 130, 230, 70, 2.8]],
-    door: 5100,
-    hints: [[650, 'Ride the moving platforms']],
+    segs: [[-600, 1400, BASE], [1250, 500, BASE], [2250, 450, 230], [3300, 500, BASE], [4260, 540, BASE], [5200, 900, BASE]],
+    blocks: [[400, 30, 40], [1500, 30, 40], [2450, 30, 40], [3550, 30, 50], [4550, 30, 40], [5450, 30, 40]],
+    // [centre x, width, top, swing, seconds per swing, 'x' or 'y', phase]
+    movers: [[1025, 80, 245, 55, 1.8, 'y', 1.2],
+             [1900, 70, 240, 45, 1.6, 'x', 0.5], [2120, 70, 225, 45, 1.5, 'x', 2.0],
+             [2850, 80, 220, 70, 2.0, 'y', 0], [3110, 80, 200, 70, 2.0, 'y', 3.1],
+             [4040, 100, 235, 90, 2.2, 'x', 0.8],
+             [5000, 80, 230, 80, 1.5, 'y', 2.0]],
+    door: 5800,
+    hints: [[650, 'Time your jumps onto the moving platforms']],
   },
   {
     name: 'Level 11', speed: 285, cp: 2200,
@@ -309,14 +314,15 @@ const LEVELS = [
     hints: [[260, "Spikes and hedgehogs: don't touch!"]],
   },
   {
-    name: 'Level 12', speed: 305, cp: 2200,
+    name: 'Level 12', speed: 315, cp: 2450,
     c: { bg: '#DDF3FC', faint: '#A9DDF2', mid: '#2BA6D9', ground: '#0E4D66' },
-    segs: [[-600, 1500, BASE], [1140, 660, BASE], [2120, 680, 230], [3080, 720, BASE], [4040, 960, BASE]],
-    blocks: [[400, 30, 40], [1600, 30, 40], [3550, 30, 50], [4650, 30, 40]],
-    bridges: [[900, 6, BASE], [1800, 8, BASE], [2800, 7, 230], [3800, 6, BASE]],
-    enemies: [['frog', 1350, 0], ['frog', 2450, 0.5], ['frog', 2650, 0.2], ['frog', 3300, 0.7], ['frog', 4250, 0.1], ['frog', 4450, 0.6]],
-    door: 4800,
-    hints: [[650, 'Bricks fall away. Keep going!'], [1150, 'Frogs hop. Jump or squash!']],
+    segs: [[-600, 1500, BASE], [1300, 500, BASE], [2400, 500, BASE], [3500, 600, BASE], [4580, 700, BASE]],
+    blocks: [[400, 30, 40], [1550, 30, 40], [3650, 30, 50]],
+    // [x, bricks, top, bricks that shake and drop before you get there]
+    bridges: [[900, 10, BASE, [3, 4, 5]], [1800, 15, BASE, [2, 3, 6, 7, 8, 11, 12]], [2900, 15, 230, [3, 4, 7, 8, 11, 12]], [4100, 12, BASE, [2, 3, 4, 7, 8, 9]]],
+    enemies: [['frog', 1450, 0], ['frog', 2650, 0.5], ['frog', 2780, 0.2], ['frog', 3850, 0.7], ['frog', 4800, 0.1], ['frog', 5000, 0.6]],
+    door: 5200,
+    hints: [[600, 'Shaking bricks fall. Jump the holes!'], [1300, 'Frogs hop. Jump or squash!']],
   },
   {
     name: 'Level 13', speed: 310, cp: 2120,
@@ -329,21 +335,24 @@ const LEVELS = [
     hints: [[260, 'Squash bees from above'], [560, "Low ceiling: don't jump!"]],
   },
   {
-    name: 'Level 14', speed: 300, cp: 2500, noDrops: true,
+    name: 'Level 14', speed: 315, cp: 3350, noDrops: true,
     c: { bg: '#FBF0D2', faint: '#EBCF85', mid: '#C99A1C', ground: '#5C430A' },
-    segs: [[-600, 1500, BASE], [1060, 640, BASE], [1830, 470, 230], [2420, 6200, BASE]],
-    blocks: [],
-    springs: [],
-    spikes: [[1550, 4]],
-    enemies: [['snail', 450], ['hedgehog', 1350], ['bee', 2050, 0.3]],
-    boss: { start: 2650, swoops: [3200, 4250, 5350, 6450, 7550], bombs: [3550, 3850, 4600, 4950, 5700, 6050, 6800, 7150] },
-    door: 8100,
-    hints: [[2550, 'Jump into King Crow 3 times!']],
+    segs: [[-600, 1500, BASE], [1050, 600, BASE], [1650, 500, 120], [2150, 650, BASE], [3300, 500, BASE], [4400, 900, BASE], [5650, 1350, BASE]],
+    blocks: [[4990, 30, 130]],
+    springs: [1560, 4900],
+    spikes: [[600, 3], [3620, 3], [6010, 3]],
+    ceils: [[2300, 250], [6300, 220]],
+    movers: [[2960, 90, 235, 50, 2.0, 'y', 0.6], [3170, 80, 230, 50, 1.8, 'x', 1.5], [5475, 90, 230, 60, 1.8, 'y', 2.4]],
+    bridges: [[3800, 15, BASE, [3, 4, 9, 10]]],
+    enemies: [['snail', 400], ['hedgehog', 1250], ['bee', 2050, 0.3], ['hedgehog', 2680], ['frog', 3450, 0.4],
+              ['frog', 4060, 0.2], ['snail', 4620], ['bee', 4760, 0.6], ['hedgehog', 5800], ['bee', 6200, 0.6], ['frog', 6700, 0.5]],
+    door: 6850,
+    hints: [[250, 'Last level: everything at once!']],
   },
 ];
 const FINAL_DOOR = { mid: '#9B4FD0', ground: '#4A1F6B' };
 const seasonEnd = i => i === 6 || i === 13;
-const SPRING_V = -1150, STOMP_V = -560, CEIL_GAP = 64, BRICK_W = 40, BRICK_DELAY = 0.32;
+const SPRING_V = -1150, STOMP_V = -560, CEIL_GAP = 64, BRICK_W = 40, BRICK_DELAY = 0.2, BRICK_SHAKE = 0.5, BRICK_EARLY = 240;
 // Enemy sizes; their meeting point x is where they are when the block gets there.
 const FOES = {
   snail: { w: 40, h: 26, stomp: true },
@@ -374,9 +383,13 @@ for (const L of LEVELS) {
     L.solids.push({ x, y: bottom - 140, w, h: 140, kind: 'ceil' });   // too tall to jump over
   }
   L.springs = (L.springs || []).map(x => ({ x, y: topAt(L, x) - 14, w: 34, h: 14 }));
-  L.movers = (L.movers || []).map(([cx, w, top, amp, period]) => ({ cx, w, y: top, h: 16, amp, period, tm: cx / L.speed }));
+  L.movers = (L.movers || []).map(([cx, w, top, amp, period, axis = 'x', ph = 0]) => ({ cx, w, y: top, h: 16, amp, period, axis, ph, tm: cx / L.speed }));
+  // Bridge bricks drop once stepped on; the listed ones shake and drop by themselves before you arrive.
   L.bricks = [];
-  for (const [x, n, top] of L.bridges || []) for (let i = 0; i < n; i++) L.bricks.push({ x: x + i * BRICK_W, y: top, w: BRICK_W, h: 18 });
+  for (const [x, n, top, holes = []] of L.bridges || []) for (let i = 0; i < n; i++) {
+    const bx = x + i * BRICK_W;
+    L.bricks.push({ x: bx, y: top, w: BRICK_W, h: 18, tEarly: holes.includes(i) ? (bx - BRICK_EARLY) / L.speed : null });
+  }
   L.foes = (L.enemies || []).map(([kind, m, ph]) => ({ kind, m, ph: ph || 0, ground: topAt(L, m), tm: m / L.speed, ...FOES[kind] }));
   if (L.boss) {
     const b = L.boss;
@@ -387,8 +400,16 @@ for (const L of LEVELS) {
   L.doorRect = { x: L.door, y: dTop - DOOR_H, w: DOOR_W, h: DOOR_H };
 }
 // Where things are at level time t (seconds since the start; the block is at x = speed * t).
-function moverX(L, m, t) { return m.cx - m.w / 2 + m.amp * Math.sin(2 * Math.PI * (t - m.tm) / m.period); }
-function brickFall(p, i) { const t0 = p.br && p.br[i]; return t0 == null ? 0 : Math.max(0, p.t - t0 - BRICK_DELAY); }
+function moverBox(L, m, t) {
+  const sw = m.amp * Math.sin(2 * Math.PI * (t - m.tm) / m.period + m.ph);
+  return m.axis === 'y' ? { x: m.cx - m.w / 2, y: m.y + sw, w: m.w, h: m.h } : { x: m.cx - m.w / 2 + sw, y: m.y, w: m.w, h: m.h };
+}
+function brickFall(p, i, L = LEVELS[p.lv]) {
+  const t0 = p.br && p.br[i], b = L && L.bricks[i];
+  let f = t0 == null ? 0 : Math.max(0, p.t - t0 - BRICK_DELAY);
+  if (b && b.tEarly != null) f = Math.max(f, p.t - b.tEarly);
+  return f;
+}
 function foeBox(L, f, t) {
   const u = t - f.tm;
   let x = f.m, y = f.ground - f.h;
@@ -415,7 +436,7 @@ function swoopPos(L, p, k) {
 // ---------- Physics (pure, also used by the level checker) ----------
 function newPlayer(L, fromX = 0, hits = 0) {
   return { x: fromX, y: topAt(L, fromX), vy: 0, grounded: true, lastGround: fromX / L.speed, used: false, t: fromX / L.speed,
-           dead: false, done: false, rot: 0, kills: 0, hits, bossMask: 0, br: null };
+           dead: false, done: false, rot: 0, kills: 0, hits, bossMask: 0, br: null, ride: -1, lv: LEVELS.indexOf(L) };
 }
 const over = (p, b) => p.x + S > b.x && p.x < b.x + b.w && p.y > b.y && p.y - S < b.y + b.h;
 function step(L, p, wantJump) {
@@ -448,16 +469,25 @@ function step(L, p, wantJump) {
     }
     solid(s);
   }
-  for (const m of L.movers) {
-    const b = { x: moverX(L, m, p.t), y: m.y, w: m.w, h: m.h };
-    if (over(p, b)) solid(b);
-  }
+  // Moving platforms: judged against where the top was a step ago, and they carry you up and down.
+  const rode = p.ride; p.ride = -1;
+  L.movers.forEach((m, i) => {
+    const b = moverBox(L, m, p.t), was = moverBox(L, m, p.t - DT);
+    const across = p.x + S > b.x && p.x < b.x + b.w;
+    if (!jumped && rode === i && across && p.vy >= 0 && p.y >= b.y - 12) { p.y = b.y; p.vy = 0; p.grounded = true; p.lastGround = p.t; p.used = false; p.ride = i; return; }
+    if (!over(p, b)) return;
+    if (prevBottom <= was.y + 0.5 && p.vy >= 0) { p.y = b.y; p.vy = 0; p.grounded = true; p.lastGround = p.t; p.used = false; p.ride = i; }
+    else p.dead = true;
+  });
   L.bricks.forEach((b, i) => {
-    if (brickFall(p, i) > 0 || !over(p, b)) return;
+    if (brickFall(p, i, L) > 0 || !over(p, b)) return;
     if (solid(b) && !(p.br && i in p.br)) p.br = { ...p.br, [i]: p.t };
   });
+  // Springs only work if you land on top; running into the side is a crash.
   for (const s of L.springs) {
-    if (over(p, s) && prevBottom <= s.y + s.h) { p.y = s.y; p.vy = SPRING_V; p.used = true; p.sprung = s; p.grounded = false; }
+    if (!over(p, s)) continue;
+    if (prevBottom <= s.y + 4 && p.vy >= 0) { p.y = s.y; p.vy = SPRING_V; p.used = true; p.sprung = s; p.grounded = false; }
+    else if (p.x + S > s.x + 3 && p.x < s.x + s.w - 3) p.dead = true;
   }
   L.foes.forEach((f, i) => {
     if (p.kills & (1 << i)) return;
@@ -1228,7 +1258,7 @@ $('mute').addEventListener('click', () => {
   $('mute').setAttribute('aria-pressed', String(muted));
 });
 // Share: a picture of the rainbow and fireworks with the game's address (share.js, on the website only)
-const winLine = () => `I ${levelIdx === 13 ? 'beat King Crow and cleared all 14 levels' : 'cleared Season 1'} of Colour Jump with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}!`;
+const winLine = () => `I ${levelIdx === 13 ? 'cleared all 14 levels' : 'cleared Season 1'} of Colour Jump with ${deaths} ${deaths === 1 ? 'death' : 'deaths'}!`;
 function snapWin() {
   if (!window.EmilyShare) return;
   $('winShare').hidden = false;
@@ -1309,7 +1339,7 @@ function update(dt) {
       if (seasonEnd(levelIdx)) {
         const final = levelIdx === 13, n = `${deaths} ${deaths === 1 ? 'death' : 'deaths'}`;
         mode = 'win'; rockets = []; sparks = []; fwTimer = 0;
-        $('winText').textContent = final ? `King Crow is beaten! All 14 levels cleared with ${n}.` : `Season 1 cleared with ${n}. Season 2 is open!`;
+        $('winText').textContent = final ? `Season 2 cleared! All 14 levels done with ${n}.` : `Season 1 cleared with ${n}. Season 2 is open!`;
         $('season2').hidden = final; $('again').className = final ? '' : 'ghost';
         if (!final) unlockTo(7);
         $('winPanel').hidden = false; snapWin();
@@ -1649,24 +1679,27 @@ function drawSeason2(Lv, c, wx, wy, k) {
   }
   // Moving platforms, with a faint track showing how far they swing.
   for (const m of Lv.movers) {
-    const x = wx(moverX(Lv, m, t)), y = wy(m.y);
+    const b = moverBox(Lv, m, t), x = wx(b.x), y = wy(b.y);
     if (x > view.w + 200 || x < -300) continue;
-    ctx.strokeStyle = c.faint; ctx.lineWidth = 3 * k; ctx.setLineDash([4 * k, 8 * k]);
-    ctx.beginPath(); ctx.moveTo(wx(m.cx - m.w / 2 - m.amp), y + 8 * k); ctx.lineTo(wx(m.cx + m.w / 2 + m.amp), y + 8 * k); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = c.faint; ctx.lineWidth = 3 * k; ctx.setLineDash([4 * k, 8 * k]); ctx.beginPath();
+    if (m.axis === 'y') { ctx.moveTo(wx(m.cx), wy(m.y - m.amp)); ctx.lineTo(wx(m.cx), wy(m.y + m.amp + m.h)); }
+    else { ctx.moveTo(wx(m.cx - m.w / 2 - m.amp), y + 8 * k); ctx.lineTo(wx(m.cx + m.w / 2 + m.amp), y + 8 * k); }
+    ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = c.ground; roundRect(x, y, m.w * k, m.h * k, 4 * k); ctx.fill();
     ctx.fillStyle = c.mid; ctx.globalAlpha = 0.35; ctx.fillRect(x + 3 * k, y, (m.w - 6) * k, Math.max(3, 4 * k)); ctx.globalAlpha = 1;
   }
   // Brick bridges: bricks crack when stepped on, then drop.
   Lv.bricks.forEach((b, i) => {
-    const f = p ? brickFall(p, i) : 0, touched = p && p.br && i in p.br;
+    const f = p ? brickFall(p, i, Lv) : 0, touched = p && p.br && i in p.br;
     if (f > 1.2) return;
-    const x = wx(b.x), y = wy(b.y + 900 * f * f);
+    const warn = b.tEarly != null && p && f === 0 && p.t > b.tEarly - BRICK_SHAKE;   // about to drop: shake
+    const x = wx(b.x) + (warn ? Math.sin(clock * 70) * 2.5 * k : 0), y = wy(b.y + 900 * f * f);
     if (x > view.w + 50 || x < -60) return;
     ctx.save(); ctx.translate(x + b.w * k / 2, y + b.h * k / 2); ctx.rotate(f * (i % 2 ? 2 : -2));
     ctx.fillStyle = c.ground; roundRect(-b.w * k / 2 + 1, -b.h * k / 2, b.w * k - 2, b.h * k, 3 * k); ctx.fill();
     ctx.strokeStyle = c.bg; ctx.lineWidth = 1.5 * k; ctx.beginPath();
     ctx.moveTo(-b.w * k / 2 + 2, 0); ctx.lineTo(b.w * k / 2 - 2, 0);
-    if (touched) { ctx.moveTo(-4 * k, -b.h * k / 2); ctx.lineTo(2 * k, -2 * k); ctx.lineTo(-3 * k, b.h * k / 2); }
+    if (touched || warn) { ctx.moveTo(-4 * k, -b.h * k / 2); ctx.lineTo(2 * k, -2 * k); ctx.lineTo(-3 * k, b.h * k / 2); }
     ctx.stroke();
     ctx.restore();
   });
