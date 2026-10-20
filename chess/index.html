@@ -509,8 +509,13 @@ function quiesce(s,alpha,beta,qd){
     if(sc>=beta) return sc; if(sc>alpha) alpha=sc; }
   return alpha;
 }
+// positions already seen in this game: going back to one counts as a draw, so a winning AI
+// stops shuffling into threefold repetition (and a losing one may aim for it)
+let HIST=null;
+function setGameHistory(keys){ HIST=new Set(keys); }
 function negamax(s,depth,alpha,beta,ply){
   NODES++; if((NODES&2047)===0 && Date.now()>DEADLINE){ ABORT=true; return 0; }
+  if(HIST && s.half>=2 && HIST.has(posKey(s))) return 0;
   const moves=genLegal(s);
   if(moves.length===0){ if(inCheck(s,s.turn)) return -(MATE-ply); return 0; } // mate (sooner is worse) / stalemate
   if(depth===0) return quiesce(s,alpha,beta,6);
@@ -522,11 +527,11 @@ function negamax(s,depth,alpha,beta,ply){
   return best;
 }
 let DEADLINE=0;
-function rootSearch(s,maxDepth,timeBudgetMs,noise){
+function rootSearch(s,maxDepth,timeBudgetMs,vary){
   DEADLINE=Date.now()+timeBudgetMs; ABORT=false; NODES=0;
   const moves=genLegal(s); if(moves.length===0) return null;
   orderMoves(s,moves);
-  let bestMove=moves[0];
+  let bestMove=moves[0], lastScored=null, lastBest=-Infinity;
   for(let d=1;d<=maxDepth;d++){
     let localBest=null, localScore=-Infinity, alpha=-Infinity, beta=Infinity;
     const scored=[];
@@ -536,21 +541,30 @@ function rootSearch(s,maxDepth,timeBudgetMs,noise){
       if(ABORT){ break; }
       scored.push({m,sc});
       if(sc>localScore){ localScore=sc; localBest=m; }
-      if(sc>alpha) alpha=sc;
+      // with variety on, keep the window `vary` below the best so every move that close gets an
+      // exact score; moves cut off below it come back <= the bound and are never picked
+      const bound = vary>0 ? localScore-vary-1 : localScore;
+      if(bound>alpha) alpha=bound;
     }
     if(ABORT){ if(d>1) break; else break; }
-    bestMove=localBest;
+    bestMove=localBest; lastScored=scored; lastBest=localScore;
     if(localScore>=90000) break; // forced mate found
+  }
+  // a little variety so the same opening is not played every game: pick among moves
+  // within `vary` centipawns of the best (never when a mate is on the board)
+  if(vary>0 && lastScored && Math.abs(lastBest)<90000){
+    const near=lastScored.filter(x=>x.sc>=lastBest-vary);
+    if(near.length>1) return near[Math.floor(Math.random()*near.length)].m;
   }
   return bestMove;
 }
 
 // AI level config
 const LEVELS=[
-  {name:'Novice',       maxDepth:1, time:300,  blunder:0.12, noise:30},
-  {name:'Intermediate', maxDepth:2, time:800,  blunder:0,    noise:0},
-  {name:'Expert',       maxDepth:4, time:1500, blunder:0,    noise:0},
-  {name:'Master',       maxDepth:8, time:3000, blunder:0,    noise:0},
+  {name:'Novice',       maxDepth:1, time:300,  blunder:0.12, noise:30, vary:0},
+  {name:'Intermediate', maxDepth:2, time:800,  blunder:0,    noise:0,  vary:30},
+  {name:'Expert',       maxDepth:4, time:1500, blunder:0,    noise:0,  vary:12},
+  {name:'Master',       maxDepth:8, time:3000, blunder:0,    noise:0,  vary:0},
 ];
 function chooseAIMove(s,levelIdx){
   const L=LEVELS[levelIdx];
@@ -559,11 +573,15 @@ function chooseAIMove(s,levelIdx){
   if(L.noise>0){
     // shallow eval with noise
     let best=moves[0],bs=-Infinity;
-    for(const m of moves){ const u=doMove(s,m); const sc=(s.turn==='w'?-1:1)*evalWhite(s)+ (Math.random()*2-1)*L.noise; undoMove(s,u); // score for the side that just moved
+    for(const m of moves){ const u=doMove(s,m);
+      // score for the side that just moved; even Novice takes a mate in one and avoids stalemating
+      const reply=genLegal(s).length;
+      const sc = reply===0 ? (inCheck(s,s.turn)?MATE:0) : (s.turn==='w'?-1:1)*evalWhite(s)+(Math.random()*2-1)*L.noise;
+      undoMove(s,u);
       if(sc>bs){bs=sc;best=m;} }
     return best;
   }
-  return rootSearch(s,L.maxDepth,L.time,0);
+  return rootSearch(s,L.maxDepth,L.time,L.vary);
 }
 // only kings, or king + one bishop/knight vs king: nobody can mate
 function insufficient(s){
@@ -582,7 +600,7 @@ function perft(s,depth){
 }
 // expose for Node test
 if(typeof module!=='undefined' && module.exports){
-  module.exports={newGame,genLegal,doMove,undoMove,inCheck,perft,evalWhite,chooseAIMove,rootSearch,LEVELS,insufficient,posKey};
+  module.exports={newGame,genLegal,doMove,undoMove,inCheck,perft,evalWhite,chooseAIMove,rootSearch,LEVELS,insufficient,posKey,setGameHistory};
 }
 // ============================================================
 //  ENGINE END
@@ -765,6 +783,7 @@ function postMove(){
   maybeAI();
 }
 // let the AI move if it is its turn; a game id stops an old timer from moving in a new game
+function gameKeys(){ return [G.startKey].concat(G.history.map(h=>h.key)); }
 function maybeAI(){
   const s=G.state;
   if(G.mode!=='ai' || G.over || s.turn===G.humanColor) return;
@@ -772,7 +791,7 @@ function maybeAI(){
   clearTimeout(G.aiTimer);
   const id=G.gameId;
   G.aiTimer=setTimeout(()=>{ if(id!==G.gameId) return;
-    const mv=chooseAIMove(s,G.diff); G.thinking=false;
+    setGameHistory(gameKeys()); const mv=chooseAIMove(s,G.diff); G.thinking=false;
     if(mv) makeMove(mv); else render(); }, 60);
 }
 
@@ -799,7 +818,7 @@ function hint(){
   if(G.over||G.thinking||G.pending) return;
   const s=G.state;
   if(G.mode==='ai'&&s.turn!==G.humanColor) return;
-  const mv=chooseAIMove(s, 2);
+  setGameHistory(gameKeys()); const mv=chooseAIMove(s, 2);
   if(mv){ G.hintMove={from:mv.from,to:mv.to}; render(); }
 }
 
@@ -862,7 +881,7 @@ function snapShare(winner){
 function startGame(){
   hideVictory();
   clearTimeout(G.aiTimer); G.gameId++;
-  G.state=newGame(); G.history=[]; G.capturedW=[]; G.capturedB=[];
+  G.state=newGame(); G.startKey=posKey(G.state); G.history=[]; G.capturedW=[]; G.capturedB=[];
   G.over=false; G.overMsg=''; G.selected=null; G.legal=[]; G.lastMove=null; G.hintMove=null;
   G.thinking=false; G.pending=null;
   G.flipped=(G.mode==='ai'&&G.humanColor==='b');
