@@ -29,10 +29,12 @@
   /* light = gold pieces on the classic board (B); dark = gold pieces on dark walnut (C) */
   :root{--bg:#f4f1ea;--ink:#333;--muted:#8a7a5c;--card:#fff;--line:#e3ded2;--sq-l:#f0d9b5;--sq-d:#b58863;--frame:#6b4f2a;
     --btn:#6b4f2a;--ghost:#fff;--ghost-ink:#5a4a2a;--ghost-line:#d8cdb8;--sel-bg:#f7f2e8;--menu-bg:rgba(244,241,234,.96);
-    --ok-bg:#eef3ea;--ok:#3c6b3f;--warn-bg:#fbeaea;--warn:#a23c2f;--think-bg:#eaf1f8;--think:#2f5b8a;--dot:rgba(20,40,20,.28);}
+    --ok-bg:#eef3ea;--ok:#3c6b3f;--warn-bg:#fbeaea;--warn:#a23c2f;--think-bg:#eaf1f8;--think:#2f5b8a;--dot:rgba(20,40,20,.28);
+    --last-from:rgba(255,206,0,.38);--last-to:rgba(255,196,0,.62);--arrow:rgba(214,120,0,.72);}
   :root[data-theme="dark"]{--bg:#18140f;--ink:#ece3d2;--muted:#b9a684;--card:#251d15;--line:#3d3125;--sq-l:#6e523a;--sq-d:#3e2c1e;--frame:#120d08;
     --btn:#b8892e;--ghost:#2e241a;--ghost-ink:#ecdcbc;--ghost-line:#4a3b2b;--sel-bg:#3a2d20;--menu-bg:rgba(24,20,15,.97);
-    --ok-bg:#24321f;--ok:#a9d39b;--warn-bg:#3b1f1a;--warn:#f0a090;--think-bg:#1d2a38;--think:#9cc3ea;--dot:rgba(255,235,190,.35);}
+    --ok-bg:#24321f;--ok:#a9d39b;--warn-bg:#3b1f1a;--warn:#f0a090;--think-bg:#1d2a38;--think:#9cc3ea;--dot:rgba(255,235,190,.35);
+    --last-from:rgba(255,190,40,.30);--last-to:rgba(255,190,40,.55);--arrow:rgba(255,200,70,.78);}
   html{background:var(--bg);}
   body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
     background:var(--bg);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px;
@@ -67,8 +69,14 @@
   .cell.l{background:var(--sq-l);}
   .cell.d{background:var(--sq-d);}
   .cell.sel{box-shadow:inset 0 0 0 3px rgba(30,90,160,.65);}
-  .cell.last{box-shadow:inset 0 0 0 3px rgba(30,90,160,.28);}
-  .cell.last.sel{box-shadow:inset 0 0 0 3px rgba(30,90,160,.65);}
+  /* last move (Jason 2026-10-20: the faint blue frame was too hard to see): both squares tinted gold,
+     the landing square stronger, plus an arrow from start to end */
+  .cell.last{background-image:linear-gradient(var(--last-from),var(--last-from));}
+  .cell.last.to{background-image:linear-gradient(var(--last-to),var(--last-to));}
+  .board{position:relative;}
+  .last-arrow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;}
+  .last-arrow line{stroke:var(--arrow);stroke-width:.16;stroke-linecap:round;}
+  .last-arrow path{fill:var(--arrow);}
   .cell.target::after{content:"";position:absolute;width:28%;height:28%;border-radius:50%;background:var(--dot);}
   .cell.capture::after{content:"";position:absolute;width:84%;height:84%;border-radius:50%;border:4px solid rgba(190,60,40,.55);}
   .cell.hint{box-shadow:inset 0 0 0 3px rgba(46,125,50,.7);}
@@ -602,13 +610,23 @@ function render(){
       const isLast=G.lastMove&&((G.lastMove.from[0]===r&&G.lastMove.from[1]===c)||(G.lastMove.to[0]===r&&G.lastMove.to[1]===c));
       const isHint=G.hintMove&&((G.hintMove.from[0]===r&&G.hintMove.from[1]===c)||(G.hintMove.to[0]===r&&G.hintMove.to[1]===c));
       if(isSel)cls+=' sel';
-      if(isLast&&!isSel)cls+=' last';
+      if(isLast&&!isSel)cls+=' last'+(G.lastMove.to[0]===r&&G.lastMove.to[1]===c?' to':'');
       if(isHint)cls+=' hint';
       if(isTarget)cls+=(s.board[r][c]?' capture':' target');
       // small coordinates inside the edge squares (shown on phones, where the outside labels are hidden)
       const co=(j===0?`<span class="co rk">${8-r}</span>`:'')+(i===7?`<span class="co fl">${String.fromCharCode(97+c)}</span>`:'');
       html+=`<div class="${cls}" data-r="${r}" data-c="${c}">${p?pieceSVG(p.t,p.c):''}${co}</div>`;
     } }
+  // arrow for the last move, in board squares (0..8), following the flip
+  if(G.lastMove){
+    const pos=([r,c])=>[(flip?7-c:c)+.5,(flip?7-r:r)+.5];
+    const [x1,y1]=pos(G.lastMove.from), [x2,y2]=pos(G.lastMove.to);
+    const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy), ux=dx/len, uy=dy/len;
+    const hx=x2-ux*.12, hy=y2-uy*.12, bx=hx-ux*.42, by=hy-uy*.42, w=.24;
+    html+=`<svg class="last-arrow" viewBox="0 0 8 8" aria-hidden="true">`+
+      `<line x1="${x1+ux*.18}" y1="${y1+uy*.18}" x2="${bx+ux*.05}" y2="${by+uy*.05}"/>`+
+      `<path d="M${hx} ${hy}L${bx-uy*w} ${by+ux*w}L${bx+uy*w} ${by-ux*w}Z"/></svg>`;
+  }
   boardEl.innerHTML=html;
   // coordinates respect flip
   let ranks='', files='';
