@@ -70,7 +70,8 @@ const TXT = {
     colPlayer: 'Player', colCards: 'Face-down cards', colPoints: 'Points', colZone: 'Zone', colX: 'x', colScore: 'Score', none: 'none',
     totalAfter: n => `Match total after Game ${n}:`, thisGame: 'Your score this game', standings: (n, m) => `Match standings after Game ${n} of ${m}`,
     ranks: ['1st', '2nd', '3rd', '4th'], ptsDown: n => `${n} points face down`, share: 'Share', next: 'Next Game', newMatch: 'New Match', menu: 'Menu',
-    matchOver: 'Match over!', place: p => ['You finished 1st!', 'You finished 2nd.', 'You finished 3rd.', 'You finished 4th.'][p],
+    matchOver: 'Match over!', matchResults: 'Match Results', mSub: n => `Match Results · ${n} games`, champ: n => `${n} is the champion!`, youChamp: 'You are the champion!',
+    wonN: n => `Won ${n} game${n === 1 ? '' : 's'}`, best: 'Best', worst: 'Worst', chart: 'Total score after each game', gShort: n => 'G' + n, place: p => ['You finished 1st!', 'You finished 2nd.', 'You finished 3rd.', 'You finished 4th.'][p],
     howTitle: 'How to Play', close: 'Close',
     howLines: [
       '4 players, 13 cards each. Whoever has the 7♠ plays it first.',
@@ -109,7 +110,8 @@ const TXT = {
     colPlayer: '玩家', colCards: '扣的牌', colPoints: '扣分', colZone: '区', colX: '倍数', colScore: '得分', none: '无',
     totalAfter: n => `第 ${n} 局后总分：`, thisGame: '你本局得分', standings: (n, m) => `第 ${n} / ${m} 局后本场排名`,
     ranks: ['第 1', '第 2', '第 3', '第 4'], ptsDown: n => `扣下 ${n} 分`, share: '分享', next: '下一局', newMatch: '再来一场', menu: '首页',
-    matchOver: '本场结束！', place: p => ['你得了第 1 名！', '你得了第 2 名。', '你得了第 3 名。', '你得了第 4 名。'][p],
+    matchOver: '本场结束！', matchResults: '本场统计', mSub: n => `本场统计 · 共 ${n} 局`, champ: n => `${n}是本场冠军！`, youChamp: '你是本场冠军！',
+    wonN: n => `赢了 ${n} 局`, best: '最好', worst: '最差', chart: '每局结束后的总分', gShort: n => '' + n, place: p => ['你得了第 1 名！', '你得了第 2 名。', '你得了第 3 名。', '你得了第 4 名。'][p],
     howTitle: '玩法说明', close: '关闭',
     howLines: [
       '4 个人，每人 13 张牌。谁有黑桃 7 谁先出。',
@@ -230,9 +232,9 @@ const ZONE_X = { SAFE: 1, WARNING: 2, BUSTED: 4 };
 const ZONE_COL = { SAFE: '#27ae60', WARNING: '#e67e22', BUSTED: '#c0392b', FLAWLESS: '#f1c40f', LUCKY: '#e74c3c', SHUTOUT: '#111', WINNER: '#2980b9' };
 const points = cards => cards.reduce((a, c) => a + c.r, 0);
 
-function newGame(totals, n, games) {
+function newGame(totals, n, games, hist) {
   const d = shuffle(newDeck()), g = { hands: [], disc: [[], [], [], []], board: [null, null, null, null], last: [null, null, null, null],
-    moves: 0, turn: 0, n, games: games || (MATCH.includes(save.games) ? save.games : 5), totals: totals || [0, 0, 0, 0], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
+    moves: 0, turn: 0, n, games: games || (MATCH.includes(save.games) ? save.games : 5), totals: totals || [0, 0, 0, 0], hist: hist || [], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
   for (let p = 0; p < 4; p++) g.hands.push(sortHand(d.slice(p * 13, p * 13 + 13)));
   g.turn = g.first = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
   return g;
@@ -479,7 +481,7 @@ let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultA
 const BOT_WAIT = 750, FLY_MS = 320;
 function startMatch() { G = newGame(null, 1); go(Play); }
 const matchLen = () => G.games || 5;
-function nextGame() { G = G.n >= matchLen() ? newGame(null, 1) : newGame(G.totals, G.n + 1, G.games); go(Play); }
+function nextGame() { G = G.n >= matchLen() ? newGame(null, 1) : newGame(G.totals, G.n + 1, G.games, G.hist); go(Play); }
 // Bots sit in a strip along the top (left to right in turn order), the table fills the middle,
 // your hand runs along the bottom with your info on the left and the big buttons on the right.
 // On phones (Jason) the played cards overlap like a hand of cards, showing just their corners,
@@ -667,7 +669,7 @@ function startFly(p, i, x0, y0, w0) {
 // game's score, and the match standings underneath.
 function drawResult(sc) {
   const L = TXT[save.lang], R = G.res, names = T('names'), you = R.rows[0], winner = R.winners[0];
-  if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); } // match totals, once
+  if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); G.hist.push({ s: R.rows.map(r => r.score), w: winner }); } // match totals, once
   ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, 0, W, H); hits = [];
   box(36, 16, 1208, 690, 26, '#fffdf6', you.win ? '#f1c40f' : '#7fb3d5', 6);
   const green = '#1e9e55', red = '#d0392b', ink = '#2b2b2b', grey = '#8a8a8a';
@@ -725,9 +727,75 @@ function drawResult(sc) {
   }
   const by = sy + 100;
   if (window.EmilyShare) button(305, by, 210, 64, T('share'), () => EmilyShare.open(), { fill: '#2980b9', size: 30 });
-  button(535, by, 210, 64, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12', size: 30 });
+  button(535, by, 210, 64, last ? T('matchResults') : T('next'), last ? () => go(MatchEnd) : nextGame, { fill: '#f39c12', size: 30 });
   button(765, by, 210, 64, T('menu'), () => go(Title), { fill: '#7f8c8d', size: 30 });
 }
+
+
+/* ======================= end of match ======================= */
+// After the last game: final ranking (total score, games won, best and worst game) and a line
+// chart of everyone's running total so you can see how the match went.
+const LINE_COL = ['#2980b9', '#e67e22', '#a0522d', '#2b2b2b'];
+const MatchEnd = {
+  enter() { this.snapped = false; },
+  draw() {
+    felt(); hits = [];
+    const L = TXT[save.lang], names = T('names'), H_ = G.hist, n = H_.length, tot = G.totals;
+    const green = '#1e9e55', red = '#d0392b', ink = '#2b2b2b', grey = '#8a8a8a';
+    const wins = [0, 1, 2, 3].map(p => H_.filter(h => h.w === p).length);
+    const byTotal = [0, 1, 2, 3].sort((a, b) => tot[b] - tot[a] || wins[b] - wins[a]), champ = byTotal[0];
+    box(36, 16, 1208, 690, 26, '#fffdf6', '#f1c40f', 6);
+    txt(champ === 0 ? T('youChamp') : L.champ(names[champ]), W / 2, 62, 52, 'center', champ === 0 ? '#e67e22' : '#2980b9');
+    txt(L.mSub(n), W / 2, 106, 24, 'center', grey);
+    // one card per player, champion first
+    const CWD = 272, GAP = 16, x0 = W / 2 - (4 * CWD + 3 * GAP) / 2, top = 128, CHT = 196;
+    byTotal.forEach((p, i) => {
+      const x = x0 + i * (CWD + GAP), y = top, sc = H_.map(h => h.s[p]), v = tot[p];
+      box(x, y, CWD, CHT, 18, i === 0 ? '#fff1b8' : p === 0 ? '#e8f6fd' : '#f2eee4', i === 0 ? '#f1c40f' : p === 0 ? '#7fb3d5' : '#ddd5c4', i === 0 ? 4 : 2);
+      txt(['🥇', '🥈', '🥉', ''][i] || L.ranks[i], x + 30, y + 30, i < 3 ? 34 : 22, 'center', grey, { shadow: false });
+      if (i === 0) txt('👑', x + CWD - 30, y + 28, 30, 'center', '#000', { shadow: false });
+      ctx.fillStyle = LINE_COL[p]; ctx.fillRect(x + CWD / 2 - 40, y + 8, 80, 5);
+      avatar(p, x + CWD / 2, y + 48, 30);
+      txt(names[p], x + CWD / 2, y + 98, 28, 'center', ink);
+      txt(fmt(v), x + CWD / 2, y + 140, 48, 'center', v > 0 ? green : v < 0 ? red : ink, { bold: true });
+      txt(`${L.wonN(wins[p])} · ${T('best')} ${fmt(Math.max(...sc))} · ${T('worst')} ${fmt(Math.min(...sc))}`, x + CWD / 2, y + 178, 18, 'center', grey);
+    });
+    // running totals, one line per player, starting from 0
+    const cx = 130, cw = 1000, cy = 362, ch = 222;
+    txt(T('chart'), W / 2, cy - 14, 22, 'center', grey);
+    const run = [0, 1, 2, 3].map(p => { let a = 0; return [0, ...H_.map(h => (a += h.s[p]))]; });
+    const all = run.flat(), hi = Math.max(10, ...all), lo = Math.min(-10, ...all);
+    const X = k => cx + k * cw / n, Y = v => cy + 10 + (hi - v) / (hi - lo) * (ch - 20);
+    box(cx - 12, cy, cw + 24, ch, 12, '#f7f3ea', '#e6dfcf', 2);
+    ctx.strokeStyle = '#b8b0a0'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(cx, Y(0)); ctx.lineTo(cx + cw, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+    txt('0', cx - 22, Y(0), 16, 'right', grey);
+    const every = n > 10 ? 2 : 1;
+    for (let k = 1; k <= n; k++) if (k % every === 0 || k === n || (k === 1 && every === 1)) txt(L.gShort(k), X(k), cy + ch + 16, 16, 'center', grey);
+    [3, 2, 1, 0].forEach(p => { // you on top
+      ctx.strokeStyle = LINE_COL[p]; ctx.lineWidth = p === 0 ? 5 : 3.5; ctx.lineJoin = 'round';
+      ctx.beginPath(); run[p].forEach((v, k) => k ? ctx.lineTo(X(k), Y(v)) : ctx.moveTo(X(k), Y(v))); ctx.stroke();
+      ctx.fillStyle = LINE_COL[p];
+      run[p].forEach((v, k) => { if (k) { ctx.beginPath(); ctx.arc(X(k), Y(v), p === 0 ? 5 : 4, 0, 7); ctx.fill(); } });
+    });
+    // names at the line ends, nudged apart so they never overlap
+    const ends = [0, 1, 2, 3].map(p => ({ p, y: Y(run[p][n]) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < 4; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 30);
+    const over = ends[3].y - (cy + ch - 14); if (over > 0) ends.forEach(e => { e.y -= over; });
+    ends.forEach(e => { avatar(e.p, cx + cw + 30, e.y, 13); });
+    // share picture, then buttons
+    if (!this.snapped && window.EmilyShare) {
+      this.snapped = true;
+      const place = byTotal.indexOf(0) + 1;
+      EmilyShare.snap({ canvas: cv, game: 'HOLD THE SEVEN', path: 'hold-the-seven/',
+        text: `I finished ${['1st', '2nd', '3rd', '4th'][place - 1]} in a ${n}-game match of HOLD THE SEVEN with ${fmt(tot[0])}!` });
+    }
+    const by = 616;
+    if (window.EmilyShare) button(305, by, 210, 64, T('share'), () => EmilyShare.open(), { fill: '#2980b9', size: 30 });
+    button(535, by, 210, 64, T('newMatch'), startMatch, { fill: '#f39c12', size: 30 });
+    button(765, by, 210, 64, T('menu'), () => go(Title), { fill: '#7f8c8d', size: 30 });
+  },
+};
 
 /* ======================= loop ======================= */
 function frame(now) {
@@ -743,7 +811,7 @@ requestAnimationFrame(frame);
 
 // Test hooks: __h7.sim(n, levels) plays n bot-only games and checks the rules.
 window.__h7 = {
-  get G() { return G; }, go: name => go({ Title, Play }[name]),
+  get G() { return G; }, go: name => go({ Title, Play, MatchEnd }[name]),
   sim(n = 200, levels = [2, 1, 1, 1]) {
     const tot = [0, 0, 0, 0], wins = [0, 0, 0, 0]; let clean = 0, lucky = 0, shut = 0, bad = 0;
     for (let k = 0; k < n; k++) {
