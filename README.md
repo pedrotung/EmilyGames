@@ -74,7 +74,7 @@ Whoever has the 7♠ starts; build each suit out from its 7, and when nothing fi
 Fewest face-down points wins and takes the others' points; a tie goes to whoever comes first in turn order from the 7♠ player (Safe x1, Warning x2, Busted x4, Shutout x12;
 FLAWLESS x2 when the winner put nothing face down, LUCKY SEVEN x3 when the last card was also a 7).
 
-- 5 games per match with a running total; Easy, Normal and Hard bots. Normal plays cards only it can follow and puts down a big card when that leaves rivals stuck behind it; Hard also plays each choice out many times and remembers who could not follow
+- 5, 10 or 20 games per match (picked on the title screen) with a running total; Easy, Normal and Hard bots. Normal plays cards only it can follow and puts down a big card when that leaves rivals stuck behind it; Hard also plays each choice out many times and remembers who could not follow
 - English by default, with a Language button (English / 中文) on the title screen
 - On phones the played cards overlap to show just their corners, and a phone held upright (WeChat never turns pages) gets the table turned sideways; add ?phone to the address to see the phone layout on a computer
 - Everything is drawn on one canvas; the font is in `hold-the-seven/fonts/`. Test hooks: `__h7.sim(n, levels)`, `__h7.luckyDemo()`

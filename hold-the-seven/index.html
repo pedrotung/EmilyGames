@@ -53,7 +53,7 @@
 const TXT = {
   en: {
     title: 'HOLD THE SEVEN', tagline: "Build the suits from the 7s. Block your rivals. Don't get stuck!",
-    bots: 'Bots:', easy: 'Easy', normal: 'Normal', hard: 'Hard', play: 'PLAY', how: 'How to Play', language: 'Language',
+    bots: 'Bots:', games: 'Games:', easy: 'Easy', normal: 'Normal', hard: 'Hard', play: 'PLAY', how: 'How to Play', language: 'Language',
     home: 'Home', full: 'Full screen', exitFull: 'Exit full screen', sound: 'Sound', on: 'On', off: 'Off',
     gameOf: (n, m) => `Game ${n} / ${m}`, yourTotal: 'Your total', you: 'You', names: ['You', 'Foxy', 'Rex', 'Panda'],
     cardsLeft: n => `${n} card${n === 1 ? '' : 's'}`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
@@ -90,7 +90,7 @@ const TXT = {
   },
   zh: {
     title: '憋七', tagline: '从 7 开始往两边接龙，堵住对手，别被憋住！',
-    bots: '机器人：', easy: '简单', normal: '普通', hard: '困难', play: '开始', how: '玩法说明', language: 'Language',
+    bots: '机器人：', games: '每场盘数：', easy: '简单', normal: '普通', hard: '困难', play: '开始', how: '玩法说明', language: 'Language',
     home: '首页', full: '全屏', exitFull: '退出全屏', sound: '声音', on: '开', off: '关',
     gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', names: ['你', '狐狸', '小狗', '熊猫'],
     cardsLeft: n => `${n} 张牌`, faceDown: n => `扣了 ${n} 张`, yourPoints: '你的扣分：',
@@ -130,12 +130,12 @@ const T = k => TXT[save.lang][k];
 
 /* ======================= save ======================= */
 const SAVE_KEY = 'holdTheSeven';
-let save = { lang: 'en', diff: 1, sound: true, best: null };
+let save = { lang: 'en', diff: 1, games: 5, sound: true, best: null };
 try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) {}
 function store() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 /* ======================= canvas ======================= */
-const W = 1280, H = 720, GAMES = 5;
+const W = 1280, H = 720, MATCH = [5, 10, 20]; // games per match, picked on the title screen
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 // A phone held upright (WeChat and some browsers never turn the page) gets the table turned
 // sideways instead, so the player just turns the phone. Taps are turned back in toCanvas().
@@ -226,9 +226,9 @@ const ZONE_X = { SAFE: 1, WARNING: 2, BUSTED: 4 };
 const ZONE_COL = { SAFE: '#27ae60', WARNING: '#e67e22', BUSTED: '#c0392b', FLAWLESS: '#f1c40f', LUCKY: '#e74c3c', SHUTOUT: '#111', WINNER: '#2980b9' };
 const points = cards => cards.reduce((a, c) => a + c.r, 0);
 
-function newGame(totals, n) {
+function newGame(totals, n, games) {
   const d = shuffle(newDeck()), g = { hands: [], disc: [[], [], [], []], board: [null, null, null, null], last: [null, null, null, null],
-    moves: 0, turn: 0, n, totals: totals || [0, 0, 0, 0], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
+    moves: 0, turn: 0, n, games: games || (MATCH.includes(save.games) ? save.games : 5), totals: totals || [0, 0, 0, 0], over: false, res: null, cant: [0, 1, 2, 3].map(() => new Set()) };
   for (let p = 0; p < 4; p++) g.hands.push(sortHand(d.slice(p * 13, p * 13 + 13)));
   g.turn = g.first = g.hands.findIndex(h => h.some(c => c.s === 0 && c.r === 7));
   return g;
@@ -432,15 +432,20 @@ const Title = {
       const bob = Math.sin(t / 600 + s) * 4;
       drawCard({ s, r: 7 }, x - 10, y - 15 + bob, 98, 137, { rot: a * Math.PI / 180 });
     });
-    txt(T('title'), W / 2, save.lang === 'zh' ? 340 : 352, save.lang === 'zh' ? 86 : 88);
-    txt(T('tagline'), W / 2, 418, 28);
+    txt(T('title'), W / 2, save.lang === 'zh' ? 318 : 328, save.lang === 'zh' ? 80 : 84);
+    txt(T('tagline'), W / 2, 386, 28);
     const levels = ['easy', 'normal', 'hard'];
     if (COVER) { button(490, 470, 300, 84, T('play'), startMatch, { fill: '#f39c12', size: 44 }); return; }
-    const lw = textW(T('bots'), 30) + 14; let x = W / 2 - (lw + 3 * 140 - 10) / 2;
-    txt(T('bots'), x, 484, 30, 'left'); x += lw;
-    levels.forEach((k, i) => { button(x + i * 140, 455, 130, 58, T(k), () => { save.diff = i; store(); }, { fill: save.diff === i ? '#f39c12' : 'rgba(0,0,0,.25)', size: 30 }); });
-    button(490, 528, 300, 84, T('play'), startMatch, { fill: '#f39c12', size: 44 });
-    button(490, 628, 300, 70, T('how'), () => { this.howOpen = true; }, { size: 32 });
+    // two rows of choices: bot level and games per match, labels right-aligned to the same edge
+    const lw = Math.max(textW(T('bots'), 30), textW(T('games'), 30)) + 14, x = W / 2 - (lw + 3 * 140 - 10) / 2 + lw;
+    const row = (label, y, opts, on, pick) => {
+      txt(label, x - 14, y + 27, 30, 'right');
+      opts.forEach((o, i) => button(x + i * 140, y, 130, 54, o, () => { pick(i); store(); }, { fill: on === i ? '#f39c12' : 'rgba(0,0,0,.25)', size: 30 }));
+    };
+    row(T('bots'), 420, levels.map(k => T(k)), save.diff, i => { save.diff = i; });
+    row(T('games'), 484, MATCH.map(String), MATCH.indexOf(save.games), i => { save.games = MATCH[i]; });
+    button(490, 552, 300, 78, T('play'), startMatch, { fill: '#f39c12', size: 44 });
+    button(490, 642, 300, 62, T('how'), () => { this.howOpen = true; }, { size: 30 });
     button(16, 632, 200, 70, `${T('sound')}: ${save.sound ? T('on') : T('off')}`, () => { save.sound = !save.sound; store(); }, { fill: 'rgba(0,0,0,.3)', size: 28 });
     const LX = W - 16 - 290;
     button(LX, 632, 290, 70, '🌐 ' + T('language') + ': ' + (save.lang === 'zh' ? '中文' : 'English'), () => { this.langOpen = !this.langOpen; }, { fill: 'rgba(0,0,0,.3)', size: 28 });
@@ -468,7 +473,8 @@ function howPanel(close) {
 let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultAt = 0, howInGame = false;
 const BOT_WAIT = 750, FLY_MS = 320;
 function startMatch() { G = newGame(null, 1); go(Play); }
-function nextGame() { G = G.n >= GAMES ? newGame(null, 1) : newGame(G.totals, G.n + 1); go(Play); }
+const matchLen = () => G.games || 5;
+function nextGame() { G = G.n >= matchLen() ? newGame(null, 1) : newGame(G.totals, G.n + 1, G.games); go(Play); }
 // Bots sit in a strip along the top (left to right in turn order), the table fills the middle,
 // your hand runs along the bottom with your info on the left and the big buttons on the right.
 // On phones (Jason) the played cards overlap like a hand of cards, showing just their corners,
@@ -577,7 +583,7 @@ function drawYou() {
   const L = TXT[save.lang], my = points(G.disc[0]), zone = zoneOf(my), mine = G.turn === 0 && !G.over && !fly;
   avatar(0, 46, 578, 30, mine);
   txt(T('you'), 86, 566, 30, 'left');
-  txt(`${L.gameOf(G.n, GAMES)} · ${fmt(G.totals[0])}`, 86, 598, 21, 'left');
+  txt(`${L.gameOf(G.n, matchLen())} · ${fmt(G.totals[0])}`, 86, 598, 21, 'left');
   txt(T('yourPoints'), 14, 634, 24, 'left');
   const pw = textW(T('yourPoints'), 24); txt(String(my), 20 + pw, 634, 30, 'left', '#fff', { bold: true });
   badge(zone, 32 + pw + textW(String(my), 30), 634, 18);
@@ -673,7 +679,7 @@ function drawResult(sc) {
   if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); }
   const ty = hy + 22 + 4 * 80 + 22;
   txt(L.totalAfter(G.n) + ' ' + [0, 1, 2, 3].map(p => `${names[p]} ${fmt(G.totals[p])}`).join(' · '), W / 2, ty, 22, 'center', '#777');
-  const last = G.n >= GAMES;
+  const last = G.n >= matchLen();
   if (last) {
     const place = [1, 2, 3].filter(p => G.totals[p] > G.totals[0]).length;
     txt(T('matchOver') + ' ' + T('place')(place), W / 2, ty + 30, 26, 'center', '#e67e22');
