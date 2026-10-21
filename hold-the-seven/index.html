@@ -96,7 +96,7 @@ const TXT = {
     bots: '机器人：', games: '每场局数：', easy: '简单', normal: '普通', hard: '困难', play: '开始', how: '玩法说明', language: 'Language',
     menuBtn: '菜单', resume: '继续游戏', quit: '退出到菜单', quitNote: '退出后这一场就结束了。', hubHome: '游戏大厅',
     home: '首页', full: '全屏', exitFull: '退出全屏', sound: '声音', on: '开', off: '关',
-    gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', names: ['你', '狐狸', '小狗', '熊猫'],
+    gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', get names() { return castOn() ? save.cast.map(i => ROLES[i]) : ['你', '狐狸', '小狗', '熊猫']; },
     cardsLeft: n => `${n} 张牌`, faceDown: n => `扣了 ${n} 张`, yourPoints: '你的扣分：',
     yourTurn: '轮到你了！出一张发光的牌。', picked: '按“出牌”出这张；想换就点别的牌，再点一下这张就放回去。', firstMove: '你有黑桃 7，先出它！',
     noFit: '没有牌能接！选一张牌扣下。', wouldBe: (c, p, z) => `（${c} 扣下后 = ${p} 分：${z}）`,
@@ -136,8 +136,13 @@ const T = k => TXT[save.lang][k];
 
 /* ======================= save ======================= */
 const SAVE_KEY = 'holdTheSeven';
-let save = { lang: 'en', diff: 1, games: 5, sound: true, best: null };
+let save = { lang: 'en', diff: 1, games: 5, sound: true, best: null, castOn: false, cast: [0, 1, 2, 3] };
 try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) {}
+// Chinese-only easter egg (Jason): tap the 七 of 憋七 on the title four times in a row to open a
+// secret menu where seven named characters can be put in any seat. No English version on purpose.
+const ROLES = ['董总', '邵工', '郝部', '于总', '张总', '刘工', '李工'];
+const ROLE_COL = ['#c0392b', '#2980b9', '#8e44ad', '#16a085', '#d35400', '#34495e', '#b7950b']; // placeholder avatars until Jason's pictures
+const castOn = () => save.lang === 'zh' && save.castOn;
 function store() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 /* ======================= canvas ======================= */
@@ -420,8 +425,13 @@ function badge(k, x, y, size = 18, align = 'left') {
   txt(s, bx + w / 2, y + 1, size, 'center', k === 'FLAWLESS' ? '#333' : '#fff', { shadow: false });
   return w;
 }
+function roleFace(i, x, y, r) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = ROLE_COL[i]; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+  txt(ROLES[i][0], x, y + 2, r * 1.15, 'center', '#fff', { shadow: false, bold: true });
+}
 function avatar(p, x, y, r, ring) {
   if (ring) { ctx.save(); ctx.shadowColor = YELLOW; ctx.shadowBlur = 22; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.fillStyle = YELLOW; ctx.fill(); ctx.restore(); }
+  if (castOn()) { roleFace(save.cast[p], x, y, r); return; }
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = p === 0 ? '#9be7ff' : '#f4d35e'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
   txt(['😺', '🦊', '🐶', '🐼'][p], x, y + 2, r * 1.1, 'center', '#000', { shadow: false });
 }
@@ -440,6 +450,10 @@ const Title = {
       drawCard({ s, r: 7 }, x - 10, y - 15 + bob, 98, 137, { rot: a * Math.PI / 180 });
     });
     txt(T('title'), W / 2, save.lang === 'zh' ? 318 : 328, save.lang === 'zh' ? 80 : 84);
+    if (save.lang === 'zh') hits.push({ x: W / 2, y: 274, w: 96, h: 88, fn: () => { // the 七: four quick taps
+      const t = performance.now(); this.sevens = t - (this.sevenAt || 0) < 900 ? (this.sevens || 0) + 1 : 1; this.sevenAt = t;
+      if (this.sevens >= 4) { this.sevens = 0; go(Secret); }
+    } });
     txt(T('tagline'), W / 2, 386, 28);
     const levels = ['easy', 'normal', 'hard'];
     if (COVER) { button(490, 470, 300, 84, T('play'), startMatch, { fill: '#f39c12', size: 44 }); return; }
@@ -475,6 +489,49 @@ function howPanel(close) {
   T('howLines').forEach((l, i) => txt(l, 180, 146 + i * 36, 27, 'left', '#333'));
   button(530, 588, 220, 70, T('close'), close, { fill: '#f39c12', size: 32 });
 }
+
+
+/* ======================= secret menu (Chinese only) ======================= */
+// Pick a seat on top, then a character below. A character already sitting elsewhere swaps seats.
+const SEATS = ['你', '下家', '对家', '上家']; // turn order: you, then the next player, the one opposite, the one before you
+const Secret = {
+  enter() { this.at = 0; if (!Array.isArray(save.cast) || save.cast.length !== 4) save.cast = [0, 1, 2, 3]; },
+  draw() {
+    felt(); hits = [];
+    const ink = '#2b2b2b', grey = '#8a8a8a', c = save.cast;
+    box(36, 16, 1208, 690, 26, '#fffdf6', '#f1c40f', 6);
+    txt('🤫 秘密选单', W / 2, 64, 50, 'center', '#e67e22');
+    txt('先点上面的座位，再点下面的角色', W / 2, 110, 24, 'center', grey);
+    // the four seats
+    const SW = 250, SG = 22, sx = W / 2 - (4 * SW + 3 * SG) / 2;
+    SEATS.forEach((name, k) => {
+      const x = sx + k * (SW + SG), y = 136, on = k === this.at;
+      box(x, y, SW, 196, 18, on ? '#fff1b8' : '#f2eee4', on ? '#f39c12' : '#ddd5c4', on ? 5 : 2);
+      txt(name, x + SW / 2, y + 28, 28, 'center', on ? '#d35400' : grey, { bold: on });
+      roleFace(c[k], x + SW / 2, y + 96, 44);
+      txt(ROLES[c[k]], x + SW / 2, y + 166, 32, 'center', ink);
+      hits.push({ x, y, w: SW, h: 196, fn: () => { this.at = k; } });
+      if (k < 3) txt('→', x + SW + SG / 2, y + 96, 26, 'center', '#c8bfae', { shadow: false });
+    });
+    txt('出牌顺序：你 → 下家 → 对家 → 上家', W / 2, 358, 22, 'center', grey);
+    // the seven characters
+    const RW = 146, RG = 12, rx = W / 2 - (7 * RW + 6 * RG) / 2;
+    ROLES.forEach((name, i) => {
+      const x = rx + i * (RW + RG), y = 384, seat = c.indexOf(i);
+      box(x, y, RW, 170, 16, seat === this.at ? '#fff1b8' : '#fff', seat === this.at ? '#f39c12' : '#ddd5c4', seat === this.at ? 4 : 2);
+      roleFace(i, x + RW / 2, y + 62, 40);
+      txt(name, x + RW / 2, y + 122, 30, 'center', ink);
+      if (seat >= 0) txt(SEATS[seat], x + RW / 2, y + 152, 20, 'center', '#d35400');
+      hits.push({ x, y, w: RW, h: 170, fn: () => {
+        const j = c.indexOf(i); if (j >= 0) c[j] = c[this.at]; c[this.at] = i; // swap if already seated
+        this.at = (this.at + 1) % 4; store();
+      } });
+    });
+    // finish: with the characters, or back to the usual animals
+    button(250, 594, 300, 80, save.castOn ? '关闭专属角色' : '不用了', () => { save.castOn = false; store(); go(Title); }, { fill: '#7f8c8d', size: 32 });
+    button(590, 594, 440, 80, '✓ 选好了，返回菜单', () => { save.castOn = true; store(); go(Title); }, { fill: '#f39c12', size: 34 });
+  },
+};
 
 /* ======================= match + game screen ======================= */
 let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultAt = 0, howInGame = false, menuOpen = false;
@@ -811,7 +868,7 @@ requestAnimationFrame(frame);
 
 // Test hooks: __h7.sim(n, levels) plays n bot-only games and checks the rules.
 window.__h7 = {
-  get G() { return G; }, go: name => go({ Title, Play, MatchEnd }[name]),
+  get G() { return G; }, go: name => go({ Title, Play, MatchEnd, Secret }[name]),
   sim(n = 200, levels = [2, 1, 1, 1]) {
     const tot = [0, 0, 0, 0], wins = [0, 0, 0, 0]; let clean = 0, lucky = 0, shut = 0, bad = 0;
     for (let k = 0; k < n; k++) {
