@@ -61,9 +61,12 @@
 'use strict';
 /* ======================= data ======================= */
 const W = 1280, H = 720, INK = '#222', GREY = '#aaa', RED = 'rgb(255,165,165)';
-const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET', 'ROUND 4'];
+const RARITY = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET', 'ROUND 4', 'ROUND 2'];
 // Jason's second sheet of cats: bought straight from the shop once you reach Round 4 (moved from Round 2 by Jason 2026-10-20)
 const R2 = 5, R2_ROUND = 4, R2_GIFT = 4000;
+// Jason's third sheet (2026-10-21): bought from the shop once you reach Round 2
+const RB = 6, RB_ROUND = 2;
+const SHOP = { [RB]: RB_ROUND, [R2]: R2_ROUND }; // shop tab -> round that opens it
 const SPIN_COST = [50, 100, 500, 2000], SECRET_COST = 6000;
 let FAIRY_DMG = 20; // 1.5 s cooldown (Jason), so each bolt hits twice as hard to keep levels 7-10 winnable
 const DEVIL = { cd: 3, dmg: 40, boss: 60, finish: 0.5 }; // trident: finishes rats at or under half HP, else a normal stab
@@ -104,6 +107,15 @@ const CATS = [
   { id: 'jedi', name: 'Jedi cat', r: R2, price: 10000, row: 'front', hp: 420, img: 'cat_jedi', h: 99, desc: 'Lightsaber cut on close rats: 25 every 1.2 s. Every 5 s it uses the force to lift a far rat and drop it: 50 damage.' },
   { id: 'warrior', name: 'Warrior cat', r: R2, price: 10000, row: 'front', hp: 500, img: 'cat_warrior', h: 92, desc: 'Big sword slash: 50 damage every 2 s. Shouts so the rats attack it first.' },
   { id: 'tnt', name: 'TNT cat', r: R2, price: 10000, row: 'back', hp: 220, img: 'cat_tnt', h: 130, desc: 'Throws TNT every 4 s: the explosion hits every rat nearby for 80.' },
+  { id: 'lab', name: 'Lab cat', r: RB, price: 1500, row: 'back', hp: 150, img: 'cat_lab', h: 100, desc: 'Splashes acid every 2.5 s: 22 damage to every rat in the splash, then the acid burns 4 a second for 3 s.' },
+  { id: 'tiger', name: 'Tiger cat', r: RB, price: 1500, row: 'front', hp: 260, img: 'cat_tiger', h: 105, desc: 'Big scratches: 16 damage every 1 s.' },
+  { id: 'queen', name: 'Queen cat', r: RB, price: 1500, row: 'back', hp: 200, img: 'cat_queen', h: 100, desc: 'No attack. While she is standing, all your cats do 30% more damage.' },
+  { id: 'fish', name: 'Fish cat', r: RB, price: 2500, row: 'back', hp: 140, img: 'cat_fish', h: 100, desc: 'Water attack: shoots a water blast for 15 damage every 1 s.' },
+  { id: 'cloud', name: 'Cloud cat', r: RB, price: 2500, row: 'back', hp: 130, img: 'cat_cloud', h: 100, desc: 'Every 5 s puts a rain cloud over the rats for 5 s: 8 damage a second to every rat under it, and they slow down.' },
+  { id: 'butterfly', name: 'Butterfly cat', r: RB, price: 2500, row: 'back', hp: 160, img: 'cat_butterfly', h: 95, desc: 'No attack. Heals a hurt cat back to full HP, 3 times per battle (when a cat drops below a third of its HP).' },
+  { id: 'blow', name: 'Blow cat', r: RB, price: 3500, row: 'back', hp: 150, img: 'cat_blow', h: 105, desc: 'Sends a tornado every 4 s: 25 damage to every rat it passes and blows them back. Bosses only get pushed a little.' },
+  { id: 'tools', name: 'Tools cat', r: RB, price: 3500, row: 'back', hp: 180, img: 'cat_tools', h: 95, desc: 'Long range. Throws a traffic cone (20), a traffic light (30) or a brick (40) at random, every 2 s.' },
+  { id: 'wizard', name: 'Wizard cat', r: RB, price: 3500, row: 'back', hp: 170, img: 'cat_wizard', h: 100, desc: 'Magic bolt that jumps between 3 rats: 18, then 12, then 8 damage, every 2 s.' },
 ];
 // Weather cat powers: how long each one waits before it can be used again (each lasts WEATHER_TIME s)
 const WEATHER = { thunder: { name: 'Thunder', cd: 40 }, rain: { name: 'Rain', cd: 25 }, wind: { name: 'Wind', cd: 15 } }, WEATHER_TIME = 10;
@@ -117,6 +129,15 @@ const RATS = {
   clone: { name: 'CLONE RAT', img: 'rat_clone', h: 90, hp: 260, dmg: 6, rate: 1, speed: 50, coins: 70, boss: true },
   long: { name: 'LONG RAT', img: 'rat_long', h: 175, hp: 600, dmg: 11, rate: 4, speed: 45, coins: 90, boss: true },
   rainbow: { name: 'RAINBOW RAT', img: 'rat_rainbow', h: 125, hp: 600, dmg: 5, rate: 1, speed: 45, coins: 120, boss: true },
+  // Round 4 rats (Jason's sheet 2026-10-21)
+  minirainbow: { name: 'Small rainbow rat', img: 'rat_rainbow_small', h: 55, hp: 35, dmg: 3, rate: 1, speed: 58, coins: 10, zap: 6 },
+  thrower: { name: 'Thrower rat', img: 'rat_thrower', h: 52, hp: 28, dmg: 3, rate: 2.5, speed: 55, coins: 10, range: 330 },
+  ratrat: { name: 'Rat Rat', img: 'rat_ratrat', h: 60, hp: 28, dmg: 3, rate: 1, speed: 190, coins: 10 },
+  poop: { name: 'POOP RAT', img: 'rat_poop', h: 85, hp: 130, dmg: 4, rate: 1.5, speed: 40, coins: 40, boss: true, range: 240 },
+  wriggly: { name: 'WRIGGLY RAT', img: 'rat_wriggly', h: 70, hp: 190, dmg: 5, rate: 1, speed: 60, coins: 60, boss: true, dodge: 0.4 },
+  dash: { name: 'DASH RAT', img: 'rat_dash', h: 85, hp: 240, dmg: 6, rate: 1, speed: 55, coins: 80, boss: true },
+  flying: { name: 'FLYING RAT', img: 'rat_flying', h: 95, hp: 480, dmg: 7, rate: 1.5, speed: 55, coins: 100, boss: true, fly: 130 },
+  heartfelt: { name: 'HEARTFELT RAT', img: 'rat_heartfelt', h: 105, hp: 560, dmg: 6, rate: 1, speed: 42, coins: 130, boss: true },
 };
 const rep = (k, n) => Array(n).fill(k);
 // queen: [rats per call, seconds between calls] for the Rat Queen on that level.
@@ -144,6 +165,22 @@ const LEVELS = [
   { minions: [...rep('ball', 8), ...rep('spike', 10)], bosses: ['rainbow'], reward: 2500, hpMul: 1.15, rainbowHp: 1350, phase: 3, flank: 0.3,
     tip: 'SUPER RAINBOW RAT: 1350 HP and changes colour faster.' },
 ];
+// Round 4 on: Jason's new rats (sheet 2026-10-21, one column per level for levels 1-5; levels 6-10 mix them). Other knobs come from LEVELS.
+const R4LEVELS = [
+  { minions: rep('minirainbow', 6), bosses: ['poop'], tip: 'Boss: POOP RAT walks backwards and shoots rat poo. Small rainbow rats zap your cats.' },
+  { minions: [...rep('minirainbow', 6), ...rep('basic', 3)], bosses: ['wriggly'], r4k: 0.85, tip: 'Boss: WRIGGLY RAT wriggles so often your cats miss it. Fast attacks help.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6)], bosses: ['dash'], tip: 'Thrower rats shoot from far away. Boss: DASH RAT dashes past the front row to your back row.' },
+  { minions: [...rep('minirainbow', 5), ...rep('thrower', 5), ...rep('ratrat', 5)], bosses: ['flying'], r4k: 0.78, tip: 'Rat Rats run very fast. Boss: FLYING RAT is in the air: melee cats cannot reach it until it swoops.' },
+  { minions: [...rep('minirainbow', 5), ...rep('thrower', 5), ...rep('ratrat', 6)], bosses: ['heartfelt'], r4k: 0.78, tip: 'Boss: HEARTFELT RAT heals all the rats. Defeat it first! At half HP its heart catches fire.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6), ...rep('ratrat', 6)], bosses: ['poop', 'wriggly'], r4k: 1.22, tip: 'POOP RAT and WRIGGLY RAT together.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6), ...rep('ratrat', 6)], bosses: ['dash', 'flying'], r4k: 0.9, tip: 'DASH RAT and FLYING RAT together. Protect your back row, bring cats that shoot.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6), ...rep('spike', 6)], bosses: ['heartfelt', 'dash'], r4k: 0.95, tip: 'HEARTFELT RAT heals the DASH RAT. Defeat the HEARTFELT RAT first.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6), ...rep('ratrat', 6)], bosses: ['poop', 'wriggly', 'dash', 'flying', 'heartfelt'], seq: true, r4k: 0.9, tip: 'All five new bosses, one after another. Your team has to last.' },
+  { minions: [...rep('minirainbow', 6), ...rep('thrower', 6), ...rep('ratrat', 6)], bosses: ['heartfelt', 'rainbow'], r4k: 0.78, tip: 'SUPER RAINBOW RAT with a HEARTFELT RAT that heals it. Defeat the HEARTFELT RAT first!' },
+];
+// r4k: extra HP for that Round 4 level (damage grows by its square root), tuned so the new rats are about as hard as the old ones were
+const r4adj = (R, L) => { if (L.r4k && (save.round || 1) >= R2_ROUND) { R.hp *= L.r4k; R.dmg *= Math.sqrt(L.r4k); } return R; };
+const levelFor = (lv, round = save.round || 1) => round >= R2_ROUND ? Object.assign({}, LEVELS[lv - 1], R4LEVELS[lv - 1]) : LEVELS[lv - 1];
 const RAINBOW_STRIPES = ['#ff5a4e', '#ff9a3a', '#ffd84a', '#5ccf6a', '#4aa8ff', '#5a6bff', '#b06bff'];
 // Round 2 and later (after beating level 10): rats and bosses get k times the HP and the square root of k in damage.
 // Rounds 2-3: k = ROUND2[level], tuned so the best first cats (Devil x2, Fairy x2, Witch) win most levels of Round 2 and
@@ -240,7 +277,7 @@ function hpBar(cx, y, frac, w, h) { // light grey fill with a thin outline
 
 /* ======================= images ======================= */
 const IMG = {}, IMG_RED = {};
-const IMG_NAMES = [...new Set([...CATS.map(c => c.img), ...Object.values(RATS).map(r => r.img), 'cat_coin', 'hat', 'football', 'w_star', 'w_notes', 'w_tnt'])];
+const IMG_NAMES = [...new Set([...CATS.map(c => c.img), ...Object.values(RATS).map(r => r.img), 'cat_coin', 'hat', 'football', 'w_star', 'w_notes', 'w_tnt', 'w_tube', 'w_cone', 'w_light', 'w_brick'])];
 function tintRed(img) { // white body turns light red, black lines stay black
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d'); g.drawImage(img, 0, 0);
@@ -585,8 +622,8 @@ const Menu = {
 const Levels = {
   draw() {
     topBar(); txt(`ROUND ${save.round || 1}: CHOOSE A LEVEL`, W / 2, 110, 54);
-    LEVELS.forEach((L, i) => {
-      const x = 70 + (i % 5) * 232, y = 170 + Math.floor(i / 5) * 230, lv = i + 1, open = lv <= save.cleared + 1;
+    LEVELS.forEach((_, i) => {
+      const L = levelFor(i + 1), x = 70 + (i % 5) * 232, y = 170 + Math.floor(i / 5) * 230, lv = i + 1, open = lv <= save.cleared + 1;
       button(x, y, 210, 205, '', () => go(Team(lv)), { disabled: !open, draw: () => {
         txt(`LEVEL ${lv}`, x + 105, y + 28, 34);
         const b = RATS[L.bosses[L.bosses.length - 1]];
@@ -598,12 +635,20 @@ const Levels = {
     });
     button(70, 650, 160, 50, 'Back', () => go(Menu), { size: 28 });
     const r = save.round || 1, top = save.maxRound || 1, mid = [];
-    if (r > 1) mid.push(['Back to Round 1', 'Easier rats again', () => setRound(1)]);
-    if (r < top) mid.push([`Go to Round ${top}`, 'Carry on where you were', () => setRound(top)]);
-    else if (save.cleared >= LEVELS.length) mid.push([`START ROUND ${r + 1}`, 'Keep your cats and coins. Rats get much stronger.', startRound]);
+    // one button opens a list of every round reached so far (Jason)
+    if (top > 1) mid.push(['CHOOSE ROUND', `You are in Round ${r}`, () => { this.pickRound = true; }]);
+    if (r === top && save.cleared >= LEVELS.length) mid.push([`START ROUND ${r + 1}`, 'Keep your cats and coins. Rats get much stronger.', startRound]);
     const mw = mid.length > 1 ? 350 : 500, mx = mid.length > 1 ? 260 : 390;
     mid.forEach(([a, sub, fn], i) => { const x = mx + i * (mw + 20); button(x, 640, mw, 64, '', fn, { draw: () => { txt(a, x + mw / 2, 662, 32); txt(sub, x + mw / 2, 690, 18); } }); });
     button(1010, 640, 200, 64, '', () => go(Spin.from(Levels)), { draw: () => { txt('SPIN', 1110, 662, 32); txt('Get new cats', 1110, 690, 18); } });
+    if (this.pickRound) { // round list on top of the levels
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(0, 0, W, H); hits = [];
+      const n = top, cols = Math.min(5, n), rows = Math.ceil(n / 5), bw = 190, bh = 80, pw = cols * (bw + 20) + 40, ph = rows * (bh + 20) + 190, px = (W - pw) / 2, py = (H - ph) / 2;
+      ctx.fillStyle = '#fff'; ctx.fillRect(px, py, pw, ph); hbox(px, py, pw, ph, { lw: 4 }); txt('CHOOSE ROUND', W / 2, py + 45, 44);
+      for (let i = 1; i <= n; i++) { const x = px + 40 + ((i - 1) % 5) * (bw + 20), y = py + 85 + Math.floor((i - 1) / 5) * (bh + 20), done = i === r ? save.cleared : (save.roundCleared || {})[i] || 0;
+        button(x, y, bw, bh, '', () => { this.pickRound = false; if (i !== r) setRound(i); }, { on: i === r, draw: () => { txt(`Round ${i}`, x + bw / 2, y + 30, 32); txt(`${done} / ${LEVELS.length} levels`, x + bw / 2, y + 60, 18, 'center', '#666'); } }); }
+      button(W / 2 - 90, py + ph - 75, 180, 54, 'Close', () => { this.pickRound = false; }, { size: 30 });
+    }
   },
 };
 
@@ -621,13 +666,14 @@ function Team(lv) {
   };
   if (Array.isArray(save.slots) && save.slots.length === 5) save.slots.forEach((id, i) => { if (id && CAT[id]) add(id, i); });
   else for (const id of save.team || []) if (CAT[id]) add(id);
-  // fill any empty places with the strongest cats still free
-  CATS.slice().sort((a, b) => b.r - a.r || b.hp - a.hp).forEach(c => { while (count() < N && free(c.id) > 0) add(c.id); });
+  // fill any empty places with the strongest cats still free (Round 2 shop cats rank between Secret and Round 4)
+  const rank = c => c.r === RB ? 4.5 : c.r;
+  CATS.slice().sort((a, b) => rank(b) - rank(a) || b.hp - a.hp).forEach(c => { while (count() < N && free(c.id) > 0) add(c.id); });
   const prev = (x, y) => [40 + x * 0.62, 265 + (y - 330)];
   const at = i => prev(...SLOTS[i]);
   return {
     draw() {
-      topBar(); txt(`ROUND ${save.round || 1} · LEVEL ${lv}`, W / 2, 40, 40); txt(LEVELS[lv - 1].tip, W / 2, 95, 24);
+      topBar(); txt(`ROUND ${save.round || 1} · LEVEL ${lv}`, W / 2, 40, 40); txt(levelFor(lv).tip, W / 2, 95, 24);
       txt(sel == null ? 'Tap a cat to add it. Tap a cat on the left, then a place, to move it.' : (slots[sel] ? 'Tap another place to move it there, or tap it again to take it out.' : 'Tap a cat on the right to put it here.'),
         W / 2 + 40, 678, 22, 'center', '#666');
       hbox(30, 125, 570, 505, { lw: 2 }); txt('FRONT: melee', 360, 608, 22); txt('BACK: ranged + Nurse', 175, 608, 22);
@@ -644,17 +690,17 @@ function Team(lv) {
         } });
       });
       txt(`${count()} / ${N} cats`, 315, 150, 26);
-      // Round 4 cats join the grid once Round 4 is reached; then the tiles get smaller (7 x 5)
-      const list = CATS.filter(d => d.r !== R2 || (save.maxRound || 1) >= R2_ROUND || save.owned[d.id]), big = list.length > 20;
-      const cols = big ? 7 : 5, tw = big ? 88 : 120, th = big ? 98 : 120, sx = big ? 92 : 128, sy = big ? 102 : 128;
+      // round cats join the grid once their round is reached; then the tiles get smaller (7 x 5, then 8 x 6)
+      const list = CATS.filter(d => !SHOP[d.r] || (save.maxRound || 1) >= SHOP[d.r] || save.owned[d.id]), big = list.length > 20, huge = list.length > 35;
+      const cols = huge ? 8 : big ? 7 : 5, tw = huge ? 76 : big ? 88 : 120, th = huge ? 80 : big ? 98 : 120, sx = huge ? 80 : big ? 92 : 128, sy = huge ? 84 : big ? 102 : 128;
       list.forEach((d, i) => {
         const x = 625 + (i % cols) * sx, y = 125 + Math.floor(i / cols) * sy, own = save.owned[d.id] || 0, f = free(d.id);
         if (!own) { hbox(x, y, tw, th, { lw: 2 }); txt('?', x + tw / 2, y + th / 2, big ? 36 : 44, 'center', '#bbb'); return; }
         const into = sel != null && !slots[sel] ? sel : null;
         button(x, y, tw, th, '', () => { add(d.id, into); sel = null; }, { lw: 2, disabled: f <= 0 || count() >= N, draw: () => {
-          const sh = big ? 52 : 68, [ys, yn, yr] = big ? [62, 75, 89] : [82, 98, 114];
+          const sh = huge ? 42 : big ? 52 : 68, [ys, yn, yr] = huge ? [50, 62, 74] : big ? [62, 75, 89] : [82, 98, 114];
           spr(d.img, x + tw / 2, y + ys, Math.min(sh, sh * (tw - 20) / Math.max(tw - 40, iw(d.img) * sh / ih(d.img))));
-          txt(d.name, x + tw / 2, y + yn, big ? 16 : 20); txt(`x${f}  ${d.row}`, x + tw / 2, y + yr, big ? 13 : 16, 'center', '#666');
+          txt(huge ? d.name.replace(/ cat$/, '') : d.name, x + tw / 2, y + yn, huge ? 14 : big ? 16 : 20); txt(`x${f}  ${d.row}`, x + tw / 2, y + yr, huge ? 12 : big ? 13 : 16, 'center', '#666');
         } });
       });
       button(70, 650, 160, 50, 'Back', () => go(Levels), { size: 28 });
@@ -678,14 +724,14 @@ function placeTeam(ids, slots) {
 let B = null;
 function Battle(lv, ids, slots) {
   // small rats get stronger every level, faster after level 5
-  const L = LEVELS[lv - 1], mult = lv <= 5 ? Math.pow(1.1, lv - 1) : 1.4641 * Math.pow(1.25, lv - 5);
+  const L = levelFor(lv), mult = lv <= 5 ? Math.pow(1.1, lv - 1) : 1.4641 * Math.pow(1.25, lv - 5);
   const cats = placeTeam(ids, slots).map(p => {
     const d = CAT[p.id];
     return { d, x: p.x, y: p.y, hx: p.x, hy: p.y, col: p.col, hp: d.hp, max: d.hp, cd: 0.4 + Math.random() * 0.8, flash: 0, lunge: 0,
-      dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0, t2: 0, grip: [], tr: null };
+      dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0, t2: 0, grip: [], tr: null, heals: d.id === 'butterfly' ? 3 : 0 };
   });
   const minions = L.minions.slice(); for (let i = minions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [minions[i], minions[j]] = [minions[j], minions[i]]; }
-  B = { lv, L, mult, dmgMult: Math.pow(1.1, lv - 1), round: save.round || 1, R: roundMul(save.round || 1, lv), t: 0, cats, rats: [], projs: [], fx: [], floats: [], clouds: [], clones: [], queue: minions, spawnT: 1.2,
+  B = { lv, L, mult, dmgMult: Math.pow(1.1, lv - 1), round: save.round || 1, R: r4adj(roundMul(save.round || 1, lv), L), t: 0, cats, rats: [], projs: [], fx: [], floats: [], clouds: [], rainClouds: [], tornados: [], clones: [], queue: minions, queenOn: false, spawnT: 1.2,
     bosses: L.bosses.slice(), bossesLeft: L.bosses.length, bossOn: false, heals: ids.filter(i => i === 'nurse').length, hadNurse: ids.includes('nurse'),
     healSel: null, shield: 0, shieldT: 0, weather: { has: ids.includes('weather'), open: false, cd: { thunder: 0, rain: 0, wind: 0 }, kind: null, t: 0, zap: 0 }, earned: 0, over: null, paused: false, speed: 1, banner: null, silent: false };
   const s = {
@@ -711,8 +757,8 @@ function makeRat(key, x, y, o = {}) {
   if (!o.fake) hp *= B.R.hp;
   if (o.fake) hp = 1;
   const r = { d, key, x, y, laneY: y, hp, max: hp, dmg: d.dmg * B.R.dmg * (boss ? (B.L.bossDmg || 1) : B.dmgMult * (B.L.dmgMul || 1)), atkT: d.rate * 0.5, flash: 0, lunge: 0, dead: false, deadT: 0,
-    tgt: null, yOff: (Math.random() - 0.5) * 70, xOff: Math.random() * 50, h: d.h, w: d.h * iw(d.img) / ih(d.img), ph: Math.random() * 6,
-    fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, burn: 0, burnT: 0, blind: 0, liftY: 0, drainBy: null, gripBy: null, fleeing: false, stared: false, dashed: false, timer: 0, t2: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
+    tgt: null, acid: 0, acidT: 0, flyH: d.fly || 0, swoop: 0, yOff: (Math.random() - 0.5) * 70, xOff: Math.random() * 50, h: d.h, w: d.h * iw(d.img) / ih(d.img), ph: Math.random() * 6,
+    fake: !!o.fake, flank: key === 'basic' && !o.fake && Math.random() < (B.L.flank || 0), slow: 0, frozen: 0, held: false, burn: 0, burnT: 0, blind: 0, liftY: 0, drainBy: null, gripBy: null, fleeing: false, stared: false, dashed: false, timer: Math.random() * 3, t2: 0, jump: 0, phase: -1, phaseT: 0, inv: 0 };
   B.rats.push(r); return r;
 }
 function spawnBoss() {
@@ -722,18 +768,20 @@ function spawnBoss() {
   alertCats.forEach(c => { c.alarm = 3; }); if (alertCats.length) SFX.alert(); SFX.boss();
   if (!B.silent && scr && scr.battle) setMusic('boss');
 }
-function center(u) { return [u.x, u.y - u.h * 0.5]; }
+function center(u) { return [u.x, u.y - (u.flyH || 0) - u.h * 0.5]; } // flying rats sit higher
 function dist(a, b) { const [ax, ay] = center(a), [bx, by] = center(b); return Math.hypot(ax - bx, ay - by); }
 function anchor(c, fx, fy) { return [c.x - c.w / 2 + c.w * fx, c.y - c.h + c.h * fy]; }
 const targetable = r => !r.dead && !r.fleeing && !r.held && r.x < 1290;
 function nearestRat(c, range = 9999, f = () => true) {
   let best = null, bd = range;
-  for (const r of B.rats) if (targetable(r) && f(r)) { const d = dist(c, r); if (d < bd) { bd = d; best = r; } }
+  for (const r of B.rats) if (targetable(r) && f(r) && !(range <= 300 && r.flyH > 40)) { /* melee cats can't reach a rat up in the air */ const d = dist(c, r); if (d < bd) { bd = d; best = r; } }
   return best;
 }
 function hurtRat(r, dmg, o = {}) {
   if (r.dead || r.fleeing) return;
   if (r.inv > 0) { float(r.x, r.y - r.h - 20, 'blocked', 20); return; }
+  if (r.d.dodge && !o.dot && Math.random() < r.d.dodge) { float(r.x, r.y - r.h - 20, 'miss', 20); return; } // Wriggly rat
+  if (B.queenOn) dmg *= 1.3; // Queen cat: +30% for every cat while she stands
   r.hp -= dmg; r.flash = 0.25; if (!o.quiet) float(r.x + (Math.random() - 0.5) * 20, r.y - r.h - 16, `-${Math.round(dmg)}`, 24);
   if (r.d.boss && !r.fake) SFX.bossHurt(); else SFX.squeak();
   if (r.hp <= 0) killRat(r, o);
@@ -792,6 +840,8 @@ function updateBattle(dt) {
   }
   if (B.banner) { B.banner.t += dt; if (B.banner.t > 2.5) B.banner = null; }
   if (B.shield > 0) B.shield -= dt;
+  B.queenOn = B.cats.some(c => alive(c) && c.d.id === 'queen');
+  updateRainClouds(dt); updateTornados(dt);
   // Alert cat: during boss fights, a 20% chance every 5 s to shield the team for 5 s
   if (B.rats.some(r => !r.dead && r.d.boss && !r.fake) && B.cats.some(c => alive(c) && c.d.id === 'alert')) {
     B.shieldT += dt; if (B.shieldT >= 5) { B.shieldT = 0; if (Math.random() < 0.2 && B.shield <= 0) { B.shield = 5; float(W / 2, 200, 'SHIELD!', 40); SFX.shield(); } }
@@ -825,7 +875,9 @@ function updateRat(r, dt) {
   r.flash -= dt; r.lunge -= dt; r.ph += dt; if (r.slow > 0) r.slow -= dt; if (r.inv > 0) r.inv -= dt;
   if (r.fleeing) { r.x += 320 * dt; return; }
   if (r.blind > 0) r.blind -= dt;
-  if (r.burn > 0) { r.burn -= dt; r.burnT += dt; if (r.burnT >= 1) { r.burnT = 0; hurtRat(r, 4); if (r.dead) return; } } // Dragon fire
+  if (r.burn > 0) { r.burn -= dt; r.burnT += dt; if (r.burnT >= 1) { r.burnT = 0; hurtRat(r, 4, { dot: true }); if (r.dead) return; } } // Dragon fire
+  if (r.acid > 0) { r.acid -= dt; r.acidT += dt; if (r.acidT >= 1) { r.acidT = 0; hurtRat(r, 4, { dot: true, quiet: true }); if (r.dead) return; } } // Lab cat acid
+  if (r.swoop > 0) { r.swoop -= dt; r.flyH = r.swoop > 0 ? 20 : d0fly(r); }
   if (r.held) return;
   if (r.frozen > 0 || r.liftY > 0) return;
   const d = r.d, k = r.key;
@@ -847,6 +899,7 @@ function updateRat(r, dt) {
       if (r.t2 >= 6 && r.tgt && alive(r.tgt) && Math.hypot(r.tgt.x - r.x, r.tgt.y - r.y) < 200) { r.t2 = 0; cloneClaw(r, r.tgt); }
     }
     if (k === 'long') { r.t2 += dt; if (r.t2 >= 10) { r.t2 = 0; longTail(r); } }
+    if (newRatMoves(r, dt)) return;
     if (k === 'rainbow') {
       r.phaseT -= dt; const pd = B.L.phase || 5;
       if (r.phaseT <= 0) { r.phase = (r.phase + 1) % 4; r.phaseT = pd; r.midBolt = false; rainbowStart(r); }
@@ -858,6 +911,7 @@ function updateRat(r, dt) {
   const c = r.tgt; if (!c) return;
   let dx, dy;
   if (k === 'long') { dx = Math.max(860, (B.cats.filter(c => alive(c) && c.col === 'front').reduce((m, c) => Math.max(m, c.x), 0)) + 300); dy = r.laneY; }
+  else if (d.range) { dx = c.x + d.range + r.xOff; dy = (airborne(c) ? c.hy : c.y) + r.yOff; } // shooters stay back
   else { dx = c.x + 75 + r.xOff; dy = (airborne(c) ? c.hy : c.y) + r.yOff; }
   const vx = dx - r.x, vy = dy - r.y, dd = Math.hypot(vx, vy), sp = d.speed * (r.slow > 0 ? 0.5 : 1) * dt;
   if (dd > 4) { r.x += vx / dd * Math.min(sp, dd); r.y += vy / dd * Math.min(sp, dd); return; }
@@ -875,7 +929,9 @@ function updateRat(r, dt) {
     addFx(0.45, (f, q) => { const e = q < 0.5 ? q * 2 : (1 - q) * 2, tx = hx + (f.t2.x - hx) * e, ty = hy + (f.t2.y - f.t2.h * 0.6 - hy) * e; ctx.strokeStyle = INK; ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke(); ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(tx, ty, 9, 0, 7); ctx.fill(); }, { t2: t });
     SFX.neck(); hurtCat(t, r.dmg); return;
   }
-  if (airborne(c)) return; // rats can't reach a cat in the air
+  if (k === 'thrower' || k === 'poop') { lob(r, c, k === 'poop' ? 'poo' : 'pebble', r.dmg); return; }
+  if (k === 'heartfelt' && r.hp < r.max / 2) { lob(r, c, 'fireheart', r.dmg * 1.5); return; }
+  if (airborne(c) && !d.fly) return; // rats can't reach a cat in the air
   r.lunge = 0.2; hurtCat(c, r.dmg);
   if (d.boss) SFX.bossBite(); else if (d.splash) SFX.smash(); else SFX.bite();
   if (d.splash) { const o = B.cats.filter(o => alive(o) && o !== c && o.col === c.col && !airborne(o)).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0]; if (o && Math.hypot(o.x - c.x, o.y - c.y) < 260) hurtCat(o, r.dmg); }
@@ -1009,6 +1065,91 @@ function rainbowBeam(r) { // a fat rainbow beam at a back-row cat (the Angel in 
   });
 }
 
+/* ----- Round 4 rats (Jason 2026-10-21) ----- */
+const d0fly = r => r.d.fly || 0;
+function newRatMoves(r, dt) { // returns true when the rat is busy with its move this frame
+  const k = r.key;
+  if (k === 'minirainbow') { r.timer += dt; if (r.timer >= 6) { r.timer = 0; const live = B.cats.filter(alive); if (live.length) { const t = live[Math.floor(Math.random() * live.length)]; bolt(t.x, t.y - t.h * 0.5, '#ffd84a'); hurtCat(t, r.dmg * 2); SFX.zap(); } } }
+  if (k === 'poop') { r.t2 += dt; if (r.t2 >= 8) { r.t2 = 0; pooRain(r); } }
+  if (k === 'dash') { r.t2 += dt; if (r.t2 >= 6) { r.t2 = 0; dashAt(r); } }
+  if (k === 'flying') { r.t2 += dt; if (r.t2 >= 5) { r.t2 = 0; swoopAt(r); } }
+  if (k === 'heartfelt') {
+    r.t2 += dt; if (r.t2 >= 7) { r.t2 = 0; loveWave(r); }
+    if (!r.burning && r.hp < r.max / 2) { r.burning = true; float(r.x, r.y - r.h - 50, 'BURNING HEART!', 28); SFX.fire(); shake(6); }
+  }
+  return false;
+}
+function lob(r, c, kind, dmg) { // a little thing thrown in an arc from the rat to a cat
+  const x0 = r.x - r.w * 0.3, y0 = r.y - (r.flyH || 0) - r.h * 0.7; r.lunge = 0.2;
+  if (kind === 'poo') SFX.spit(); else if (kind === 'fireheart') SFX.fire(); else SFX.hatThrow();
+  addFx(0.6, (f, q) => { const x = x0 + (c.x - x0) * q, y = y0 + (c.y - c.h * 0.5 - y0) * q - Math.sin(q * Math.PI) * 90;
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    if (kind === 'fireheart') { ctx.save(); ctx.translate(x, y); ctx.fillStyle = '#ff7a5a'; ctx.beginPath(); ctx.moveTo(0, 10); ctx.bezierCurveTo(-16, -2, -6, -13, 0, -3); ctx.bezierCurveTo(6, -13, 16, -2, 0, 10); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#ffd84a'; flame(0, -14, 7); ctx.restore(); }
+    else { ctx.fillStyle = kind === 'poo' ? '#7a5230' : '#bbb'; ctx.beginPath(); ctx.arc(x, y, kind === 'poo' ? 7 : 6, 0, 7); ctx.fill(); ctx.stroke(); } });
+  later(0.6, () => { if (!c.dead && !r.dead) { hurtCat(c, dmg); if (kind === 'poo') splat(c.x, c.y - c.h * 0.4); } });
+}
+function splat(x, y) { addFx(0.6, (f, q) => { ctx.globalAlpha = 1 - q; ctx.fillStyle = '#7a5230'; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) { const a = i * 1.05, d = 8 + q * 26; ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 5, 0, 7); ctx.fill(); ctx.stroke(); } ctx.globalAlpha = 1; }); }
+function pooRain(r) { // a shower of poo on the back row
+  const live = B.cats.filter(alive), back = live.filter(c => c.col === 'back'), cats = back.length ? back : live; if (!cats.length) return;
+  warn(r, cats, 0.9, 'POO RAIN!');
+  later(0.9, () => { if (r.dead) return; SFX.smash(); shake(6); cats.forEach(c => { if (c.dead) return; hurtCat(c, r.dmg * 1.5); splat(c.x - 15, c.y - c.h * 0.6); splat(c.x + 15, c.y - c.h * 0.3); }); });
+}
+function dashAt(r) { // runs straight past the front row and bites a back-row cat
+  const live = B.cats.filter(alive), back = live.filter(c => c.col === 'back' && !airborne(c)), t = (back.length ? back : live)[0]; if (!t) return;
+  warn(r, [t], 0.7, 'DASH!');
+  later(0.7, () => { if (r.dead || t.dead || r.frozen > 0 || r.held || r.liftY > 0) return;
+    const x0 = r.x, y0 = r.y; r.x = t.x + 75; r.y = t.y; r.tgt = t; r.lunge = 0.2; SFX.dash(); shake(8);
+    addFx(0.35, (f, q) => { ctx.globalAlpha = 1 - q; ctx.strokeStyle = INK; ctx.lineWidth = 3; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x0, y0 - 40 + i * 12); ctx.lineTo(r.x + 60, r.y - 40 + i * 12); ctx.stroke(); } ctx.globalAlpha = 1; });
+    hurtCat(t, r.dmg * 2.5); impact(t.x, t.y - t.h * 0.5, 0.8); });
+}
+function swoopAt(r) { // dives down on a cat; while low, melee cats can hit it
+  const live = B.cats.filter(alive); if (!live.length) return; const t = live[Math.floor(Math.random() * live.length)];
+  warn(r, [t], 0.6, 'SWOOP!');
+  later(0.6, () => { if (r.dead || t.dead) return; r.swoop = 2.5; r.flyH = 20; SFX.whip(); hurtCat(t, r.dmg * 2); impact(t.x, t.y - t.h * 0.5, 0.8); });
+}
+function loveWave(r) { // pink rings: heals every other rat a quarter of its HP, itself a little
+  float(r.x, r.y - r.h - 50, 'LOVE WAVE!', 28); SFX.ratHeal();
+  for (const o of B.rats) if (!o.dead && !o.fake && !o.fleeing) { const add = o.max * (o === r ? 0.08 : 0.25); o.hp = Math.min(o.max, o.hp + add); if (o !== r) float(o.x, o.y - o.h - 30, '+HP', 20); }
+  const x = r.x, y = r.y - r.h * 0.5;
+  addFx(0.9, (f, q) => { ctx.strokeStyle = '#ff7aa8'; for (let i = 0; i < 3; i++) { const qq = q * 1.4 - i * 0.2; if (qq <= 0 || qq > 1) continue; ctx.globalAlpha = 1 - qq; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(x, y, 40 + qq * 600, 20 + qq * 300, 0, 0, 7); ctx.stroke(); } ctx.globalAlpha = 1; });
+}
+
+/* ----- Round 2 cats (Jason's sheet 2026-10-21) ----- */
+function acidSplash(x, y, dmg) {
+  for (const r of B.rats) if (targetable(r) && Math.hypot(r.x - x, r.y - (r.flyH || 0) - r.h * 0.5 - y) < 115) { hurtRat(r, dmg); r.acid = 3; }
+  SFX.glass();
+  addFx(0.6, (f, q) => { ctx.globalAlpha = 1 - q * 0.7; ctx.fillStyle = '#7ce35a'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    for (let i = 0; i < 10; i++) { const a = Math.PI + i * Math.PI / 9, rr = 14 + q * 90; ctx.beginPath(); ctx.arc(x + rr * Math.cos(a) * 1.3, y + rr * Math.sin(a) + q * q * 50, 6, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.beginPath(); ctx.ellipse(x, y + 30, 110, 20, 0, 0, 7); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1; });
+}
+function wizardChain(c, first) { // one bolt that jumps from rat to rat
+  const hit = [first]; while (hit.length < 3) { const p = hit[hit.length - 1], n = nearestRat(p, 320, r => !hit.includes(r)); if (!n) break; hit.push(n); }
+  const pts = [anchor(c, 0.95, 0.15), ...hit.map(r => center(r))];
+  hit.forEach((r, i) => hurtRat(r, [18, 12, 8][i]));
+  addFx(0.3, () => { ctx.lineCap = 'round'; ctx.lineJoin = 'round'; for (const [lw, col] of [[7, INK], [3, '#c58aff']]) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+    for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i]; ctx.moveTo(ax, ay); for (let k = 1; k < 5; k++) ctx.lineTo(ax + (bx - ax) * k / 5 + ((k % 2) * 2 - 1) * 9, ay + (by - ay) * k / 5); ctx.lineTo(bx, by); } ctx.stroke(); } });
+  pts.slice(1).forEach(([x, y]) => sparks(x, y));
+}
+function rainCloud(r) { B.rainClouds.push({ x: r.x - 20, y: Math.max(130, r.y - r.h - 190), life: 5, tick: 0.3 }); }
+function updateRainClouds(dt) {
+  for (const cl of B.rainClouds) { cl.life -= dt; cl.tick -= dt;
+    for (const r of B.rats) if (targetable(r) && Math.abs(r.x - cl.x) < 130 && r.y > cl.y && r.y - cl.y < 420) { r.slow = Math.max(r.slow, 0.3); if (cl.tick <= 0) hurtRat(r, 8, { quiet: true }); }
+    if (cl.tick <= 0) cl.tick = 1; }
+  B.rainClouds = B.rainClouds.filter(c => c.life > 0);
+}
+function tornado(c, r) { B.tornados.push({ x: c.x + 40, y: r.y, hit: new Set() }); SFX.wind(); }
+function updateTornados(dt) {
+  for (const t of B.tornados) { t.x += 520 * dt;
+    for (const r of B.rats) if (targetable(r) && !t.hit.has(r) && Math.abs(r.x - t.x) < 50 && Math.abs(r.y - t.y) < 70) { t.hit.add(r); hurtRat(r, 25); if (!r.frozen && !r.held && !r.liftY) r.x = Math.min(1240, r.x + (r.d.boss && !r.fake ? 50 : 160)); } }
+  B.tornados = B.tornados.filter(t => t.x < 1350);
+}
+function butterflyHeal(c) { // full HP for the most hurt cat under a third of its HP
+  const t = B.cats.filter(o => alive(o) && o.hp < o.max / 3).sort((a, b) => a.hp / a.max - b.hp / b.max)[0]; if (!t) return false;
+  t.hp = t.max; c.heals--; float(t.x, t.y - t.h - 40, 'FULL HP!', 30); SFX.heal();
+  addFx(0.8, (f, q) => { ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + q * 3, d = 30 + q * 30; star(t.x + Math.cos(a) * d, t.y - t.h * 0.5 + Math.sin(a) * d - q * 30, 8, 3, 4); } });
+  return true;
+}
+
 function updateCat(c, dt) {
   if (c.dead) return;
   c.flash -= dt; c.lunge -= dt; c.t += dt; if (c.alarm > 0) c.alarm -= dt; if (c.chew > 0) c.chew -= dt;
@@ -1065,6 +1206,16 @@ function updateCat(c, dt) {
       break;
     case 'tnt': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.85, 0.5), dur: 0.8, dmg: 80, kind: 'tnt', arc: true, spin: true }); SFX.throwPotion(); c.cd = 4; } else c.cd = 0.1; } break;
     case 'angel': angel(c, dt); break;
+    // ----- Round 2 cats (sheet 3) -----
+    case 'fish': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.45), speed: 750, dmg: 15, kind: 'drop' }); SFX.water(); c.cd = 1; } else c.cd = 0.1; } break;
+    case 'cloud': if (ready()) { const r = nearestRat(c); if (r) { rainCloud(r); SFX.rain(); c.cd = 5; } else c.cd = 0.1; } break;
+    case 'lab': if (ready()) { const r = nearestRat(c); if (r) { shoot(c, r, { from: anchor(c, 0.9, 0.5), dur: 0.7, dmg: 22, kind: 'tube', arc: true, spin: true }); SFX.throwPotion(); c.cd = 2.5; } else c.cd = 0.1; } break;
+    case 'tiger': if (ready()) { const r = nearestRat(c, MELEE); if (r) { c.lunge = 0.25; hurtRat(r, 16); slash(r); SFX.claw(); c.cd = 1; } else c.cd = 0.1; } break;
+    case 'blow': if (ready()) { const r = nearestRat(c); if (r) { tornado(c, r); c.cd = 4; } else c.cd = 0.1; } break;
+    case 'tools': if (ready()) { const r = nearestRat(c); if (r) { const kind = ['w_cone', 'w_light', 'w_brick'][Math.floor(Math.random() * 3)];
+      shoot(c, r, { from: anchor(c, 0.9, 0.45), speed: 650, dmg: { w_cone: 20, w_light: 30, w_brick: 40 }[kind], kind, spin: true }); SFX.hatThrow(); c.cd = 2; } else c.cd = 0.1; } break;
+    case 'wizard': if (ready()) { const r = nearestRat(c); if (r) { wizardChain(c, r); SFX.magic(); c.cd = 2; } else c.cd = 0.1; } break;
+    case 'butterfly': if (c.heals > 0 && ready()) c.cd = butterflyHeal(c) ? 2 : 0.2; break;
   }
 }
 function waterFan(c, r) {
@@ -1257,10 +1408,10 @@ function updateClones(dt) {
 }
 function updateProj(p, dt) {
   p.t += dt; if (p.spin) p.rot += dt * 12;
-  if (p.r && !p.r.dead && !p.r.fleeing) { p.tx = p.r.x; p.ty = p.r.y - p.r.h * 0.5; }
+  if (p.r && !p.r.dead && !p.r.fleeing) [p.tx, p.ty] = center(p.r);
   if (p.arc) { // witch potion: fixed target point, lobbed
     const q = Math.min(1, p.t / p.dur); p.cx = p.x + (p.tx - p.x) * q; p.cy = p.y + (p.ty - p.y) * q - Math.sin(q * Math.PI) * 110;
-    if (q >= 1) { p.done = true; (p.kind === 'tnt' ? explode : splash)(p.tx, p.ty, p.dmg); }
+    if (q >= 1) { p.done = true; (p.kind === 'tnt' ? explode : p.kind === 'tube' ? acidSplash : splash)(p.tx, p.ty, p.dmg); }
     return;
   }
   if (p.cx === undefined) { p.cx = p.x; p.cy = p.y; if (p.miss) { p.vx = p.tx - p.x; p.vy = p.ty - p.y - 140; const m = Math.hypot(p.vx, p.vy); p.vx /= m; p.vy /= m; } }
@@ -1328,10 +1479,15 @@ function drawBattle() {
   }
 
   drawWeatherFx(b);
+  for (const t of b.tornados) { ctx.strokeStyle = INK; ctx.lineWidth = 2.5; for (let i = 0; i < 6; i++) { const w = 12 + i * 7, yy = t.y - i * 18, ox = Math.sin(b.t * 14 + i) * 6; ctx.beginPath(); ctx.ellipse(t.x + ox, yy, w, 6, 0, 0, 7); ctx.stroke(); } }
   const units = [...b.cats.filter(c => !c.dead || c.deadT < 0.6).map(c => ({ c, y: c.state === 'rise' || c.state === 'blast' || c.state === 'down' ? c.hy : c.y })),
     ...b.rats.map(r => ({ r, y: r.y })), ...b.clones.map(k => ({ k, y: k.y + 20 }))].sort((a, z) => a.y - z.y);
   for (const u of units) { if (u.c) drawCat(u.c); else if (u.r) drawRat(u.r); else drawClone(u.k); }
 
+  for (const cl of b.rainClouds) { const a = Math.min(1, cl.life * 2); ctx.globalAlpha = a; ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 12; i++) { const x = cl.x - 90 + i * 16, y = cl.y + 30 + (i * 37 + b.t * 500) % 260; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 16); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 2.5; for (const [dx, dy, rr] of [[-60, 8, 30], [-20, -8, 40], [30, -4, 36], [70, 8, 28]]) { ctx.beginPath(); ctx.arc(cl.x + dx, cl.y + dy, rr, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.fillRect(cl.x - 80, cl.y, 160, 30); ctx.beginPath(); ctx.moveTo(cl.x - 90, cl.y + 30); ctx.lineTo(cl.x + 98, cl.y + 30); ctx.stroke(); ctx.globalAlpha = 1; }
   for (const p of b.projs) drawProj(p);
   for (const f of b.fx) f.draw(f, Math.min(1, f.t / f.dur));
   for (const f of b.floats) txt(f.s, f.x, f.y - f.t * 40, f.size);
@@ -1418,6 +1574,8 @@ function drawCat(c) {
   if (d.id === 'rizz' && c.state === 'stare' && c.tr) { const hx = c.tr.x, hy = c.tr.y - c.tr.h - 26 - (b.t * 20 % 16); heart(hx, hy, 9); }
   if (b.shield > 0) { ctx.setLineDash([8, 6]); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y - c.h * 0.5, c.w * 0.6, c.h * 0.65, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
   hpBar(c.x, y - c.h - 16, c.hp / c.max, 64, 8);
+  if (d.id === 'butterfly') { heart(c.x + 46, y - c.h - 14, 8); txt(`${c.heals}`, c.x + 62, y - c.h - 14, 20, 'left'); }
+  if (d.id === 'queen') txt('+30%', c.x, y - c.h - 36, 20);
   if (b.healSel === c) { ctx.setLineDash([6, 6]); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(c.x, c.y + 2, c.w * 0.45, 12, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
 }
 function heart(x, y, s) {
@@ -1430,13 +1588,16 @@ function drawRat(r) {
   let x = r.x, y = r.y;
   const walk = r.frozen > 0 || r.held ? 0 : Math.sin(r.ph * 9) * 2;
   if (r.lunge > 0) x -= Math.sin((r.lunge / 0.2) * Math.PI) * 18;
+  if (r.flyH) { ctx.strokeStyle = '#999'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.w * 0.35, 7, 0, 0, 7); ctx.stroke(); y -= r.flyH + Math.sin(r.ph * 4) * 6; }
   if (r.liftY > 0) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.w * 0.4, 8, 0, 0, 7); ctx.fill(); y -= r.liftY; }
   if (r.jump > 0) { const q = 1 - r.jump / 0.9; y -= Math.sin(q * Math.PI) * 170; ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.w * 0.45 * (1 - Math.sin(q * Math.PI) * 0.5), 10, 0, 0, 7); ctx.fill(); }
   if (r.key === 'rainbow' && r.phase >= 0) { // rainbow aura in the colour of its current move
     const col = RAINBOW[r.phase][1]; ctx.globalAlpha = 0.35; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, y - r.h * 0.5, r.w * 0.62, r.h * 0.62, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     if (r.inv > 0) { ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(x, y - r.h * 0.5, r.w * 0.7, r.h * 0.7, 0, 0, 7); ctx.stroke(); }
   }
-  spr(r.d.img, x, y + walk * 0.5, r.h, { red: r.flash > 0, flip: r.fleeing, rot: r.held ? -0.3 : 0 });
+  const wig = r.key === 'wriggly' ? Math.sin(r.ph * 11) * 0.18 : 0; // Wriggly rat never keeps still
+  spr(r.d.img, x, y + walk * 0.5, r.h, { red: r.flash > 0, flip: r.key === 'poop' ? false : r.fleeing, rot: r.held ? -0.3 : wig });
+  if (r.acid > 0) { ctx.fillStyle = '#7ce35a'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; for (const dx of [-14, 4, 18]) { ctx.beginPath(); ctx.arc(x + dx, y - r.h * 0.3 + ((r.ph * 40 + dx * 3) % 20), 4, 0, 7); ctx.fill(); ctx.stroke(); } }
   if (r.burn > 0) { ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (const dx of [-12, 10]) flame(x + dx, y - r.h * 0.75 - Math.sin(r.ph * 12 + dx) * 3, 9); }
   if (r.blind > 0) { const [ex, ey] = [x - r.w * 0.28, y - r.h * 0.6]; ['#ff5a4e', '#ffd84a', '#4aa8ff'].forEach((col, i) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ex + i * 9 - 9, ey + (i % 2) * 6, 9, 0, 7); ctx.fill(); }); }
   if (!r.fleeing) hpBar(r.x, y - r.h - 10, r.hp / r.max, r.d.boss ? 90 : 46, r.d.boss ? 8 : 6);
@@ -1458,6 +1619,8 @@ function drawProj(p) {
     case 'shuriken': ctx.restore(); spr('w_star', x, y + 15, 30, { rot: p.rot }); return;
     case 'note': ctx.restore(); spr('w_notes', x, y + 18 + Math.sin(p.t * 14 + p.wave) * 8, 36); return;
     case 'tnt': ctx.restore(); spr('w_tnt', x, y + 20, 40, { rot: p.rot }); return;
+    case 'tube': ctx.restore(); spr('w_tube', x, y + 18, 36, { rot: p.rot }); return;
+    case 'w_cone': case 'w_light': case 'w_brick': ctx.restore(); spr(p.kind, x, y + 18, p.kind === 'w_light' ? 44 : 34, { rot: p.rot }); return;
     case 'magic': ctx.fillStyle = 'rgba(255,120,200,0.45)'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; star(0, 0, 10, 4, 4); break;
     case 'drop': ctx.rotate(-(p.rot || 0) + Math.atan2(p.ty - y, p.tx - x) + Math.PI / 2); ctx.beginPath(); ctx.moveTo(0, -14); ctx.quadraticCurveTo(10, 2, 0, 9); ctx.quadraticCurveTo(-10, 2, 0, -14); ctx.fill(); ctx.stroke(); break;
     case 'star5': star(0, 0, 16, 7, 5); break;
@@ -1476,7 +1639,7 @@ const Spin = {
   enter() { this.result = null; },
   draw() {
     topBar();
-    RARITY.forEach((s, i) => button(40 + i * 205, 85, 190, 50, s, () => { if (!this.spinning) { this.tab = i; this.result = null; this.pick = null; } }, { on: this.tab === i, size: 28 }));
+    [...RARITY.slice(0, R2), 'ROUND CATS'].forEach((s, i) => button(40 + i * 205, 85, 190, 50, s, () => { if (!this.spinning) { this.tab = i; this.result = null; this.pick = null; } }, { on: this.tab === i, size: 28 }));
     button(40, 650, 160, 50, 'Back', () => { this.spinning = null; go(this.back || Menu); }, { size: 28 });
     if (this.tab === 4) return this.drawSecret();
     if (this.tab === R2) return this.drawRound2();
@@ -1510,14 +1673,16 @@ const Spin = {
     }, { disabled: !can, draw: () => { txt('SPIN', 920, 570, 60); coinIcon(1015, 570, 36); txt(`x ${cost}`, 1040, 572, 34, 'left'); } });
     if (save.coins < cost && !this.spinning) txt('Not enough coins yet. Win levels to earn more.', 970, 650, 24);
   },
-  pick: null,
-  drawRound2() { // Round 4 cats: no wheel, buy the one you want once you have reached Round 4
-    const open = (save.maxRound || 1) >= R2_ROUND, d0 = this.pick;
-    if (!open) txt(`LOCKED: beat Rounds 1, 2 and 3 to reach Round ${R2_ROUND}, then you can buy these cats.`, W / 2, 168, 28);
-    else if (d0) wrapText(`${d0.name}: ${d0.desc}`, W / 2, 158, 1180, 22, 26);
-    else txt('Buy any cat you like. Tap a cat to see what it does.', W / 2, 168, 28, 'center', '#555');
-    CATS.filter(c => c.r === R2).forEach((d, i) => {
-      const x = 40 + (i % 5) * 244, y = 200 + Math.floor(i / 5) * 145, own = save.owned[d.id] || 0;
+  pick: null, shopR: RB,
+  drawRound2() { // round cats: no wheel, buy the one you want once you have reached that round. One tab, a switch picks the round (Jason).
+    const rr = this.shopR, need = SHOP[rr], open = (save.maxRound || 1) >= need, d0 = this.pick;
+    [RB, R2].forEach((k, i) => button(40 + i * 170, 150, 160, 44, `Round ${SHOP[k]}`, () => { this.shopR = k; this.pick = null; }, { on: rr === k, size: 26, lw: 2 }));
+    const tx = 380, tw = 860;
+    if (!open) wrapText(`LOCKED: reach Round ${need} to buy these cats.`, tx + tw / 2, 160, tw, 26, 28);
+    else if (d0) wrapText(`${d0.name}: ${d0.desc}`, tx + tw / 2, 152, tw, 21, 24);
+    else txt('Buy any cat you like. Tap a cat to see what it does.', tx + tw / 2, 172, 26, 'center', '#555');
+    CATS.filter(c => c.r === rr).forEach((d, i) => {
+      const x = 40 + (i % 5) * 244, y = 205 + Math.floor(i / 5) * 145, own = save.owned[d.id] || 0;
       button(x, y, 228, 136, '', () => { this.pick = d; }, { lw: 3, on: d0 === d, draw: () => {
         spr(d.img, x + 62, y + 118, Math.min(100, 100 * 115 / (iw(d.img) * 100 / ih(d.img))));
         txt(d.name, x + 170, y + 26, 24); if (own) txt(`you have ${own}`, x + 170, y + 56, 18, 'center', '#666');
@@ -1545,9 +1710,9 @@ const MyCats = {
   draw() {
     topBar(); txt('MY CATS', W / 2, 40, 44);
     // page 0: the five Round 1 rarities; page 1: Round 4 cats in rows by price
-    const rows = this.page ? [4000, 6000, 10000].map(p => [`$${p}`, CATS.filter(c => c.r === R2 && c.price === p)]) : RARITY.slice(0, R2).map((s, ri) => [s, CATS.filter(c => c.r === ri)]);
-    button(260, 660, 200, 48, 'FIRST CATS', () => { this.page = 0; }, { size: 24, on: !this.page });
-    button(480, 660, 200, 48, 'ROUND 4 CATS', () => { this.page = 1; }, { size: 24, on: !!this.page });
+    const byPrice = (r, ps) => ps.map(p => [`$${p}`, CATS.filter(c => c.r === r && c.price === p)]);
+    const rows = this.page === 2 ? byPrice(R2, [4000, 6000, 10000]) : this.page === 1 ? byPrice(RB, [1500, 2500, 3500]) : RARITY.slice(0, R2).map((s, ri) => [s, CATS.filter(c => c.r === ri)]);
+    ['FIRST CATS', 'ROUND 2 CATS', 'ROUND 4 CATS'].forEach((s, i) => button(260 + i * 220, 660, 200, 48, s, () => { this.page = i; }, { size: 24, on: this.page === i }));
     rows.forEach(([s, list], ri) => {
       const y = 100 + ri * 112; txt(s, 120, y + 52, 26);
       list.forEach((d, i) => {
@@ -1564,7 +1729,7 @@ const MyCats = {
       const d = this.info;
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(0, 0, W, H); hits = [];
       ctx.fillStyle = '#fff'; ctx.fillRect(290, 120, 700, 480); hbox(290, 120, 700, 480, { lw: 4 });
-      txt(d.name, W / 2, 165, 46); txt(`${d.price ? `ROUND ${R2_ROUND} ($${d.price})` : RARITY[d.r]}  -  ${d.row === 'front' ? 'front row (melee)' : 'back row'}  -  ${d.hp} HP  -  you have ${save.owned[d.id]}`, W / 2, 210, 24);
+      txt(d.name, W / 2, 165, 46); txt(`${d.price ? `ROUND ${SHOP[d.r]} ($${d.price})` : RARITY[d.r]}  -  ${d.row === 'front' ? 'front row (melee)' : 'back row'}  -  ${d.hp} HP  -  you have ${save.owned[d.id]}`, W / 2, 210, 24);
       spr(d.img, W / 2, 420, 180); wrapText(d.desc, W / 2, 465, 600, 28, 34);
       button(540, 530, 200, 54, 'Close', () => { this.info = null; }, { size: 30 });
     }
