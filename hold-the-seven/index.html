@@ -68,7 +68,8 @@ const TXT = {
     cleanLine: 'FLAWLESS: 0 cards face down, winnings x2', luckyLine: c => `LUCKY SEVEN: 0 face down and the last card was ${c}, winnings x3`,
     shutLine: n => `SHUTOUT: ${n} played no cards at all, x12!`,
     colPlayer: 'Player', colCards: 'Face-down cards', colPoints: 'Points', colZone: 'Zone', colX: 'x', colScore: 'Score', none: 'none',
-    totalAfter: n => `Match total after Game ${n}:`, share: 'Share', next: 'Next Game', newMatch: 'New Match', menu: 'Menu',
+    totalAfter: n => `Match total after Game ${n}:`, thisGame: 'Your score this game', standings: (n, m) => `Match standings after Game ${n} of ${m}`,
+    ranks: ['1st', '2nd', '3rd', '4th'], ptsDown: n => `${n} points face down`, share: 'Share', next: 'Next Game', newMatch: 'New Match', menu: 'Menu',
     matchOver: 'Match over!', place: p => ['You finished 1st!', 'You finished 2nd.', 'You finished 3rd.', 'You finished 4th.'][p],
     howTitle: 'How to Play', close: 'Close',
     howLines: [
@@ -106,7 +107,8 @@ const TXT = {
     cleanLine: '净手：一张没扣，赢的积分 x2', luckyLine: c => `倒拉七：一张没扣，最后一张是 ${c}，赢的积分 x3`,
     shutLine: n => `关春天：${n}一张牌都没出，x12！`,
     colPlayer: '玩家', colCards: '扣的牌', colPoints: '扣分', colZone: '区', colX: '倍数', colScore: '得分', none: '无',
-    totalAfter: n => `第 ${n} 局后总分：`, share: '分享', next: '下一局', newMatch: '再来一场', menu: '首页',
+    totalAfter: n => `第 ${n} 局后总分：`, thisGame: '你本局得分', standings: (n, m) => `第 ${n} / ${m} 局后本场排名`,
+    ranks: ['第 1', '第 2', '第 3', '第 4'], ptsDown: n => `扣下 ${n} 分`, share: '分享', next: '下一局', newMatch: '再来一场', menu: '首页',
     matchOver: '本场结束！', place: p => ['你得了第 1 名！', '你得了第 2 名。', '你得了第 3 名。', '你得了第 4 名。'][p],
     howTitle: '玩法说明', close: '关闭',
     howLines: [
@@ -661,45 +663,58 @@ function startFly(p, i, x0, y0, w0) {
 }
 
 /* ======================= results ======================= */
+// Result of one game: who won and your score in big type, one column per player sorted by this
+// game's score, and the match standings underneath.
 function drawResult(sc) {
-  const L = TXT[save.lang], R = G.res, names = T('names'), you = R.rows[0];
-  ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
-  box(170, 34, 940, 656, 24, '#fffdf6', '#f1c40f', 5);
-  const wn = R.winners.map(p => names[p]).join(' & ');
-  const head = you.win ? (R.winners.length > 1 ? T('youTie') : T('youWin')) : R.winners.length > 1 ? L.tie(wn) : L.wins(wn);
-  txt(head, W / 2, 84, 56, 'center', you.win ? '#e67e22' : '#2980b9');
-  // bonus lines
-  const lines = [];
-  if (R.lucky) { const w = R.rows.find(r => r.badge === 'LUCKY'); lines.push(['LUCKY', L.luckyLine(cname(w.last))]); }
-  else if (R.clean) lines.push(['FLAWLESS', T('cleanLine')]);
-  R.rows.filter(r => r.shut).forEach(r => lines.push(['SHUTOUT', L.shutLine(names[r.p])]));
-  lines.forEach(([k, s], i) => txt(s, W / 2, 132 + i * 30, 23, 'center', '#333'));
-  const hy = 132 + Math.max(lines.length, 1) * 30;
-  const cols = [210, 360, 625, 712, 852, 930];
-  [T('colPlayer'), T('colCards'), T('colPoints'), T('colZone'), T('colX'), T('colScore')].forEach((s, i) => txt(s, cols[i], hy, 20, 'left', '#888'));
-  const order = [0, 1, 2, 3];
+  const L = TXT[save.lang], R = G.res, names = T('names'), you = R.rows[0], winner = R.winners[0];
+  if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); } // match totals, once
+  ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, 0, W, H); hits = [];
+  box(36, 16, 1208, 690, 26, '#fffdf6', you.win ? '#f1c40f' : '#7fb3d5', 6);
+  const green = '#1e9e55', red = '#d0392b', ink = '#2b2b2b', grey = '#8a8a8a';
+  // headline + your score
+  txt(you.win ? T('youWin') : L.wins(names[winner]), W / 2, 66, 58, 'center', you.win ? '#e67e22' : '#2980b9');
+  txt(T('thisGame'), W / 2, 112, 24, 'center', grey);
+  txt(fmt(you.score), W / 2, 162, 76, 'center', you.score > 0 ? green : you.score < 0 ? red : ink, { bold: true });
+  // bonus chips (FLAWLESS / LUCKY SEVEN / SHUTOUT) next to the big number
+  const chips = [];
+  if (R.lucky) chips.push(['LUCKY', L.luckyLine(cname(R.rows[winner].last))]);
+  else if (R.clean) chips.push(['FLAWLESS', T('cleanLine')]);
+  R.rows.filter(r => r.shut).forEach(r => chips.push(['SHUTOUT', L.shutLine(names[r.p])]));
+  chips.forEach(([k, s], i) => txt(s, W / 2, 212 + i * 26, 22, 'center', k === 'SHUTOUT' ? '#111' : '#b9770e'));
+  // one column per player, best score first
+  const top = 232 + Math.max(0, chips.length - 1) * 26, CWD = 272, GAP = 16, x0 = W / 2 - (4 * CWD + 3 * GAP) / 2, CHT = 250;
+  const order = [0, 1, 2, 3].sort((a, b) => R.rows[b].score - R.rows[a].score || (a === winner ? -1 : b === winner ? 1 : 0));
   order.forEach((p, i) => {
-    const r = R.rows[p], y = hy + 22 + i * 80;
-    box(202, y, 876, 74, 12, r.win ? '#fff3c4' : '#f1ece0');
-    avatar(p, 230, y + 37, 20);
-    txt(names[p], 258, y + 37, 28, 'left', '#333');
-    if (!r.cards.length) txt(T('none'), cols[1] + 4, y + 37, 24, 'left', '#999');
-    const step = r.cards.length > 1 ? Math.min(38, 200 / (r.cards.length - 1)) : 0;
-    r.cards.forEach((c, j) => drawCard(c, cols[1] + j * step, y + 2, 50, 70));
-    txt(String(r.pts), cols[2] + 8, y + 38, 32, 'left', '#333');
-    badge(r.badge, cols[3], y + 37, 17);
-    if (!r.win) txt(r.zx + (R.bonus > 1 ? ' x' + R.bonus : ''), cols[4], y + 38, 24, 'left', '#333');
-    txt(fmt(r.score), cols[5], y + 38, 36, 'left', r.score > 0 ? '#27ae60' : r.score < 0 ? '#c0392b' : '#333');
+    const r = R.rows[p], x = x0 + i * (CWD + GAP), y = top;
+    box(x, y, CWD, CHT, 18, r.win ? '#fff1b8' : p === 0 ? '#e8f6fd' : '#f2eee4', r.win ? '#f1c40f' : p === 0 ? '#7fb3d5' : '#ddd5c4', r.win ? 4 : 2);
+    txt(L.ranks[i], x + 16, y + 24, 22, 'left', grey);
+    if (r.win) txt('👑', x + CWD - 30, y + 26, 30, 'center', '#000', { shadow: false });
+    avatar(p, x + CWD / 2, y + 46, 30);
+    txt(names[p], x + CWD / 2, y + 96, 30, 'center', ink);
+    txt(fmt(r.score), x + CWD / 2, y + 142, 50, 'center', r.score > 0 ? green : r.score < 0 ? red : ink, { bold: true });
+    // the face-down cards, then points, zone and multiplier
+    if (!r.cards.length) txt(T('none'), x + CWD / 2, y + 196, 22, 'center', grey);
+    else {
+      const cw = 38, step = r.cards.length > 1 ? Math.min(cw + 2, (CWD - 24 - cw) / (r.cards.length - 1)) : 0, w = cw + step * (r.cards.length - 1);
+      r.cards.forEach((c, j) => drawCard(c, x + (CWD - w) / 2 + j * step, y + 170, cw, cw * 1.36));
+    }
+    const mult = r.win ? (R.bonus > 1 ? 'x' + R.bonus : '') : 'x' + r.zx + (R.bonus > 1 ? ' x' + R.bonus : '');
+    const bw = textW(T(r.badge), 17) + 18, mw = mult ? textW(mult, 22) + 8 : 0, bx = x + (CWD - bw - mw) / 2;
+    badge(r.badge, bx, y + 233, 17);
+    if (mult) txt(mult, bx + bw + 8, y + 234, 22, 'left', ink);
   });
-  // match totals (added once)
-  if (!R.added) { R.added = true; R.rows.forEach(r => { G.totals[r.p] += r.score; }); }
-  const ty = hy + 22 + 4 * 80 + 22;
-  txt(L.totalAfter(G.n) + ' ' + [0, 1, 2, 3].map(p => `${names[p]} ${fmt(G.totals[p])}`).join(' · '), W / 2, ty, 22, 'center', '#777');
-  const last = G.n >= matchLen();
-  if (last) {
-    const place = [1, 2, 3].filter(p => G.totals[p] > G.totals[0]).length;
-    txt(T('matchOver') + ' ' + T('place')(place), W / 2, ty + 30, 26, 'center', '#e67e22');
-  }
+  // match standings
+  const sy = top + CHT + 18, last = G.n >= matchLen(), byTotal = [0, 1, 2, 3].sort((a, b) => G.totals[b] - G.totals[a]);
+  const place = byTotal.indexOf(0);
+  txt(last ? T('matchOver') + ' ' + T('place')(place) : L.standings(G.n, matchLen()), W / 2, sy + 14, last ? 30 : 24, 'center', last ? '#e67e22' : grey);
+  byTotal.forEach((p, i) => {
+    const x = x0 + i * (CWD + GAP), y = sy + 34, v = G.totals[p];
+    box(x, y, CWD, 52, 26, p === 0 ? '#d6eefa' : '#efe9dc', p === 0 ? '#7fb3d5' : null, 2);
+    txt(L.ranks[i], x + 16, y + 27, 20, 'left', grey);
+    avatar(p, x + 70, y + 26, 18);
+    txt(names[p], x + 96, y + 27, 24, 'left', ink);
+    txt(fmt(v), x + CWD - 16, y + 27, 28, 'right', v > 0 ? green : v < 0 ? red : ink, { bold: true });
+  });
   // picture of the result for the Share button, taken once the panel is drawn
   if (!sc.snapped && window.EmilyShare) {
     sc.snapped = true;
@@ -708,10 +723,10 @@ function drawResult(sc) {
       : `I played HOLD THE SEVEN: ${fmt(you.score)} in Game ${G.n}.`;
     EmilyShare.snap({ canvas: cv, game: 'HOLD THE SEVEN', path: 'hold-the-seven/', text });
   }
-  const by = Math.min(ty + (last ? 50 : 30), 612);
-  if (window.EmilyShare) button(305, by, 210, 68, T('share'), () => EmilyShare.open(), { fill: '#2980b9', size: 32 });
-  button(535, by, 210, 68, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12', size: 32 });
-  button(765, by, 210, 68, T('menu'), () => go(Title), { fill: '#7f8c8d', size: 32 });
+  const by = sy + 100;
+  if (window.EmilyShare) button(305, by, 210, 64, T('share'), () => EmilyShare.open(), { fill: '#2980b9', size: 30 });
+  button(535, by, 210, 64, last ? T('newMatch') : T('next'), nextGame, { fill: '#f39c12', size: 30 });
+  button(765, by, 210, 64, T('menu'), () => go(Title), { fill: '#7f8c8d', size: 30 });
 }
 
 /* ======================= loop ======================= */
