@@ -112,7 +112,7 @@ const CATS = [
   { id: 'queen', name: 'Queen cat', r: RB, price: 1500, row: 'back', hp: 200, img: 'cat_queen', h: 100, desc: 'No attack. While she is standing, all your cats do 30% more damage.' },
   { id: 'fish', name: 'Fish cat', r: RB, price: 2500, row: 'back', hp: 140, img: 'cat_fish', h: 100, desc: 'Water attack: shoots a water blast for 15 damage every 1 s.' },
   { id: 'cloud', name: 'Cloud cat', r: RB, price: 2500, row: 'back', hp: 130, img: 'cat_cloud', h: 100, desc: 'Every 5 s puts a rain cloud over the rats for 5 s: 8 damage a second to every rat under it, and they slow down.' },
-  { id: 'butterfly', name: 'Butterfly cat', r: RB, price: 2500, row: 'back', hp: 160, img: 'cat_butterfly', h: 95, desc: 'No attack. Heals a hurt cat back to full HP, 3 times per battle (when a cat drops below a third of its HP).' },
+  { id: 'butterfly', name: 'Butterfly cat', r: RB, price: 2500, row: 'back', hp: 160, img: 'cat_butterfly', h: 95, desc: 'No attack. 3 full heals per battle: tap a hurt cat, then FULL HEAL to give it all its HP back.' },
   { id: 'blow', name: 'Blow cat', r: RB, price: 3500, row: 'back', hp: 150, img: 'cat_blow', h: 105, desc: 'Sends a tornado every 4 s: 25 damage to every rat it passes and blows them back. Bosses only get pushed a little.' },
   { id: 'tools', name: 'Tools cat', r: RB, price: 3500, row: 'back', hp: 180, img: 'cat_tools', h: 95, desc: 'Long range. Throws a traffic cone (20), a traffic light (30) or a brick (40) at random, every 2 s.' },
   { id: 'wizard', name: 'Wizard cat', r: RB, price: 3500, row: 'back', hp: 170, img: 'cat_wizard', h: 100, desc: 'Magic bolt that jumps between 3 rats: 18, then 12, then 8 damage, every 2 s.' },
@@ -728,18 +728,18 @@ function Battle(lv, ids, slots) {
   const cats = placeTeam(ids, slots).map(p => {
     const d = CAT[p.id];
     return { d, x: p.x, y: p.y, hx: p.x, hy: p.y, col: p.col, hp: d.hp, max: d.hp, cd: 0.4 + Math.random() * 0.8, flash: 0, lunge: 0,
-      dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0, t2: 0, grip: [], tr: null, heals: d.id === 'butterfly' ? 3 : 0 };
+      dead: false, deadT: 0, h: d.h, w: d.h * iw(d.img) / ih(d.img), state: 'idle', t: 0, ph: Math.random() * 6, cloneT: 16, alarm: 0, chew: 0, fly: 0, t2: 0, grip: [], tr: null };
   });
   const minions = L.minions.slice(); for (let i = minions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [minions[i], minions[j]] = [minions[j], minions[i]]; }
   B = { lv, L, mult, dmgMult: Math.pow(1.1, lv - 1), round: save.round || 1, R: r4adj(roundMul(save.round || 1, lv), L), t: 0, cats, rats: [], projs: [], fx: [], floats: [], clouds: [], rainClouds: [], tornados: [], clones: [], queue: minions, queenOn: false, spawnT: 1.2,
-    bosses: L.bosses.slice(), bossesLeft: L.bosses.length, bossOn: false, heals: ids.filter(i => i === 'nurse').length, hadNurse: ids.includes('nurse'),
+    bosses: L.bosses.slice(), bossesLeft: L.bosses.length, bossOn: false, heals: ids.filter(i => i === 'nurse').length, hadNurse: ids.includes('nurse'), fullHeals: 3 * ids.filter(i => i === 'butterfly').length, hadButterfly: ids.includes('butterfly'),
     healSel: null, shield: 0, shieldT: 0, weather: { has: ids.includes('weather'), open: false, cd: { thunder: 0, rain: 0, wind: 0 }, kind: null, t: 0, zap: 0 }, earned: 0, over: null, paused: false, speed: 1, banner: null, silent: false };
   const s = {
     battle: B,
     tap(x, y) {
       if (B.over || B.paused) return;
       const c = B.cats.find(c => !c.dead && x > c.x - c.w / 2 && x < c.x + c.w / 2 && y > c.y - c.h - 10 && y < c.y + 10);
-      B.healSel = c && B.heals > 0 && c.hp < c.max ? c : null;
+      B.healSel = c && (B.heals > 0 || B.fullHeals > 0) && c.hp < c.max ? c : null;
     },
     draw() { drawBattle(); },
   };
@@ -1080,6 +1080,7 @@ function newRatMoves(r, dt) { // returns true when the rat is busy with its move
   return false;
 }
 function lob(r, c, kind, dmg) { // a little thing thrown in an arc from the rat to a cat
+  if (kind === 'poo') return pooShot(r, c, dmg);
   const x0 = r.x - r.w * 0.3, y0 = r.y - (r.flyH || 0) - r.h * 0.7; r.lunge = 0.2;
   if (kind === 'poo') SFX.spit(); else if (kind === 'fireheart') SFX.fire(); else SFX.hatThrow();
   addFx(0.6, (f, q) => { const x = x0 + (c.x - x0) * q, y = y0 + (c.y - c.h * 0.5 - y0) * q - Math.sin(q * Math.PI) * 90;
@@ -1088,11 +1089,24 @@ function lob(r, c, kind, dmg) { // a little thing thrown in an arc from the rat 
     else { ctx.fillStyle = kind === 'poo' ? '#7a5230' : '#bbb'; ctx.beginPath(); ctx.arc(x, y, kind === 'poo' ? 7 : 6, 0, 7); ctx.fill(); ctx.stroke(); } });
   later(0.6, () => { if (!c.dead && !r.dead) { hurtCat(c, dmg); if (kind === 'poo') splat(c.x, c.y - c.h * 0.4); } });
 }
+function poo(x, y, s) { // a little brown poo: three stacked blobs
+  ctx.fillStyle = '#7a5230'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+  for (const [dy, w] of [[0, 1], [-0.75, 0.75], [-1.35, 0.45]]) { ctx.beginPath(); ctx.ellipse(x, y + dy * s, s * w, s * 0.55 * Math.max(w, 0.7), 0, 0, 7); ctx.fill(); ctx.stroke(); }
+}
+function pooShot(r, c, dmg) { // POOP RAT walks backwards, so the poo comes out of its back end straight at a cat
+  const x0 = r.x - r.w * 0.42, y0 = r.y - r.h * 0.45, tx = c.x + 20, ty = c.y - c.h * 0.45, T = Math.max(0.25, Math.hypot(tx - x0, ty - y0) / 900);
+  SFX.spit(); r.lunge = 0.2;
+  addFx(0.18, (f, q) => { ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x0 + 6, y0 - 10 + i * 10); ctx.lineTo(x0 + 6 + 18 + q * 10, y0 - 12 + i * 12); ctx.stroke(); } });
+  addFx(T, (f, q) => { const x = x0 + (tx - x0) * q, y = y0 + (ty - y0) * q - Math.sin(q * Math.PI) * 25; ctx.globalAlpha = 0.5; poo(x + 16, y + 2, 5); ctx.globalAlpha = 1; poo(x, y, 9); });
+  later(T, () => { if (!c.dead && !r.dead) { hurtCat(c, dmg); splat(c.x, c.y - c.h * 0.4); } });
+}
 function splat(x, y) { addFx(0.6, (f, q) => { ctx.globalAlpha = 1 - q; ctx.fillStyle = '#7a5230'; ctx.strokeStyle = INK; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) { const a = i * 1.05, d = 8 + q * 26; ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 5, 0, 7); ctx.fill(); ctx.stroke(); } ctx.globalAlpha = 1; }); }
 function pooRain(r) { // a shower of poo on the back row
   const live = B.cats.filter(alive), back = live.filter(c => c.col === 'back'), cats = back.length ? back : live; if (!cats.length) return;
   warn(r, cats, 0.9, 'POO RAIN!');
-  later(0.9, () => { if (r.dead) return; SFX.smash(); shake(6); cats.forEach(c => { if (c.dead) return; hurtCat(c, r.dmg * 1.5); splat(c.x - 15, c.y - c.h * 0.6); splat(c.x + 15, c.y - c.h * 0.3); }); });
+  later(0.9, () => { if (r.dead) return; // poo falls from the sky onto each cat, then splats
+    addFx(0.35, (f, q) => { for (const c of cats) if (!c.dead) for (const dx of [-22, 0, 22]) poo(c.x + dx, 60 + (c.y - c.h * 0.5 - 60) * q - Math.abs(dx) * 2, 8); });
+    later(0.35, () => { SFX.smash(); shake(6); cats.forEach(c => { if (c.dead) return; hurtCat(c, r.dmg * 1.5); splat(c.x - 15, c.y - c.h * 0.6); splat(c.x + 15, c.y - c.h * 0.3); }); }); });
 }
 function dashAt(r) { // runs straight past the front row and bites a back-row cat
   const live = B.cats.filter(alive), back = live.filter(c => c.col === 'back' && !airborne(c)), t = (back.length ? back : live)[0]; if (!t) return;
@@ -1130,6 +1144,9 @@ function wizardChain(c, first) { // one bolt that jumps from rat to rat
     for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i]; ctx.moveTo(ax, ay); for (let k = 1; k < 5; k++) ctx.lineTo(ax + (bx - ax) * k / 5 + ((k % 2) * 2 - 1) * 9, ay + (by - ay) * k / 5); ctx.lineTo(bx, by); } ctx.stroke(); } });
   pts.slice(1).forEach(([x, y]) => sparks(x, y));
 }
+function sparkleHeal(t) { // Butterfly full heal: stars spin round the cat
+  addFx(0.8, (f, q) => { ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + q * 3, d = 30 + q * 30; star(t.x + Math.cos(a) * d, t.y - t.h * 0.5 + Math.sin(a) * d - q * 30, 8, 3, 4); } });
+}
 function rainCloud(r) { B.rainClouds.push({ x: r.x - 20, y: Math.max(130, r.y - r.h - 190), life: 5, tick: 0.3 }); }
 function updateRainClouds(dt) {
   for (const cl of B.rainClouds) { cl.life -= dt; cl.tick -= dt;
@@ -1142,12 +1159,6 @@ function updateTornados(dt) {
   for (const t of B.tornados) { t.x += 520 * dt;
     for (const r of B.rats) if (targetable(r) && !t.hit.has(r) && Math.abs(r.x - t.x) < 50 && Math.abs(r.y - t.y) < 70) { t.hit.add(r); hurtRat(r, 25); if (!r.frozen && !r.held && !r.liftY) r.x = Math.min(1240, r.x + (r.d.boss && !r.fake ? 50 : 160)); } }
   B.tornados = B.tornados.filter(t => t.x < 1350);
-}
-function butterflyHeal(c) { // full HP for the most hurt cat under a third of its HP
-  const t = B.cats.filter(o => alive(o) && o.hp < o.max / 3).sort((a, b) => a.hp / a.max - b.hp / b.max)[0]; if (!t) return false;
-  t.hp = t.max; c.heals--; float(t.x, t.y - t.h - 40, 'FULL HP!', 30); SFX.heal();
-  addFx(0.8, (f, q) => { ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + q * 3, d = 30 + q * 30; star(t.x + Math.cos(a) * d, t.y - t.h * 0.5 + Math.sin(a) * d - q * 30, 8, 3, 4); } });
-  return true;
 }
 
 function updateCat(c, dt) {
@@ -1215,7 +1226,6 @@ function updateCat(c, dt) {
     case 'tools': if (ready()) { const r = nearestRat(c); if (r) { const kind = ['w_cone', 'w_light', 'w_brick'][Math.floor(Math.random() * 3)];
       shoot(c, r, { from: anchor(c, 0.9, 0.45), speed: 650, dmg: { w_cone: 20, w_light: 30, w_brick: 40 }[kind], kind, spin: true }); SFX.hatThrow(); c.cd = 2; } else c.cd = 0.1; } break;
     case 'wizard': if (ready()) { const r = nearestRat(c); if (r) { wizardChain(c, r); SFX.magic(); c.cd = 2; } else c.cd = 0.1; } break;
-    case 'butterfly': if (c.heals > 0 && ready()) c.cd = butterflyHeal(c) ? 2 : 0.2; break;
   }
 }
 function waterFan(c, r) {
@@ -1462,7 +1472,8 @@ function drawBattle() {
     txt(`${boss.d.name}   ${Math.ceil(boss.hp)} / ${Math.round(boss.max)} hp`, W / 2, 96, 24);
   } else txt(`Rats left: ${ratCount()}`, W / 2, 72, 26);
   if (b.hadNurse) { spr('cat_nurse', 920, 118, 36); txt(`Heals left: ${b.heals}`, 950, 100, 24, 'left'); }
-  if (b.t < 6 && !b.over) txt('Cats fight on their own.  Tap a hurt cat to use a Nurse heal.', W / 2, 700, 24);
+  if (b.hadButterfly) { const yy = b.hadNurse ? 140 : 100; spr('cat_butterfly', 920, yy + 18, 30); txt(`Full heals: ${b.fullHeals}`, 950, yy, 24, 'left'); }
+  if (b.t < 6 && !b.over) txt(`Cats fight on their own.  Tap a hurt cat to use a ${b.hadButterfly && !b.hadNurse ? 'Butterfly' : 'Nurse'} heal.`, W / 2, 700, 24);
 
   // the battlefield shakes after big boss hits
   ctx.save(); if (b.shake > 0) ctx.translate((Math.random() - 0.5) * b.shake, (Math.random() - 0.5) * b.shake);
@@ -1494,9 +1505,13 @@ function drawBattle() {
   ctx.restore();
   if (b.weather.has) drawWeatherUI(b);
 
-  if (b.healSel && !b.healSel.dead && b.heals > 0 && !b.over) {
-    const c = b.healSel, x = c.x - 55, y = c.y - c.h - 78;
-    button(x, y, 110, 44, 'HEAL', () => { c.hp = Math.min(c.max, c.hp + c.max / 2); b.heals--; b.healSel = null; float(c.x, c.y - c.h - 40, '+HP', 30); SFX.heal(); }, { size: 30, lw: 3 });
+  if (b.healSel && !b.healSel.dead && (b.heals > 0 || b.fullHeals > 0) && !b.over) {
+    // Nurse: HEAL gives back half. Butterfly: FULL HEAL fills it up (3 per Butterfly, Jason). Both show when both are left.
+    const c = b.healSel, btns = [];
+    if (b.heals > 0) btns.push(['HEAL', 110, () => { c.hp = Math.min(c.max, c.hp + c.max / 2); b.heals--; float(c.x, c.y - c.h - 40, '+HP', 30); }]);
+    if (b.fullHeals > 0) btns.push(['FULL HEAL', 160, () => { c.hp = c.max; b.fullHeals--; float(c.x, c.y - c.h - 40, 'FULL HP!', 30); sparkleHeal(c); }]);
+    let x = c.x - (btns.reduce((a, t) => a + t[1], 0) + (btns.length - 1) * 10) / 2;
+    for (const [s, w, fn] of btns) { button(x, c.y - c.h - 78, w, 44, s, () => { fn(); b.healSel = null; SFX.heal(); }, { size: s === 'HEAL' ? 30 : 26, lw: 3 }); x += w + 10; }
   }
   if (b.banner) { const a = Math.min(1, b.banner.t * 3, (2.5 - b.banner.t) * 2); ctx.globalAlpha = a; ctx.fillStyle = '#fff'; ctx.fillRect(330, 130, 620, 80); hbox(330, 130, 620, 80, { lw: 4 }); txt(b.banner.s, W / 2, 171, 48); ctx.globalAlpha = 1; }
 
@@ -1574,7 +1589,6 @@ function drawCat(c) {
   if (d.id === 'rizz' && c.state === 'stare' && c.tr) { const hx = c.tr.x, hy = c.tr.y - c.tr.h - 26 - (b.t * 20 % 16); heart(hx, hy, 9); }
   if (b.shield > 0) { ctx.setLineDash([8, 6]); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y - c.h * 0.5, c.w * 0.6, c.h * 0.65, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
   hpBar(c.x, y - c.h - 16, c.hp / c.max, 64, 8);
-  if (d.id === 'butterfly') { heart(c.x + 46, y - c.h - 14, 8); txt(`${c.heals}`, c.x + 62, y - c.h - 14, 20, 'left'); }
   if (d.id === 'queen') txt('+30%', c.x, y - c.h - 36, 20);
   if (b.healSel === c) { ctx.setLineDash([6, 6]); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(c.x, c.y + 2, c.w * 0.45, 12, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
 }
@@ -1760,7 +1774,7 @@ window.__meow = {
   sim(lv, ids, maxT = 400, round) { // run a whole battle without drawing; returns the result
     const keep = save.coins, keepC = save.cleared, keepR = save.round; if (round) save.round = round; const s = Battle(lv, ids); B.silent = true; let t = 0;
     while (!B.over && t < maxT) { // the player taps a Nurse heal on any cat under 30%
-      if (B.heals > 0) { const c = B.cats.find(c => alive(c) && c.hp < c.max * 0.3); if (c) { c.hp = Math.min(c.max, c.hp + c.max / 2); B.heals--; } }
+      if (B.heals > 0 || B.fullHeals > 0) { const c = B.cats.find(c => alive(c) && c.hp < c.max * 0.3); if (c) { if (B.fullHeals > 0) { c.hp = c.max; B.fullHeals--; } else { c.hp = Math.min(c.max, c.hp + c.max / 2); B.heals--; } } }
       if (B.weather.has && !B.weather.kind && B.rats.some(targetable)) { const k = ['thunder', 'rain', 'wind'].find(k => B.weather.cd[k] <= 0); if (k && B.cats.some(c => alive(c) && c.d.id === 'weather')) useWeather(k); }
       updateBattle(STEP); t += STEP;
     }
