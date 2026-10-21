@@ -54,6 +54,7 @@ const TXT = {
   en: {
     title: 'HOLD THE SEVEN', tagline: "Build the suits from the 7s. Block your rivals. Don't get stuck!",
     bots: 'Bots:', games: 'Games per match:', easy: 'Easy', normal: 'Normal', hard: 'Hard', play: 'PLAY', how: 'How to Play', language: 'Language',
+    menuBtn: 'Menu', resume: 'Back to game', quit: 'Quit to menu', quitNote: 'Quitting ends this match.', hubHome: 'EmilyGames home',
     home: 'Home', full: 'Full screen', exitFull: 'Exit full screen', sound: 'Sound', on: 'On', off: 'Off',
     gameOf: (n, m) => `Game ${n} / ${m}`, yourTotal: 'Your total', you: 'You', names: ['You', 'Foxy', 'Rex', 'Panda'],
     cardsLeft: n => `${n} card${n === 1 ? '' : 's'}`, faceDown: n => `${n} face down`, yourPoints: 'Your points:',
@@ -91,6 +92,7 @@ const TXT = {
   zh: {
     title: '憋七', tagline: '从 7 开始往两边接龙，堵住对手，别被憋住！',
     bots: '机器人：', games: '每场局数：', easy: '简单', normal: '普通', hard: '困难', play: '开始', how: '玩法说明', language: 'Language',
+    menuBtn: '菜单', resume: '继续游戏', quit: '退出到菜单', quitNote: '退出后这一场就结束了。', hubHome: '游戏大厅',
     home: '首页', full: '全屏', exitFull: '退出全屏', sound: '声音', on: '开', off: '关',
     gameOf: (n, m) => `第 ${n} / ${m} 局`, yourTotal: '你的总分', you: '你', names: ['你', '狐狸', '小狗', '熊猫'],
     cardsLeft: n => `${n} 张牌`, faceDown: n => `扣了 ${n} 张`, yourPoints: '你的扣分：',
@@ -398,8 +400,9 @@ function setLang(l) {
 }
 
 // Buttons and cards are big because on a phone the whole 1280x720 table shrinks to about half size.
-function topBar() {
-  button(14, 10, 150, 72, '⌂ ' + T('home'), () => { location.href = '../index.html'; }, { fill: 'rgba(0,0,0,.3)', size: 32 });
+function topBar(o = {}) {
+  if (o.menu) button(14, 10, 150, 72, '☰ ' + T('menuBtn'), o.menu, { fill: 'rgba(0,0,0,.3)', size: 32 });
+  else button(14, 10, 150, 72, '⌂ ' + T('home'), () => { location.href = '../index.html'; }, { fill: 'rgba(0,0,0,.3)', size: 32 });
   if (!standalone) button(W - 14 - 190, 10, 190, 72, '⛶ ' + (fsOn() ? T('exitFull') : T('full')), toggleFullscreen, { fill: 'rgba(0,0,0,.3)', size: fsOn() ? 26 : 30 });
 }
 function felt() {
@@ -470,7 +473,7 @@ function howPanel(close) {
 }
 
 /* ======================= match + game screen ======================= */
-let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultAt = 0, howInGame = false;
+let G = null, msg = '', fly = null, botAt = 0, sel = -1, handRects = [], resultAt = 0, howInGame = false, menuOpen = false;
 const BOT_WAIT = 750, FLY_MS = 320;
 function startMatch() { G = newGame(null, 1); go(Play); }
 const matchLen = () => G.games || 5;
@@ -488,17 +491,18 @@ const SEAT = [[640, 600], [228, 49], [523, 49], [818, 49]]; // where each player
 
 const Play = {
   enter() {
-    sel = -1; fly = null; resultAt = 0; howInGame = false; this.snapped = false;
+    sel = -1; fly = null; resultAt = 0; howInGame = false; menuOpen = false; this.snapped = false;
     msg = G.turn === 0 ? '' : TXT[save.lang].starts(T('names')[G.turn]); botAt = performance.now() + BOT_WAIT + 500;
   },
   draw(t) {
     felt();
-    topBar();
+    topBar({ menu: () => { menuOpen = true; sel = -1; } });
     drawBoard();
     drawBots();
     drawYou();
     // bots move on a timer; the flying card finishes each move
     if (fly && t >= fly.t0 + FLY_MS) { const f = fly; fly = null; f.done(); }
+    if (menuOpen) botAt = Math.max(botAt, t + 400); // bots wait while the menu is open
     if (!fly && !G.over && G.turn !== 0 && t >= botAt) botMove(t);
     if (fly) {
       const k = Math.min(1, (t - fly.t0) / FLY_MS), e = 1 - (1 - k) * (1 - k);
@@ -510,8 +514,10 @@ const Play = {
       if (t - resultAt > 700) drawResult(this);
     }
     if (howInGame) howPanel(() => { howInGame = false; });
+    if (menuOpen) gameMenu();
   },
   tap(x, y) {
+    if (menuOpen) { menuOpen = false; return; }
     if (G.over || G.turn !== 0 || fly) return;
     for (let i = handRects.length - 1; i >= 0; i--) {
       const r = handRects[i];
@@ -563,6 +569,16 @@ function drawBoard() {
       }
     }
   }
+}
+// In-game menu: back to the game, quit this match to the title screen, or go to the EmilyGames home page.
+function gameMenu() {
+  ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(0, 0, W, H); hits = [];
+  box(390, 130, 500, 460, 24, '#fffdf6', '#f1c40f', 5);
+  txt(T('menuBtn'), W / 2, 185, 46, 'center', '#e67e22');
+  button(450, 230, 380, 80, T('resume'), () => { menuOpen = false; }, { fill: '#27ae60', size: 34 });
+  button(450, 330, 380, 80, T('quit'), () => go(Title), { fill: '#f39c12', size: 34 });
+  txt(T('quitNote'), W / 2, 432, 22, 'center', '#777');
+  button(450, 470, 380, 80, '⌂ ' + T('hubHome'), () => { location.href = '../index.html'; }, { fill: '#7f8c8d', size: 32 });
 }
 function drawBots() {
   const names = T('names'), L = TXT[save.lang];
