@@ -33,6 +33,7 @@
   .mc:active { background: #7a7a7a; box-shadow: inset 3px 3px 0 #5a5a5a, inset -3px -3px 0 #b5b5b5; }
   #home { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
   #fsBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+  #tiltBtn { bottom: max(8px, env(safe-area-inset-bottom)); left: max(8px, env(safe-area-inset-left)); font-size: 11px; padding: 7px 8px; }
   #soundBtn { bottom: max(8px, env(safe-area-inset-bottom)); right: max(8px, env(safe-area-inset-right)); font-size: 11px; padding: 7px 8px; }
   /* while running only the game shows; menu buttons come back on the title, pause and game over screens */
   body.playing .menu { display: none !important; }
@@ -58,6 +59,7 @@
 <div id="wrap"><canvas id="game"></canvas></div>
 <a id="home" class="mc menu" href="../">&#9664; GAMES</a>
 <button id="soundBtn" class="mc menu">SOUND ON</button>
+<button id="tiltBtn" class="mc menu hidden">TILT ON</button>
 <button id="fsBtn" class="mc menu">FULL SCREEN</button>
 <div id="rotateHint" class="menu">Hold your phone upright<br>to see the whole park!</div>
 <div id="endBtns" class="hidden withSound">
@@ -104,6 +106,10 @@ const CONFIG = {
   jumpBuffer: 0.12,         // s  a swipe up this long before landing still jumps on landing
   graceY: 0.06,             // m  you only hit things you are this much inside of (grazing is safe)
 
+  // --- tilt steering (phones and iPads) ---
+  tiltAngle: 12,            // degrees [8-20] tilt this far from level to go to a side lane
+  tiltHysteresis: 5,        // degrees  come back this much past the line before going back to the middle (stops flicker)
+
   // --- obstacles ---
   spawnAhead: 46,           // m  how far ahead the park is built (fog hides the far end)
   firstRow: 28,             // m  first obstacle row
@@ -119,7 +125,8 @@ const CONFIG = {
   // --- the magpie ---
   invulnTime: 1.6,          // s  safe time after a hit
   magpieForget: 9,          // s  after this long without another hit the magpie drops back
-  hitsToCatch: 2,           // hits in a row (before it forgets) and you are caught
+  hitsToCatch: 2,
+  caughtTime: 3.6,          // s  the funny chase after you are caught, before the score screen (tap to skip)           // hits in a row (before it forgets) and you are caught
 
   // --- gold and points ---
   coinChance: 0.6,          // chance each gap between rows has a line of gold blocks
@@ -673,7 +680,18 @@ function runnerBack(frame, pose) {
   px(x, 'a', 0, 3, 14, 1); px(x, 'A', 0, 4, 14, 1); px(x, 'a', 4, 0, 6, 3); px(x, 'A', 4, 2, 6, 1);   // bush hat
   return c;
 }
-const RUNNER = { run: [runnerBack(0), runnerBack(1)], jump: runnerBack(0, 'jump'), roll: runnerBack(0, 'roll') };
+// caught: hat knocked off, arms waving over the head
+function runnerFlail(f) {
+  const [c, x] = makeCanvas(14, 34), lift = f ? 3 : 0;
+  px(x, 'p', 3, 22, 4, 10 - lift); px(x, 'S', 3, 32 - lift, 4, 2); px(x, 'p', 7, 22, 4, 10 - (3 - lift)); px(x, 'S', 7, 32 - (3 - lift), 4, 2); px(x, 'P', 6, 22, 2, 6);
+  px(x, 'c', 3, 12, 8, 10); px(x, 'C', 3, 20, 8, 2); px(x, 'C', 6, 13, 2, 7);
+  if (f) { px(x, 'c', 1, 11, 2, 2); px(x, 'n', 0, 4, 2, 7); px(x, 'c', 11, 11, 2, 2); px(x, 'n', 12, 2, 2, 9); }
+  else { px(x, 'c', 1, 11, 2, 2); px(x, 'n', 0, 2, 2, 9); px(x, 'c', 11, 11, 2, 2); px(x, 'n', 12, 4, 2, 7); }
+  px(x, 'h', 3, 3, 8, 8); px(x, 'h', 4, 2, 6, 1); px(x, 'h', 5 + f, 1, 2, 1); px(x, 'n', 3, 11, 8, 1); px(x, 'N', 2, 7, 1, 2); px(x, 'N', 11, 7, 1, 2);
+  return c;
+}
+const HAT = tex(14, 5, x => { px(x, 'a', 4, 0, 6, 3); px(x, 'A', 4, 2, 6, 1); px(x, 'a', 0, 3, 14, 1); px(x, 'A', 0, 4, 14, 1); });
+const RUNNER = { run: [runnerBack(0), runnerBack(1)], jump: runnerBack(0, 'jump'), roll: runnerBack(0, 'roll'), flail: [runnerFlail(0), runnerFlail(1)] };
 // swooping magpie, wings spread (frame 0) or down (frame 1), red eyes, coming at you
 function magpieBig(f) {
   const [c, x] = makeCanvas(26, 14);
@@ -762,7 +780,7 @@ function drawObstacle(o, z) {
 // SAVED RECORDS (localStorage). Every read and write is wrapped in
 // try/catch, so a private window or broken data never stops the game.
 // =====================================================================
-const STORE = { best: 'magpie_best_score', top: 'magpie_top_scores', seen: 'magpie_animals_seen', sound: 'magpie_sound' };
+const STORE = { best: 'magpie_best_score', top: 'magpie_top_scores', seen: 'magpie_animals_seen', sound: 'magpie_sound', tilt: 'magpie_tilt' };
 function loadJSON(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; } catch (e) { return fallback; }
 }
@@ -775,6 +793,7 @@ let seen = loadJSON(STORE.seen, []);                  // field guide: animal ids
 if (!Array.isArray(seen)) seen = [];
 seen = seen.filter(id => ANIMALS[id]);
 let soundOn = loadJSON(STORE.sound, true) !== false;
+let tiltOn = loadJSON(STORE.tilt, true) !== false;   // tilt to steer on phones and iPads (when the device has a motion sensor)
 
 // add this run to the Top 5. Equal scores keep the older one first, so the list never jumps around.
 function recordRun(score) {
@@ -966,7 +985,7 @@ function act(a) {
   if (state !== 'play') return;
   if (a === 'left') moveLane(-1); else if (a === 'right') moveLane(1); else if (a === 'up') jump(); else if (a === 'down') roll();
 }
-function start() { audio(); newRun(); state = 'play'; showEnd(false); setPlaying(true); SFX.magpie(); markSeenSoon = 0.4; }
+function start() { audio(); newRun(); tilt.center = null; state = 'play'; showEnd(false); setPlaying(true); SFX.magpie(); markSeenSoon = 0.4; }
 let markSeenSoon = 0;
 function pause() { if (state !== 'play') return; state = 'pause'; setPlaying(false); }
 function resume() { if (state !== 'pause') return; state = 'play'; setPlaying(true); last = 0; }
@@ -981,11 +1000,12 @@ function update(dt) {
   if (state === 'pause') return;
   if (state === 'dead') {
     G.deadT += dt; G.speed = Math.max(0, G.speed - 30 * dt); G.z += G.speed * dt; G.shake = Math.max(0, G.shake - dt);
-    G.magT = 1; scrollWorld(); updateFx(dt); return;
+    G.magT = 1; scrollWorld(); updateCaught(dt); updateFx(dt); return;
   }
   const p = G.p;
   G.time += dt;
   if (markSeenSoon > 0 && (markSeenSoon -= dt) <= 0) markSeen('magpie');
+  updateTilt();
   G.speed = Math.min(CONFIG.maxSpeed, CONFIG.baseSpeed + G.z * CONFIG.speedRamp);
   const dz = G.speed * dt;
   G.z += dz; G.cleanDist += dz;
@@ -1078,8 +1098,33 @@ function hitThing(h) {
   else { banner('WATCH OUT! THE MAGPIE!', '#ff6a5a'); setTimeout(() => state === 'play' && SFX.magpie(), 150); }
 }
 function caught() {
-  state = 'dead'; G.deadT = 0; G.result = recordRun(G.score); setPlaying(false);
-  SFX.clack(); SFX.over();
+  state = 'dead'; G.deadT = 0; G.result = recordRun(G.score);
+  G.dp = { x: G.p.x, y: G.p.y, z: RUNNER_Z }; G.peckT = 0.55; G.say = null;
+  G.hat = { x: G.p.x, y: G.p.y + 1.45, z: G.z + RUNNER_Z, vx: rnd(-1.5, 1.5), vy: 0, out: false };
+  SFX.clack(); SFX.magpie();
+}
+// The funny bit after you are caught: the magpie knocks your hat off and pecks your head
+// while you run around in circles waving your arms, then you flee down the path.
+const SAYS = ['OUCH!', 'SHOO!', 'NOT THE HAT!', 'HELP!', 'OW OW OW!', 'GO AWAY!'];
+function updateCaught(dt) {
+  const t = G.deadT, d = G.dp, T = CONFIG.caughtTime;
+  if (t < 0.5) return;
+  const run = Math.max(0, t - (T - 1.2));                       // last 1.2 s: flee down the path
+  d.x = Math.max(-1.25, Math.min(1.25, G.p.x * Math.max(0, 1 - (t - 0.5) * 2) + Math.sin((t - 0.5) * 5) * 0.9));
+  d.y = Math.abs(Math.sin(t * 11)) * 0.18;
+  d.z = RUNNER_Z + run * run * 4;
+  const h = G.hat;
+  if (!h.out) { h.out = true; h.vy = 7; h.x = d.x; SFX.jump(); }
+  if (h.y > 0) { h.vy -= 22 * dt; h.y = Math.max(0, h.y + h.vy * dt); h.x += h.vx * dt; }
+  if (t >= G.peckT && t < T - 0.2) {                             // peck!
+    G.peckT = t + rnd(0.28, 0.42); SFX.clack();
+    if (Math.random() < 0.3) beep(900, 1400, 0.1, 0.05, 'triangle');   // yelp
+    const [hx, hy] = proj(d.x, d.y + 1.4, d.z);
+    for (let i = 0; i < 3; i++) G.particles.push({ x: hx + rnd(-6, 6), y: hy + rnd(-8, 0), vx: rnd(-50, 50), vy: rnd(-80, -20), life: 0.7, col: pick(['#1b1b20', '#f4f4f4', '#f4f4f4']) });
+    if (!G.say || Math.random() < 0.45) G.say = { s: pick(SAYS.filter(x => !G.say || x !== G.say.s)), t };
+    G.peck = t;
+  }
+  if (Math.floor((t - dt) / 1.3) !== Math.floor(t / 1.3)) SFX.magpie();
 }
 function scrollWorld() {
   CAMZ = G.z;
@@ -1186,7 +1231,8 @@ function drawWorld() {
   }
   for (const f of G.flowers) { const z = f.z - CAMZ; if (z < 0.8 || z > 46) continue;
     list.push({ k: z, f: () => bill(FLOWER_BIG, f.lane, z, f.y + Math.sin(G.time * 4) * 0.05, 2.2) }); }
-  list.push({ k: pzRel, f: drawRunner });
+  list.push({ k: state === 'dead' && G.dp && G.deadT >= 0.5 ? G.dp.z : pzRel, f: drawRunner });
+  if (G.hat && G.hat.out) list.push({ k: G.hat.z - CAMZ, f: drawHat });
   list.sort((a, b) => b.k - a.k);
   for (const t of list) t.f();
 }
@@ -1199,14 +1245,33 @@ function drawRunner() {
   if (state === 'title') img = RUNNER.run[Math.floor(p.anim) % 2];
   if (!p.onGround && state !== 'title') img = RUNNER.jump;
   if (p.roll > 0 || p.airRoll) img = RUNNER.roll;
-  if (dead) img = RUNNER.jump;
-  const s = FOC / RUNNER_Z / 24 * 0.95;
-  const [sx, sy] = proj(p.x, p.y, RUNNER_Z), [gx, gy] = proj(p.x, p.ground, RUNNER_Z);
+  let X = p.x, Y = p.y, Z = RUNNER_Z, GY = p.ground;
+  if (dead) {
+    img = G.deadT < 0.5 ? RUNNER.jump : RUNNER.flail[Math.floor(G.deadT * 10) % 2];
+    if (G.deadT >= 0.5) { X = G.dp.x; Y = G.dp.y; Z = G.dp.z; GY = 0; }
+  }
+  const s = FOC / Z / 24 * 0.95;
+  const [sx, sy] = proj(X, Y, Z), [gx, gy] = proj(X, GY, Z);
   ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; const shw = Math.round(14 * s / 2.4 * Math.max(0.5, 1 - (p.y - p.ground) * 0.3));
   ctx.fillRect(Math.round(gx - shw / 2), Math.round(gy - 2), shw, 3); ctx.globalAlpha = 1;
   const w = Math.round(img.width * s), h = Math.round(img.height * s);
-  const lean = (p.lane - p.x) * 6;
+  const lean = dead ? 0 : (p.lane - p.x) * 6;
   ctx.drawImage(img, Math.round(sx - w / 2 + lean), Math.round(sy - h), w, h);
+}
+// the knocked-off hat, lying on the path behind you
+function drawHat() {
+  const h = G.hat; if (!h || !h.out) return;
+  const z = h.z - CAMZ; if (z < 0.8) return;
+  bill(HAT, h.x, z, h.y, 0.95);
+}
+// a white speech bubble over your head while the magpie pecks
+function drawSay() {
+  if (state !== 'dead' || !G.say || G.deadT > CONFIG.caughtTime - 0.15 || G.deadT - G.say.t > 0.9) return;
+  const d = G.dp, [hx, hy] = proj(d.x, d.y + 1.5, d.z), s = G.say.s, w = textWidth(s) + 8;
+  const x = Math.max(2, Math.min(W - w - 2, Math.round(hx - w / 2 + 24))), y = Math.max(46, Math.round(hy - 58));
+  px(ctx, '#1b1b20', x - 1, y - 1, w + 2, 13); px(ctx, '#ffffff', x, y, w, 11);
+  px(ctx, '#1b1b20', Math.max(x + 2, Math.min(x + w - 6, Math.round(hx))), y + 11, 3, 3);
+  drawText(ctx, s, x + 4, y + 2, '#1b1b20', 1, 'left', null);
 }
 // the magpie: right behind you after a hit (and at the start), dropping back when it forgets you
 function drawMagpie() {
@@ -1214,6 +1279,13 @@ function drawMagpie() {
   const p = G.p, [rx, ry] = proj(p.x, p.y, RUNNER_Z), s = Math.max(2, Math.round(FOC / RUNNER_Z / 24));
   const img = MAGPIE[Math.floor(G.time * 7 + (state === 'dead' ? G.deadT * 8 : 0)) % 2];
   let x, y;
+  if (state === 'dead' && G.deadT >= 0.5) {   // hovering over your head, pecking
+    const d = G.dp, k = Math.max(1, Math.round(FOC / d.z / 24)), [hx, hy] = proj(d.x, d.y + 1.42, d.z);
+    const peck = G.peck && G.deadT - G.peck < 0.1 ? 4 * k : 0;
+    const fl = MAGPIE[Math.floor(G.deadT * 14) % 2];
+    ctx.drawImage(fl, Math.round(hx - fl.width * k / 2 + Math.sin(G.deadT * 7) * 3 * k), Math.round(hy - fl.height * k * 0.6 + peck), fl.width * k, fl.height * k);
+    return;
+  }
   if (state === 'dead') {   // swoops onto your hat
     const t = Math.min(1, G.deadT / 0.5);
     x = rx - img.width * s / 2 + (1 - t) * -60; y = ry - 34 * s * 0.95 - img.height * s * 0.6 + (1 - t) * 40;
@@ -1234,7 +1306,9 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 const PAUSE_BTN = { x: 6, y: 25, w: 15, h: 15 };
 function drawHud() {
   if (state === 'title') { drawTitle(); return; }
-  if (state === 'dead' && G.deadT > 0.9) { drawGameOver(); return; }
+  if (state === 'dead' && G.deadT > CONFIG.caughtTime) { drawGameOver(); return; }
+  if (state === 'dead') { for (const q of G.particles) px(ctx, q.col, Math.round(q.x), Math.round(q.y), 2, 2);
+    if (G.deadT > 0.5) drawText(ctx, 'CAUGHT!', W / 2, 52, '#ff5a4a', 3, 'center', '#3a0a00'); return; }
   // gold and pause (top left), score and multiplier (top right)
   panel(6, 6, 50, 14); ctx.drawImage(SPR.coin, 9, 9); drawText(ctx, G.coins, 21, 10, '#1b1b20', 1, 'left', null);
   panel(PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h); px(ctx, '#1b1b20', 10, 29, 2, 7); px(ctx, '#1b1b20', 15, 29, 2, 7);
@@ -1248,7 +1322,7 @@ function drawHud() {
   }
   if (state === 'play' && G.time < 3.2) {
     drawText(ctx, 'RUN!', W / 2, 70, '#ffffff', 3, 'center');
-    drawText(ctx, isTouch ? 'SWIPE TO DODGE' : 'ARROWS OR WASD', W / 2, 96, '#ffffff', 1, 'center');
+    drawText(ctx, tiltActive() ? 'TILT TO DODGE' : isTouch ? 'SWIPE TO DODGE' : 'ARROWS OR WASD', W / 2, 96, '#ffffff', 1, 'center');
   }
   G.banners.forEach((b, i) => drawText(ctx, b.s, W / 2, 58 + i * 11 - Math.min(4, b.t * 20), b.col, 1, 'center', '#3a2a00'));
   for (const q of G.particles) px(ctx, q.col, Math.round(q.x), Math.round(q.y), 2, 2);
@@ -1264,7 +1338,7 @@ function drawTitle() {
   ctx.globalAlpha = 0.45; px(ctx, '#000000', 0, y0 + 66, W, 112); ctx.globalAlpha = 1;
   drawText(ctx, 'MAGPIE', W / 2, y0, '#ffffff', 4, 'center', '#1b1b20');
   drawText(ctx, 'DASH', W / 2, y0 + 32, '#f2c230', 4, 'center', '#4a2f1c');
-  const L = isTouch
+  const L = tiltActive() ? ['TILT LEFT / RIGHT = CHANGE LANE', 'SWIPE UP = JUMP   DOWN = ROLL'] : isTouch
     ? ['SWIPE LEFT / RIGHT = CHANGE LANE', 'SWIPE UP = JUMP   DOWN = ROLL']
     : ['ARROWS OR WASD TO MOVE', 'UP = JUMP   DOWN = ROLL'];
   const lines = [...L, '', 'JUMP BENCHES AND BINS', 'ROLL UNDER THE RED BARS', 'DODGE UTES OR RUN ON THE MULCH', '2 HITS AND THE MAGPIE GETS YOU!'];
@@ -1296,7 +1370,7 @@ function drawGameOver() {
     drawText(ctx, e ? pad(e.s, 7) : '      -', x + pw - 12, yy, mine ? '#1b1b20' : '#555555', 1, 'right', null);
   }
   if (G.newAnimals.length) drawText(ctx, G.newAnimals.length === 1 ? 'NEW ANIMAL: ' + ANIMALS[G.newAnimals[0]] : 'NEW ANIMALS +' + G.newAnimals.length, W / 2, y + 82, '#d8ffd0', 1, 'center');
-  if (G.deadT > 1.2 && !isTouch) drawText(ctx, 'SPACE TO RUN AGAIN', W / 2, y + 96, '#ffffff', 1, 'center');
+  if (G.deadT > CONFIG.caughtTime + 0.3 && !isTouch) drawText(ctx, 'SPACE TO RUN AGAIN', W / 2, y + 96, '#ffffff', 1, 'center');
 }
 let fps = 60;
 function drawDebug() {
@@ -1310,7 +1384,7 @@ function draw() {
   ctx.imageSmoothingEnabled = false; mx = ctx;
   ctx.save();
   if (G.shake > 0) ctx.translate(Math.round(rnd(-2, 2)), Math.round(rnd(-2, 2)));
-  drawSky(); drawGround(); drawWorld(); drawMagpie();
+  drawSky(); drawGround(); drawWorld(); drawMagpie(); drawSay();
   ctx.restore();
   if (!window.__noHud) drawHud();
 }
@@ -1326,7 +1400,7 @@ function frame(now) {
   acc += dt;
   while (acc >= CONFIG.fixedStep) { update(CONFIG.fixedStep); acc -= CONFIG.fixedStep; }
   draw();
-  if (state === 'dead' && G.deadT > 1 && !G.endShown) { G.endShown = true; showEnd(true); }
+  if (state === 'dead' && G.deadT > CONFIG.caughtTime + 0.1 && !G.endShown) { G.endShown = true; SFX.over(); setPlaying(false); showEnd(true); }
   requestAnimationFrame(frame);
 }
 
@@ -1361,7 +1435,7 @@ function setPlaying(on) { document.body.classList.toggle('playing', on); }
 const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down' };
 window.addEventListener('keydown', e => {
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); if (state === 'play') pause(); else if (state === 'pause') resume(); return; }
-  if ((e.code === 'Space' || e.code === 'Enter') && state === 'dead' && G.deadT > 1.2) { e.preventDefault(); start(); return; }
+  if ((e.code === 'Space' || e.code === 'Enter') && state === 'dead') { e.preventDefault(); if (G.deadT > CONFIG.caughtTime + 0.3) start(); else if (G.deadT > 0.6) G.deadT = CONFIG.caughtTime; return; }
   const a = KEYMAP[e.code] || (e.code === 'Enter' ? 'up' : null);
   if (a) { e.preventDefault(); if (!e.repeat) { audio(); act(a); } }
 });
@@ -1375,6 +1449,7 @@ function onDown(e) {
   if (isTouch && !triedFs) { triedFs = true; goFull(); }
   if (state === 'title') { start(); return; }
   if (state === 'pause') { resume(); return; }
+  if (state === 'dead' && G.deadT > 0.6 && G.deadT < CONFIG.caughtTime) { G.deadT = CONFIG.caughtTime; return; }   // tap skips the chase
   if (state !== 'play') return;
   const [cx, cy] = toCanvas(e), b = PAUSE_BTN;
   if (cx > b.x - 6 && cx < b.x + b.w + 10 && cy > b.y - 6 && cy < b.y + b.h + 10) { pause(); return; }
@@ -1384,8 +1459,10 @@ function onMove(e) {
   if (!swipe || swipe.done) return;
   const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
+  const horiz = Math.abs(dx) > Math.abs(dy);
+  if (horiz && tiltActive()) return;           // with tilt steering, left and right come from tilting only
   swipe.done = true;
-  act(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  act(horiz ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
 }
 document.addEventListener('pointerdown', onDown, { passive: false });
 document.addEventListener('pointermove', onMove);
@@ -1395,6 +1472,49 @@ document.addEventListener('touchmove', e => e.preventDefault(), { passive: false
 document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+// ---------- TILT STEERING (phones and iPads with a motion sensor) ----------
+// Tilt the device left or right past tiltAngle and the runner goes to that lane; hold it level for the middle.
+// The level position is taken when a run starts, so any comfortable way of holding the device works.
+// Jump and roll stay on swipes. iPhone and iPad ask for permission to use motion on the first tap.
+const tilt = { value: 0, center: null, lastT: -9, lane: 0, asked: false };
+const tiltSupported = isTouch && 'DeviceOrientationEvent' in window;
+function tiltActive() { return tiltSupported && tiltOn && performance.now() - tilt.lastT < 600; }
+function askTilt() {   // iOS needs a tap before it sends motion
+  if (!tiltSupported || tilt.asked || !tiltOn) return;
+  const D = window.DeviceOrientationEvent;
+  if (typeof D.requestPermission === 'function') {
+    D.requestPermission().then(r => { tilt.asked = true; if (r !== 'granted') { tiltOn = false; showTilt(); } }).catch(() => {});
+  } else tilt.asked = true;
+}
+window.addEventListener('deviceorientation', e => {
+  if (e.gamma == null) return;
+  const ang = (screen.orientation && screen.orientation.angle != null ? screen.orientation.angle : window.orientation || 0) | 0;
+  // left/right tilt in the way the screen is turned
+  let v = e.gamma;
+  if (ang === 90) v = e.beta; else if (ang === -90 || ang === 270) v = -e.beta; else if (ang === 180) v = -e.gamma;
+  tilt.value = v; tilt.lastT = performance.now();
+});
+function updateTilt() {
+  if (state !== 'play' || !tiltActive()) return;
+  if (tilt.center == null) { tilt.center = tilt.value; tilt.lane = 0; }
+  const a = tilt.value - tilt.center, T = CONFIG.tiltAngle, back = T - CONFIG.tiltHysteresis;
+  let want = tilt.lane;
+  if (a > T) want = 1; else if (a < -T) want = -1;
+  else if ((tilt.lane === 1 && a < back) || (tilt.lane === -1 && a > -back)) want = 0;
+  if (want === tilt.lane) return;
+  tilt.lane = want;
+  // move one lane at a time towards where the device points (a ute side can still bump you back)
+  const p = G.p;
+  if (want > p.lane) { moveLane(1); if (want > p.lane) moveLane(1); }
+  else if (want < p.lane) { moveLane(-1); if (want < p.lane) moveLane(-1); }
+}
+const tiltBtn = document.getElementById('tiltBtn');
+function showTilt() { tiltBtn.textContent = tiltOn ? 'TILT ON' : 'TILT OFF'; tiltBtn.classList.toggle('hidden', !tiltSupported); }
+tiltBtn.addEventListener('click', () => { tiltOn = !tiltOn; saveJSON(STORE.tilt, tiltOn); if (tiltOn) { tilt.asked = false; askTilt(); } showTilt(); });
+showTilt();
+document.addEventListener('touchend', askTilt);
+document.addEventListener('click', askTilt);
 
 // ---------- full screen (Android, iPad, computers); iPhone gets Add to Home Screen steps ----------
 const fsHelp = document.getElementById('fsHelp');
@@ -1450,7 +1570,7 @@ const HARD_PRESET = { baseSpeed: 11, maxSpeed: 22, speedRamp: 0.006, rowGapTime:
 }
 
 // test hooks
-window.__md = { get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, act, update, draw, probe, CONFIG, KINDS, caught,
+window.__md = { get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, act, update, draw, probe, CONFIG, KINDS, caught, tilt, tiltActive,
   get seen() { return seen; }, get W() { return W; }, get H() { return H; },
   setView(w, h, hy, foc) { W = w; H = h; HY = hy; FOC = foc; cv.width = W; cv.height = H; }, MAGPIE, SPR, drawText, makeCanvas, px, resize };
 
