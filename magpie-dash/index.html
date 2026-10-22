@@ -51,7 +51,6 @@
   /* MOBILE: phones held sideways get asked to turn upright (the park is a tall picture) */
   #rotateHint { position: fixed; z-index: 5; left: 0; right: 0; top: 40%; text-align: center; color: #f2c230; font: bold 15px/1.4 "Courier New", monospace;
     text-shadow: 2px 2px 0 #000; display: none; padding: 0 16px; pointer-events: none; }
-  @media (orientation: landscape) and (max-height: 500px) { #rotateHint { display: block; } }
   @media (max-width: 520px), (max-height: 500px) { #fsBtn, #home { font-size: 11px; padding: 7px 8px; } }
 </style>
 </head>
@@ -61,7 +60,6 @@
 <button id="soundBtn" class="mc menu">SOUND ON</button>
 <button id="tiltBtn" class="mc menu hidden">TILT ON</button>
 <button id="fsBtn" class="mc menu">FULL SCREEN</button>
-<div id="rotateHint" class="menu">Hold your phone upright<br>to see the whole park!</div>
 <div id="endBtns" class="hidden withSound">
   <button id="againBtn" class="mc">RUN AGAIN</button>
   <button id="shareBtn" class="mc">SHARE</button>
@@ -125,8 +123,8 @@ const CONFIG = {
   // --- the magpie ---
   invulnTime: 1.6,          // s  safe time after a hit
   magpieForget: 9,          // s  after this long without another hit the magpie drops back
-  hitsToCatch: 2,
-  caughtTime: 3.6,          // s  the funny chase after you are caught, before the score screen (tap to skip)           // hits in a row (before it forgets) and you are caught
+  hitsToCatch: 2,           // hits in a row (before it forgets) and you are caught
+  caughtTime: 3.6,          // s  the funny chase after you are caught, before the score screen (tap to skip)
 
   // --- gold and points ---
   coinChance: 0.6,          // chance each gap between rows has a line of gold blocks
@@ -1407,8 +1405,31 @@ function frame(now) {
 // =====================================================================
 // SCREEN SIZE: a tall picture. Phones upright fill the screen; wide screens get the park in the middle.
 // =====================================================================
+// TABLETS AND PHONES HELD SIDEWAYS: web pages cannot lock the screen upright (iPad Safari never can),
+// so the whole page is turned 90 degrees to stand upright on the device. Hold the device upright
+// and the park is the right way up; tilt steering then reads the device's own left/right tilt.
+let ROT = 0;                       // 0, or -90 / 90 when the page is turned
+function screenAngle() {
+  const a = screen.orientation && screen.orientation.angle != null ? screen.orientation.angle : (window.orientation || 0);
+  return ((a | 0) % 360 + 360) % 360;
+}
+function layoutTurn() {
+  const sw = window.innerWidth, sh = window.innerHeight, b = document.body.style;
+  const ang = screenAngle();
+  ROT = isTouch && sw > sh ? (ang === 270 ? 90 : -90) : 0;
+  if (!ROT) { b.position = ''; b.width = ''; b.height = ''; b.transform = ''; b.transformOrigin = ''; b.left = ''; b.top = ''; return [sw, sh]; }
+  b.position = 'fixed'; b.left = '0'; b.top = '0'; b.width = sh + 'px'; b.height = sw + 'px'; b.transformOrigin = '0 0';
+  b.transform = ROT < 0 ? `translate(0px, ${sh}px) rotate(-90deg)` : `translate(${sw}px, 0px) rotate(90deg)`;
+  return [sh, sw];
+}
+// a screen point (clientX/Y) in the page's own upright frame
+function pagePoint(cx, cy) {
+  if (ROT < 0) return [window.innerHeight - cy, cx];
+  if (ROT > 0) return [cy, window.innerWidth - cx];
+  return [cx, cy];
+}
 function resize() {
-  const vw = window.innerWidth, vh = window.innerHeight, a = vw / vh;
+  const [vw, vh] = layoutTurn(), a = vw / vh;
   if (a < 216 / 384) { W = 216; H = Math.min(468, Math.round(216 / a)); }
   else { H = 384; W = Math.min(288, Math.round(384 * a)); }
   HY = Math.round(H * 0.365); FOC = 230;
@@ -1441,7 +1462,8 @@ window.addEventListener('keydown', e => {
 });
 let triedFs = false, swipe = null;
 const SWIPE_PX = 22;
-function toCanvas(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+function toCanvas(e) { const [x, y] = pagePoint(e.clientX, e.clientY);
+  return [(x - cv.offsetLeft) / cv.offsetWidth * W, (y - cv.offsetTop) / cv.offsetHeight * H]; }
 // MOBILE: swipe anywhere on the screen. preventDefault stops scrolling, zooming and the long-press menu.
 function onDown(e) {
   if (e.target.closest && e.target.closest('.mc, #fsHelp, #emilyShare')) return;
@@ -1453,11 +1475,12 @@ function onDown(e) {
   if (state !== 'play') return;
   const [cx, cy] = toCanvas(e), b = PAUSE_BTN;
   if (cx > b.x - 6 && cx < b.x + b.w + 10 && cy > b.y - 6 && cy < b.y + b.h + 10) { pause(); return; }
-  swipe = { x: e.clientX, y: e.clientY, done: false };
+  const [sx, sy] = pagePoint(e.clientX, e.clientY);
+  swipe = { x: sx, y: sy, done: false };
 }
 function onMove(e) {
   if (!swipe || swipe.done) return;
-  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  const [mx2, my2] = pagePoint(e.clientX, e.clientY), dx = mx2 - swipe.x, dy = my2 - swipe.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
   const horiz = Math.abs(dx) > Math.abs(dy);
   if (horiz && tiltActive()) return;           // with tilt steering, left and right come from tilting only
@@ -1489,10 +1512,12 @@ function askTilt() {   // iOS needs a tap before it sends motion
 }
 window.addEventListener('deviceorientation', e => {
   if (e.gamma == null) return;
-  const ang = (screen.orientation && screen.orientation.angle != null ? screen.orientation.angle : window.orientation || 0) | 0;
-  // left/right tilt in the way the screen is turned
+  // left/right tilt of the picture: when the page is turned upright on a sideways screen
+  // the picture's left/right is the device's own (gamma); upside-down screens flip it
+  const ang = screenAngle();
   let v = e.gamma;
-  if (ang === 90) v = e.beta; else if (ang === -90 || ang === 270) v = -e.beta; else if (ang === 180) v = -e.gamma;
+  if (!ROT && ang === 180) v = -e.gamma;
+  else if (!ROT && (ang === 90 || ang === 270)) v = ang === 90 ? e.beta : -e.beta;
   tilt.value = v; tilt.lastT = performance.now();
 });
 function updateTilt() {
