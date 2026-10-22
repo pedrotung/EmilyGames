@@ -1123,25 +1123,34 @@ const [PC, pctx] = makeCanvas(20, 34);
 function limb(X, Y, len, wdt, lean, col, col2) {
   for (let i = 0; i < len; i++) { const dx = Math.round(i * lean); px(pctx, i >= len - 2 && col2 ? col2 : col, X + dx, Y + i, wdt, 1); }
 }
+// the hero: an outback bushman in a slouch hat with a croc-tooth band, leather vest, jeans and boots
+function drawHero(c, sw) {
+  const P = (col, x, y, w = 1, h = 1) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  const SK = '#d6a27a', SKD = '#a7765a', BOOT = '#5a3a1e', HAT = '#8a6a3a', HATD = '#5e4426', BAND = '#2a1e14', VEST = '#6b4426', VESTD = '#4a2e18';
+  // a limb: one colour, the last 2 rows in the end colour (hand or boot)
+  const limb = (X, Y, len, wdt, lean, a, end) => { for (let i = 0; i < len; i++) P(i >= len - 2 ? end : a, X + Math.round(i * lean), Y + i, wdt, 1); };
+  const X = 6, by = 33, legTop = by - 8, bodyTop = by - 16, headTop = by - 24;
+  limb(X + 2, legTop, 8, 3, -sw * 0.8, '#34507a', BOOT);       // back leg
+  limb(X + 3, bodyTop + 1, 7, 2, sw * 0.7, SKD, SKD);            // back arm, bare
+  P(VEST, X + 1, bodyTop, 5, 7); P(SK, X + 4, bodyTop, 1, 5); P(VESTD, X + 1, bodyTop + 4, 1, 3);   // sleeveless leather vest
+  P(BAND, X + 1, bodyTop + 7, 5, 1); P('#c2cad2', X + 4, bodyTop + 7, 1, 1);                     // belt and buckle
+  limb(X + 2, legTop, 8, 3, sw * 0.8, '#4a6a9a', BOOT);          // front leg in jeans
+  limb(X + 3, bodyTop + 1, 7, 2, -sw * 0.7, SK, SK);             // front arm
+  // tanned face, dark hair, squinting eye, stubble
+  P(SK, X, headTop, 8, 8); P('#4a2f1c', X, headTop + 1, 2, 5); P('#4a2f1c', X + 2, headTop + 1, 1, 2);
+  P('#1b1b20', X + 5, headTop + 3, 2, 1); P('#7a5236', X + 5, headTop + 2, 2, 1); P(SKD, X + 7, headTop + 4, 1, 2);
+  P('#8a6448', X + 3, headTop + 6, 5, 2); P('#8a6448', X + 2, headTop + 5, 1, 2); P('#5a3a2a', X + 5, headTop + 6, 2, 1);
+  // slouch hat: wide brim turned down at the ends, a band of croc teeth
+  P(HATD, X - 3, headTop, 1, 1); P(HATD, X + 11, headTop, 1, 1); P(HAT, X - 2, headTop - 1, 13, 1); P(HATD, X - 2, headTop, 2, 1);
+  P(HAT, X, headTop - 5, 8, 4); P(HATD, X + 3, headTop - 6, 3, 1); P(HAT, X + 1, headTop - 6, 2, 1); P(HAT, X + 6, headTop - 6, 1, 1);
+  P(BAND, X, headTop - 2, 8, 1); for (let i = 0; i < 4; i++) P('#f4f4f4', X + 1 + i * 2, headTop - 2, 1, 1);
+}
 function drawPlayer() {
   const p = G.p, dead = state === 'dead', air = !p.onGround && state === 'play';
   if (dead && Math.floor(G.deadT * 12) % 2) return;     // blink after a crash
   if (G.tour && G.tour.hurt > 0 && Math.floor(G.tour.hurt * 14) % 2) return;   // blink while a bump can't hurt again
   const sw = air ? 0.55 : Math.sin(p.anim) * 0.6;       // leg swing
-  pctx.clearRect(0, 0, 20, 34);
-  const X = 6, by = 33, legTop = by - 8, bodyTop = by - 16, headTop = by - 24;
-  limb(X + 2, legTop, 8, 3, -sw * 0.8, 'P', 'S');
-  limb(X + 3, bodyTop + 1, 7, 2, sw * 0.7, 'N');
-  px(pctx, 'c', X + 1, bodyTop, 5, 8); px(pctx, 'C', X + 1, bodyTop + 6, 5, 2);
-  limb(X + 2, legTop, 8, 3, sw * 0.8, 'p', 'S');
-  limb(X + 3, bodyTop + 1, 7, 2, -sw * 0.7, 'n');
-  px(pctx, 'c', X + 3, bodyTop + 1, 2, 2);
-  px(pctx, 'n', X, headTop, 8, 8);
-  px(pctx, 'h', X, headTop, 8, 2); px(pctx, 'h', X, headTop + 2, 2, 3);
-  px(pctx, 'w', X + 5, headTop + 3, 1, 1); px(pctx, 'v', X + 6, headTop + 3, 1, 1);
-  px(pctx, 'N', X + 5, headTop + 6, 3, 1); px(pctx, 'N', X + 7, headTop + 4, 1, 1);
-  px(pctx, 'a', X - 2, headTop - 1, 12, 1); px(pctx, 'A', X - 2, headTop, 2, 1);
-  px(pctx, 'a', X + 1, headTop - 4, 6, 3); px(pctx, 'A', X + 1, headTop - 2, 6, 1);
+  pctx.clearRect(0, 0, 20, 34); drawHero(pctx, sw);
   // stretch while rising, squash on landing (blocky, nearest-pixel scaling)
   let sx = 1, sy = 1;
   if (p.squash > 0) { sx = 1.25; sy = 0.8; } else if (air && p.vy < -60) { sx = 0.85; sy = 1.15; }
@@ -1292,7 +1301,7 @@ function frame(now) {
   if (dt > 0) fps += (1 / dt - fps) * 0.05;
   acc += dt;
   while (acc >= CONFIG.fixedStep) { update(CONFIG.fixedStep); acc -= CONFIG.fixedStep; }
-  draw();
+  draw(); musicTick();
   requestAnimationFrame(frame);
 }
 
@@ -2451,6 +2460,161 @@ function drawSpecialsWorld(T) {
 }
 
 // =====================================================================
+// MUSIC - small 8-bit songs, one for the title page and one per city.
+// Each channel is a row of steps (8th notes): a note like 'E5', '-' holds the
+// note before, '.' is a rest, 'C4+E4+G4' is a chord. Drums: k kick, s snare,
+// h hat, c clapsticks (two letters = both). Bars are split with | to read easily.
+// =====================================================================
+const SONGS = {
+  title: { bpm: 100, ch: [   // easy and relaxed, a sunny walk in the park
+    { w: 'pulse25', v: 0.09, n: 'E5 - G5 - E5 - D5 C5 | D5 - - - B4 - G4 - | C5 - E5 - A5 - G5 E5 | F5 - - - E5 - D5 - | E5 - G5 - C6 - B5 A5 | G5 - - - D5 - E5 F5 | E5 - D5 - C5 - A4 - | C5 - - - . . . .' },
+    { w: 'tri', v: 0.22, n: 'C3 . G3 . C3 . G3 . | G2 . D3 . G2 . D3 . | A2 . E3 . A2 . E3 . | F2 . C3 . F2 . C3 . | C3 . G3 . C3 . G3 . | G2 . D3 . G2 . D3 . | F2 . C3 . F2 . C3 . | C3 . G3 . C3 . . .' },
+    { w: 'pulse12', v: 0.04, n: 'C4 E4 G4 E4 C4 E4 G4 E4 | B3 D4 G4 D4 B3 D4 G4 D4 | A3 C4 E4 C4 A3 C4 E4 C4 | A3 C4 F4 C4 A3 C4 F4 C4 | C4 E4 G4 E4 C4 E4 G4 E4 | B3 D4 G4 D4 B3 D4 G4 D4 | A3 C4 F4 C4 A3 C4 F4 C4 | C4 E4 G4 E4 C4 . . .' },
+    { w: 'drums', v: 0.5, n: 'k . h . s . h . | k . h . s . h . | k . h . s . h . | k . h . s . h h | k . h . s . h . | k . h . s . h . | k . h . s . h . | k . h . s . . .' },
+  ] },
+  canberra: { bpm: 104, ch: [   // a proud brass march for the capital
+    { w: 'pulse25', v: 0.09, n: 'D5 - - F#5 A5 - - - | A5 - G5 F#5 E5 - - - | F#5 - - A5 D6 - A5 - | B5 - - A5 G5 - - - | A5 - F#5 - D5 - F#5 - | E5 - - C#5 E5 - A4 - | G5 - F#5 - E5 - C#5 - | D5 - - - D5 . . .' },
+    { w: 'tri', v: 0.24, n: 'D3 . A2 . D3 . A2 . | A2 . E3 . A2 . E3 . | D3 . A2 . D3 . A2 . | G2 . D3 . G2 . D3 . | D3 . A2 . D3 . A2 . | A2 . E3 . A2 . E3 . | G2 . D3 . A2 . E3 . | D3 . A2 . D3 . . .' },
+    { w: 'pulse50', v: 0.035, n: '. F#4+A4 . F#4+A4 . F#4+A4 . F#4+A4 | . E4+A4 . E4+A4 . E4+A4 . E4+A4 | . F#4+A4 . F#4+A4 . F#4+A4 . F#4+A4 | . G4+B4 . G4+B4 . G4+B4 . G4+B4 | . F#4+A4 . F#4+A4 . F#4+A4 . F#4+A4 | . E4+A4 . E4+A4 . E4+A4 . E4+A4 | . G4+B4 . G4+B4 . E4+A4 . E4+A4 | . F#4+A4 . F#4+A4 . . . .' },
+    { w: 'drums', v: 0.5, n: 'k . s s k . s . | k . s s k . s . | k . s s k . s . | k . s s k s s s | k . s s k . s . | k . s s k . s . | k . s s k . s . | k s s s k . . .' },
+  ] },
+  sydney: { bpm: 150, ch: [   // surf rock for the beaches and the harbour
+    { w: 'pulse25', v: 0.085, n: 'E5 - G5 - B5 - A5 G5 | G5 - E5 - - - . . | F#5 - A5 - D6 - C6 B5 | B5 - - - D#5 - F#5 - | E5 E5 G5 E5 B5 - A5 G5 | C6 - B5 - A5 - G5 - | A5 - G5 - F#5 - D5 - | E5 - - - . . E4 F#4' },
+    { w: 'tri', v: 0.24, n: 'E2 E2 E3 E2 E2 E2 E3 E2 | C3 C3 C3 C3 C3 C3 G2 G2 | D3 D3 D3 D3 D3 D3 A2 A2 | B2 B2 B2 B2 B2 B2 F#2 F#2 | E2 E2 E3 E2 E2 E2 E3 E2 | C3 C3 C3 C3 C3 C3 G2 G2 | D3 D3 D3 D3 D3 D3 A2 A2 | E2 E2 E3 E2 B2 B2 B2 B2' },
+    { w: 'pulse12', v: 0.035, n: '. E4+G4 . E4+G4 . E4+G4 . E4+G4 | . E4+G4 . E4+G4 . E4+G4 . E4+G4 | . F#4+A4 . F#4+A4 . F#4+A4 . F#4+A4 | . D#4+F#4 . D#4+F#4 . D#4+F#4 . D#4+F#4 | . E4+G4 . E4+G4 . E4+G4 . E4+G4 | . E4+G4 . E4+G4 . E4+G4 . E4+G4 | . F#4+A4 . F#4+A4 . F#4+A4 . F#4+A4 | . E4+G4 . E4+G4 . D#4+F#4 . D#4+F#4' },
+    { w: 'drums', v: 0.5, n: 'k h s h k k s h | k h s h k k s h | k h s h k k s h | k h s h k k s s | k h s h k k s h | k h s h k k s h | k h s h k k s h | k h s h k s s s' },
+  ] },
+  brisbane: { bpm: 96, ch: [   // lazy sunny reggae for river city
+    { w: 'pulse25', v: 0.085, n: 'D5 - - B4 D5 - E5 - | E5 - - - G5 - E5 - | F#5 - - D5 A5 - F#5 - | E5 - D5 - B4 - - - | G5 - - G5 F#5 - E5 - | E5 - - C5 E5 - G5 - | F#5 - E5 - D5 - A4 - | G4 - - - . . . .' },
+    { w: 'tri', v: 0.25, n: 'G2 - . G2 B2 - D3 . | C3 - . C3 E3 - G2 . | D3 - . D3 F#3 - A2 . | C3 - . C3 E3 - G2 . | G2 - . G2 B2 - D3 . | C3 - . C3 E3 - G2 . | D3 - . D3 F#3 - A2 . | G2 - . G2 D3 . . .' },
+    { w: 'pulse50', v: 0.035, n: '. . G4+B4+D5 . . . G4+B4+D5 . | . . G4+C5+E5 . . . G4+C5+E5 . | . . F#4+A4+D5 . . . F#4+A4+D5 . | . . G4+C5+E5 . . . G4+C5+E5 . | . . G4+B4+D5 . . . G4+B4+D5 . | . . G4+C5+E5 . . . G4+C5+E5 . | . . F#4+A4+D5 . . . F#4+A4+D5 . | . . G4+B4+D5 . . . . .' },
+    { w: 'drums', v: 0.5, n: 'h . h . ks . h . | h . h . ks . h . | h . h . ks . h . | h . h . ks . h h | h . h . ks . h . | h . h . ks . h . | h . h . ks . h . | h . h . ks . . .' },
+  ] },
+  darwin: { bpm: 100, ch: [   // the Top End: a deep droning drone, clapsticks and a soft flute
+    { w: 'tri', v: 0.2, n: 'B4 - - - E5 - D5 - | B4 - A4 - G4 - - - | E4 - G4 - A4 - B4 - | D5 - - - B4 - - - | E5 - - - G5 - E5 D5 | B4 - - - D5 - B4 A4 | G4 - A4 - B4 - G4 - | E4 - - - . . . .' },
+    { w: 'drone', v: 0.2, n: 'E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 - | E2 - - E2 - - E2 -' },
+    { w: 'drums', v: 0.5, n: 'kc . c . c c . . | kc . c . c c . . | kc . c . c c . . | kc . c . c c c c | kc . c . c c . . | kc . c . c c . . | kc . c . c c . . | kc . c c c c . .' },
+  ] },
+  perth: { bpm: 120, ch: [   // breezy west coast afternoon, wind in the arpeggios
+    { w: 'pulse25', v: 0.08, n: 'B5 - - - A5 - G5 - | B5 - - - - - E5 - | G5 - - - F#5 - E5 - | F#5 - - - - - D5 - | D6 - - B5 - - G5 - | A5 - - G5 - - E5 - | E5 - G5 - C6 - B5 - | A5 - - - - - . .' },
+    { w: 'tri', v: 0.24, n: 'G2 - - - D3 - - - | E2 - - - B2 - - - | C3 - - - G2 - - - | D3 - - - A2 - - - | G2 - - - D3 - - - | E2 - - - B2 - - - | C3 - - - G2 - - - | D3 - - - A2 - - -' },
+    { w: 'pulse12', v: 0.04, n: 'G4 B4 D5 B4 G4 B4 D5 B4 | E4 G4 B4 G4 E4 G4 B4 G4 | C4 E4 G4 E4 C4 E4 G4 E4 | D4 F#4 A4 F#4 D4 F#4 A4 F#4 | G4 B4 D5 B4 G4 B4 D5 B4 | E4 G4 B4 G4 E4 G4 B4 G4 | C4 E4 G4 E4 C4 E4 G4 E4 | D4 F#4 A4 F#4 D4 F#4 A4 F#4' },
+    { w: 'drums', v: 0.45, n: 'k . h . s . h h | k . h . s . h . | k . h . s . h h | k . h . s . h . | k . h . s . h h | k . h . s . h . | k . h . s . h h | k . h . s s s .' },
+  ] },
+  adelaide: { bpm: 160, beats: 6, ch: [   // a cheerful folk waltz for the festival city and the vineyards
+    { w: 'pulse25', v: 0.085, n: 'C5 - F5 - A5 - | G5 - - - E5 - | G5 - E5 - C5 - | F5 - - - - - | D5 - F5 - A#5 - | A5 - - - F5 - | G5 - E5 - G5 - | F5 - - - . .' },
+    { w: 'tri', v: 0.25, n: 'F2 - . . . . | C3 - . . . . | C3 - . . . . | F2 - . . . . | A#2 - . . . . | F2 - . . . . | C3 - . . . . | F2 - . . . .' },
+    { w: 'pulse50', v: 0.035, n: '. . A4+C5 . A4+C5 . | . . G4+C5 . G4+C5 . | . . G4+C5 . G4+C5 . | . . A4+C5 . A4+C5 . | . . A#4+D5 . A#4+D5 . | . . A4+C5 . A4+C5 . | . . G4+C5 . G4+C5 . | . . A4+C5 . . .' },
+    { w: 'drums', v: 0.45, n: 'k . h . h . | k . h . h . | k . h . h . | k . h . s . | k . h . h . | k . h . h . | k . h . h . | k . s . s .' },
+  ] },
+  melbourne: { bpm: 120, swing: 0.3, ch: [   // laneway cafe jazz, a little moody, like the weather
+    { w: 'pulse25', v: 0.08, n: 'F5 - A5 - C6 - A5 G5 | F5 - - - D5 - B4 - | E5 - G5 - B5 - - - | A5 - G5 - E5 - C#5 - | D5 F5 A5 - . A5 G5 F5 | E5 - D5 - F5 - - - | E5 - - - G5 - B4 - | C#5 - - - A4 . . .' },
+    { w: 'tri', v: 0.25, n: 'D3 - F3 - A3 - C4 - | G2 - B2 - D3 - F3 - | C3 - E3 - G3 - B3 - | A2 - C#3 - E3 - G3 - | D3 - F3 - A3 - C4 - | G2 - B2 - D3 - F3 - | C3 - E3 - G3 - B3 - | A2 - C#3 - E3 - G3 -' },
+    { w: 'pulse50', v: 0.03, n: '. . F4+A4+C5 . . . F4+A4+C5 . | . . F4+B4+D5 . . . F4+B4+D5 . | . . E4+G4+B4 . . . E4+G4+B4 . | . . C#4+E4+G4 . . . C#4+E4+G4 . | . . F4+A4+C5 . . . F4+A4+C5 . | . . F4+B4+D5 . . . F4+B4+D5 . | . . E4+G4+B4 . . . E4+G4+B4 . | . . C#4+E4+G4 . . . . .' },
+    { w: 'drums', v: 0.4, n: 'kh . h h s . h h | kh . h h s . h h | kh . h h s . h h | kh . h h s . h h | kh . h h s . h h | kh . h h s . h h | kh . h h s . h h | kh . h h s . . .' },
+  ] },
+  hobart: { bpm: 132, beats: 6, ch: [   // a sea shanty jig for the old harbour town under the mountain
+    { w: 'pulse25', v: 0.085, n: 'D5 - F5 A5 - F5 | G5 - E5 C5 - E5 | D5 - E5 F5 - A5 | E5 - C5 A4 - - | A5 - G5 F5 - D5 | E5 - G5 C6 - G5 | A5 - F5 G5 - E5 | D5 - - D5 . .' },
+    { w: 'tri', v: 0.25, n: 'D3 - - A2 - - | C3 - - G2 - - | D3 - - A2 - - | A2 - - E3 - - | D3 - - A2 - - | C3 - - G2 - - | F2 - - C3 - - | D3 - - A2 - -' },
+    { w: 'pulse12', v: 0.035, n: 'D4 F4 A4 D4 F4 A4 | C4 E4 G4 C4 E4 G4 | D4 F4 A4 D4 F4 A4 | A3 C4 E4 A3 C4 E4 | D4 F4 A4 D4 F4 A4 | C4 E4 G4 C4 E4 G4 | F4 A4 C5 C4 E4 G4 | D4 F4 A4 D4 . .' },
+    { w: 'drums', v: 0.45, n: 'k . h k . h | k . h k . h | k . h k . h | k . h k s s | k . h k . h | k . h k . h | k . h k . h | k . s k . .' },
+  ] },
+};
+// note name to frequency: 'A4' = 440
+const NOTE_I = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 };
+function noteFreq(n) { const m = /^([A-G])(#?)(\d)$/.exec(n); return 440 * Math.pow(2, (NOTE_I[m[1]] + (m[2] ? 1 : 0) + (m[3] - 4) * 12) / 12); }
+// turn a channel row into [{step, len, notes}]
+function parseRow(s) {
+  const tok = s.split(/\s+/).filter(t => t && t !== '|'), out = [];
+  tok.forEach((t, i) => { if (t === '-') { if (out.length && out[out.length - 1].open) out[out.length - 1].len++; } else if (t === '.') { if (out.length) out[out.length - 1].open = false; } else out.push({ step: i, len: 1, notes: t.split('+'), open: true }); });
+  return { events: out, steps: tok.length };
+}
+const WAVES = {};
+function waveFor(ac, w) {   // pulse waves with a thinner duty sound more 8-bit than a plain square
+  const duty = { pulse12: 0.125, pulse25: 0.25 }[w]; if (!duty) return null;
+  const key = w; if (WAVES[key] && WAVES[key].ac === ac) return WAVES[key].wave;
+  const N = 32, re = new Float32Array(N), im = new Float32Array(N);
+  for (let k = 1; k < N; k++) { re[k] = Math.sin(2 * Math.PI * k * duty) / (k * Math.PI); im[k] = (1 - Math.cos(2 * Math.PI * k * duty)) / (k * Math.PI); }
+  const wave = ac.createPeriodicWave(re, im); WAVES[key] = { ac, wave }; return wave;
+}
+let NOISE = null;
+function noiseBuf(ac) { if (NOISE && NOISE.ac === ac) return NOISE.buf; const b = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; NOISE = { ac, buf: b }; return b; }
+// play one note or drum hit at time t into node out
+function playEvent(ac, out, w, v, ev, t, dur) {
+  if (w === 'drums') {
+    for (const d of ev.notes[0]) {
+      if (d === 'k') { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+        g.gain.setValueAtTime(v * 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.16); }
+      else if (d === 'c') { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'square'; o.frequency.setValueAtTime(1900, t);
+        g.gain.setValueAtTime(v * 0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.04); }
+      else { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), snare = d === 's', len = snare ? 0.12 : 0.035;
+        s.buffer = noiseBuf(ac); f.type = snare ? 'bandpass' : 'highpass'; f.frequency.value = snare ? 1800 : 7000;
+        g.gain.setValueAtTime(v * (snare ? 0.5 : 0.22), t); g.gain.exponentialRampToValueAtTime(0.001, t + len); s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + len + 0.01); }
+    }
+    return;
+  }
+  for (const n of ev.notes) {
+    const o = ac.createOscillator(), g = ac.createGain(), f0 = noteFreq(n), end = t + dur;
+    let node = o;
+    if (w === 'drone') {   // a deep buzzing drone: sawtooth through a wobbling low-pass filter
+      o.type = 'sawtooth'; const lp = ac.createBiquadFilter(), lfo = ac.createOscillator(), lg = ac.createGain();
+      lp.type = 'lowpass'; lp.frequency.value = 380; lp.Q.value = 6; lfo.frequency.value = 3.2; lg.gain.value = 220;
+      lfo.connect(lg); lg.connect(lp.frequency); lfo.start(t); lfo.stop(end + 0.05); o.connect(lp); node = lp;
+    } else { const pw = waveFor(ac, w); if (pw) o.setPeriodicWave(pw); else o.type = w === 'tri' ? 'triangle' : 'square'; }
+    o.frequency.setValueAtTime(f0, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(v * 0.65, t + Math.min(0.09, dur * 0.5)); g.gain.setValueAtTime(v * 0.65, Math.max(t + 0.01, end - 0.04));
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    node.connect(g); g.connect(out); o.start(t); o.stop(end + 0.02);
+  }
+}
+// all the notes of one pass of a song, with times in seconds from its start
+function songNotes(song) {
+  if (song.parsed) return song.parsed;
+  const st = 60 / song.bpm / 2, rows = song.ch.map(c => ({ c, ...parseRow(c.n) })), steps = Math.max(...rows.map(r => r.steps)), list = [];
+  // the song plays twice: the second time the tune changes sound and gets a soft echo, so a long level does not get boring
+  for (let pass = 0; pass < 2; pass++) for (const [ri, r] of rows.entries()) for (const ev of r.events) {
+    const t = pass * steps * st + ev.step * st + (ev.step % 2 ? (song.swing || 0) * st : 0), dur = ev.len * st - (r.c.w === 'drums' ? 0 : 0.01);
+    const lead = ri === 0 && pass === 1 && r.c.w !== 'tri', w = lead ? (r.c.w === 'pulse25' ? 'pulse50' : 'pulse25') : r.c.w;
+    list.push({ t, dur, w, v: lead ? r.c.v * 0.8 : r.c.v, ev });
+    if (lead) list.push({ t: t + st * 1.5, dur, w: 'pulse12', v: r.c.v * 0.3, ev });
+  }
+  list.sort((a, b) => a.t - b.t);
+  return song.parsed = { list, len: 2 * steps * st };
+}
+
+// ---------- the music player: the title tune on the menus, the city's song in its level ----------
+let music = null;                                   // { id, out, t0, i, notes }
+function musicWanted() {
+  if (['title', 'map', 'flight', 'complete'].includes(state)) return 'title';
+  if (state === 'play') return G.tour ? G.tour.city.id : 'title';
+  return null;                                      // quiet on the clear / fail / game over screens
+}
+function stopMusic() {
+  if (!music) return; const g = music.out, t = AC.currentTime;
+  g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.15);
+  setTimeout(() => g.disconnect(), 400); music = null;
+}
+function musicTick() {
+  if (!AC || AC.state !== 'running') return;
+  const id = soundOn ? musicWanted() : null;
+  if (music && music.id !== id) stopMusic();
+  if (!id) return;
+  if (!music) { const out = AC.createGain(); out.gain.value = 0.55; out.connect(AC.destination);
+    music = { id, out, t0: AC.currentTime + 0.1, i: 0, song: songNotes(SONGS[id]) }; }
+  const m = music, ahead = AC.currentTime + 0.3;   // book the notes of the next 0.3 s
+  if (m.t0 + m.song.len < AC.currentTime) { m.t0 = AC.currentTime + 0.05; m.i = 0; }   // the tab was hidden: start the tune again
+  for (;;) {
+    if (m.i >= m.song.list.length) { m.i = 0; m.t0 += m.song.len; }   // loop
+    const n = m.song.list[m.i], t = m.t0 + n.t;
+    if (t > ahead) break;
+    if (t > AC.currentTime - 0.05) playEvent(AC, m.out, n.w, n.v, n.ev, Math.max(t, AC.currentTime), n.dur);
+    m.i++;
+  }
+}
+
+// =====================================================================
 // PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
 // =====================================================================
 const EASY_PRESET = { baseSpeed: 85, maxSpeed: 190, speedRampRate: 0.08, minObstacleGap: 160, maxObstacleGap: 320, minReactionTime: 1.5,
@@ -2465,7 +2629,7 @@ const HARD_PRESET = { baseSpeed: 120, maxSpeed: 270, speedRampRate: 0.2, minObst
 }
 
 // test hooks
-window.__pp = { get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, press, release, update, draw, CONFIG, die,
+window.__pp = { get music() { return music && music.id; }, get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, press, release, update, draw, CONFIG, die,
   get seen() { return seen; }, startLevel, goMap, goTitle, startFlight, CITIES, CITY, get tourSave() { return tourSave; }, get endInfo() { return endInfo; }, menuKey, uiTap };
 
 newRun(); resize(); requestAnimationFrame(frame);
