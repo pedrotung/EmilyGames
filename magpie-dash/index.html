@@ -435,9 +435,10 @@ const PROPS = {
     const blobs = [[8, 14], [32, 12], [20, 6], [12, 26], [34, 26]];
     for (const [cx, cy] of blobs) for (let yy = -6; yy <= 6; yy += 2) for (let xx = -9; xx <= 9; xx += 2)
       if ((xx * xx) / 81 + (yy * yy) / 36 < 1 && R() < 0.55) px(x, R() < 0.5 ? 'u' : 'U', cx + xx, cy + yy, 2, 2);
-    const a = R(); c.animal = null;
-    if (a < 0.4) { x.drawImage(SPR.koala, tx - 5, 36); c.animal = 'koala'; }          // koala hugging the trunk
-    else if (a < 0.6) { x.drawImage(SPR.possum, tx + 3, 23); c.animal = 'possum'; }   // possum on a branch
+    // the tree variations take turns: koala, possum, empty (so both animals always turn up)
+    const a = seed % 3; c.animal = null;
+    if (a === 0) { x.drawImage(SPR.koala, tx - 5, 36); c.animal = 'koala'; }          // koala hugging the trunk
+    else if (a === 1) { x.drawImage(SPR.possum, tx + 3, 23); c.animal = 'possum'; }  // possum on a branch
     return c;
   },
   // golden wattle: small tree with yellow fluffy balls
