@@ -64,6 +64,9 @@
   .phone .thumb { border-radius: 8px; }
   .phone .game h2 { font-size: 23px; }
   .phone .game p { font-size: 13px; line-height: 1.4; }
+  /* Hidden card games: tap "Games" in the title 4 times in a row to show or hide them. */
+  html:not(.show-secret) .game.secret { display: none; }
+  h1 .tap { cursor: default; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
   @media (prefers-reduced-motion: reduce) { .game { transition: none; } }
 </style>
 <script>
@@ -88,7 +91,7 @@
 <body>
 <main>
   <header>
-    <h1>EmilyGames</h1>
+    <h1>Emily<span class="tap" id="gamesTap">Games</span></h1>
     <p>Little games for the phone browser. Tap one to play.</p>
     <div class="rainbow" aria-hidden="true"><i style="background:#E5484D"></i><i style="background:#EE7D1F"></i><i style="background:#E8B90C"></i><i style="background:#36A852"></i><i style="background:#3B7DD8"></i><i style="background:#4A4FC4"></i><i style="background:#9B4FD0"></i></div>
   </header>
@@ -154,7 +157,7 @@
       <span class="play">Play →</span>
     </a>
     <!-- Card and board games always go last -->
-    <a class="game" href="hold-the-seven/index.html">
+    <a class="game secret" href="hold-the-seven/index.html">
       <img class="thumb" src="hold-the-seven/cover.png" width="1200" height="630" alt="HOLD THE SEVEN cover: the four 7s fanned out on a green card table" style="height: auto; border: 1px solid var(--line);">
       <h2>HOLD THE SEVEN</h2>
       <p>Sevens, the card game. Build the suits out from the 7s against three bots, hold your 7s to block them, and don't get stuck with points.</p>
@@ -166,7 +169,7 @@
       <p>Classic chess. Play the computer at four levels or a friend on the same screen, on a light or dark board.</p>
       <span class="play">Play →</span>
     </a>
-    <a class="game" href="six-player/index.html">
+    <a class="game secret" href="six-player/index.html">
       <img class="thumb" src="six-player/cover.png" width="1200" height="630" alt="SIX PLAYER cover: a fan of cards with a Joker, 3 and 2 as wild cards, and six players in two teams" style="height: auto; border: 1px solid var(--line);">
       <h2>SIX PLAYER</h2>
       <p>Za Liu Jia, the Tianjin team card game. You and two bots against three bots, with Jokers, 3s and 2s as wild cards. Ten hands make a pot.</p>
@@ -174,5 +177,23 @@
     </a>
   </section>
 </main>
+<script>
+  // Secret: 4 quick taps on "Games" show the hidden card games (and 4 more hide them).
+  // Remembered on this device.
+  (function () {
+    var root = document.documentElement, KEY = 'emilyShowSecret';
+    try { if (localStorage.getItem(KEY) === '1') root.classList.add('show-secret'); } catch (e) {}
+    var n = 0, last = 0;
+    document.getElementById('gamesTap').addEventListener('click', function () {
+      var now = Date.now();
+      n = now - last < 800 ? n + 1 : 1;
+      last = now;
+      if (n < 4) return;
+      n = 0;
+      var on = root.classList.toggle('show-secret');
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+    });
+  })();
+</script>
 </body>
 </html>
