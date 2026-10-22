@@ -1,0 +1,16 @@
+# Files Cloudflare should not upload (only the games are needed)
+.git
+.github
+.gitignore
+.assetsignore
+wrangler.jsonc
+node_modules
+.wrangler
+*.md
+*.py
+*.pyc
+__pycache__
+*.wav
+cat-rat-battle/design/
+cat-rat-battle/src/*
+!cat-rat-battle/src/fonts/
