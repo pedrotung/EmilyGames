@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIX PLAYER</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Six Player">
+<meta name="theme-color" content="#0f4d3a">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Best of three.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SIX PLAYER">
+<meta property="og:description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Best of three.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/six-player/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/six-player/cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{--felt:#13684d;--felt2:#0d4f3a;--rim:#5a3a1e;--ink:#1d1d1d;--red:#c8262c;--gold:#f2c94c;
+    --teamA:#3aa0ff;--teamB:#ff8a3d;--panel:rgba(0,0,0,.35);--white:#fff;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#082a20;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:#fff;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  /* the whole game is a 1280x720 stage scaled to fit; upright phones get it turned sideways */
+  #stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center;
+    background:radial-gradient(ellipse at 50% 45%,#1a7a5a 0%,#0f5a43 55%,#0a3d2e 100%);overflow:hidden;}
+  #table{position:absolute;left:150px;top:100px;width:980px;height:420px;border-radius:50%;
+    background:radial-gradient(ellipse at 50% 40%,var(--felt) 0%,var(--felt2) 100%);
+    border:14px solid var(--rim);box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.45);}
+  .hidden{display:none!important;}
+  button,.btn{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:8px 14px;font-weight:700;font-size:16px;
+    color:#1d1d1d;background:#fff;box-shadow:0 3px 0 rgba(0,0,0,.35);text-decoration:none;display:inline-block;}
+  button:active,.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35);}
+  button:disabled{opacity:.4;cursor:default;transform:none;}
+  .ghost{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.35);font-size:14px;padding:6px 11px;}
+  #topL{position:absolute;left:14px;top:12px;display:flex;gap:8px;z-index:20;}
+  #topR{position:absolute;right:14px;top:12px;display:flex;gap:8px;z-index:20;}
+  #score{position:absolute;left:14px;top:56px;background:var(--panel);border-radius:12px;padding:8px 12px;font-size:15px;line-height:1.35;z-index:5;}
+  #score b.a{color:var(--teamA);} #score b.b{color:var(--teamB);}
+  #score .big{font-size:22px;font-weight:800;}
+  /* seats */
+  .seat{position:absolute;width:150px;padding:8px 10px;border-radius:14px;background:var(--panel);border:3px solid transparent;
+    display:flex;gap:9px;align-items:center;transform:translate(-50%,-50%);transition:border-color .2s,box-shadow .2s;z-index:4;}
+  .seat.turn{border-color:var(--gold);box-shadow:0 0 18px rgba(242,201,76,.7);}
+  .seat.out{opacity:.75;}
+  .ava{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex:none;
+    border:3px solid #fff;color:#fff;}
+  .ava.A{background:var(--teamA);} .ava.B{background:var(--teamB);}
+  .sname{font-weight:800;font-size:16px;white-space:nowrap;}
+  .badge{display:inline-block;font-size:11px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:2px;color:#111;}
+  .badge.A{background:var(--teamA);} .badge.B{background:var(--teamB);}
+  .scount{font-size:14px;opacity:.95;margin-top:2px;white-space:nowrap;}
+  .scount .mini{display:inline-block;width:12px;height:16px;border-radius:2px;background:linear-gradient(135deg,#b3262c,#7a1218);border:1px solid #fff;vertical-align:-3px;margin-right:4px;}
+  .arrow{position:absolute;left:50%;top:-30px;transform:translateX(-50%);color:var(--gold);font-size:22px;animation:bob .8s ease-in-out infinite;}
+  @keyframes bob{50%{transform:translate(-50%,6px);}}
+  .place{position:absolute;right:-8px;top:-10px;background:var(--gold);color:#111;font-weight:800;font-size:12px;border-radius:8px;padding:2px 6px;}
+  /* each player's latest action, near the table centre */
+  .act{position:absolute;transform:translate(-50%,-50%);display:flex;z-index:3;}
+  .act .card{margin-left:-38px;} .act .card:first-child{margin-left:0;}
+  .passTag{background:rgba(0,0,0,.5);border-radius:10px;padding:5px 12px;font-weight:800;font-size:17px;color:#ddd;}
+  /* cards */
+  .card{position:relative;width:64px;height:92px;border-radius:8px;background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.4);
+    border:1px solid #bbb;flex:none;}
+  .card.red{color:var(--red);}
+  .card .tl{position:absolute;left:5px;top:3px;font-weight:800;font-size:19px;line-height:1;text-align:center;}
+  .card .tl i{display:block;font-style:normal;font-size:16px;margin-top:1px;}
+  .card .mid{position:absolute;right:6px;bottom:4px;font-size:30px;line-height:1;}
+  .card.joker .tl{font-size:12px;letter-spacing:-.5px;writing-mode:vertical-rl;text-orientation:upright;left:4px;top:5px;}
+  .card.joker .mid{font-size:34px;right:5px;bottom:6px;}
+  .card .wild{position:absolute;right:3px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--gold);border:1px solid #a57a00;}
+  .card.big{width:84px;height:120px;border-radius:10px;}
+  .card.big .tl{font-size:24px;left:6px;top:5px;} .card.big .tl i{font-size:20px;}
+  .card.big .mid{font-size:42px;}
+  .card.big.joker .tl{font-size:15px;} .card.big.joker .mid{font-size:46px;}
+  .card.big .wild{width:17px;height:17px;}
+  /* centre: the card to beat */
+  #center{position:absolute;left:640px;top:300px;transform:translate(-50%,-50%);text-align:center;z-index:6;pointer-events:none;}
+  #center .cards{display:flex;justify-content:center;}
+  #center .cards .card{margin-left:-30px;} #center .cards .card:first-child{margin-left:0;}
+  #center .who{margin-top:8px;font-weight:800;font-size:17px;background:rgba(0,0,0,.4);display:inline-block;padding:4px 12px;border-radius:10px;}
+  #center .free{font-size:20px;font-weight:800;opacity:.85;}
+  /* the human */
+  #me{position:absolute;left:80px;top:552px;}
+  #msg{position:absolute;left:560px;top:556px;transform:translateX(-50%);font-weight:800;font-size:19px;white-space:nowrap;
+    background:rgba(0,0,0,.4);padding:5px 16px;border-radius:12px;z-index:6;}
+  #hand{position:absolute;left:560px;top:592px;transform:translateX(-50%);display:flex;z-index:7;height:124px;align-items:flex-end;}
+  #hand .card{margin-left:-6px;cursor:pointer;transition:transform .12s;}
+  #hand .card:first-child{margin-left:0;}
+  #hand .card.sel{transform:translateY(-26px);box-shadow:0 0 0 3px var(--gold),0 6px 12px rgba(0,0,0,.5);}
+  #btns{position:absolute;right:22px;top:578px;display:grid;grid-template-columns:1fr 1fr;gap:10px;width:250px;z-index:8;}
+  #btns button{font-size:20px;padding:12px 0;}
+  #playBtn{background:var(--gold);grid-column:1 / 3;}
+  #comboTip{position:absolute;right:22px;top:548px;width:250px;text-align:center;font-size:14px;opacity:.9;z-index:8;}
+  /* overlays */
+  .ov{position:absolute;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .box{background:#fff;color:#1d1d1d;border-radius:18px;padding:22px 28px;max-width:860px;max-height:660px;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .box h2{font-size:30px;margin-bottom:8px;} .box h3{font-size:19px;margin:12px 0 4px;}
+  .box p,.box li{font-size:16px;line-height:1.45;} .box ul{padding-left:22px;}
+  .box .row{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
+  .box .row button{font-size:19px;padding:10px 22px;border:2px solid #1d1d1d;box-shadow:0 3px 0 #1d1d1d;}
+  .box .row button.go{background:var(--gold);}
+  .order{display:flex;gap:10px;justify-content:center;margin:12px 0;flex-wrap:wrap;}
+  .order .o{width:110px;border-radius:12px;padding:8px;text-align:center;background:#f1f1f1;border:3px solid #ddd;}
+  .order .o.first{border-color:#e0a800;background:#fff7d6;} .order .o.last{border-color:#c8262c;background:#fde8e8;}
+  .order .o .n{font-weight:800;font-size:15px;} .order .o .t{font-size:12px;font-weight:700;margin-top:2px;}
+  .order .ava{margin:4px auto;}
+  .res{font-size:24px;font-weight:800;text-align:center;margin-top:6px;}
+  .res.a{color:#1677d6;} .res.b{color:#e0661a;}
+  #toast{position:absolute;left:50%;top:470px;transform:translateX(-50%);background:rgba(0,0,0,.75);padding:10px 22px;border-radius:14px;
+    font-size:20px;font-weight:800;z-index:40;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;}
+  #toast.show{opacity:1;}
+  .title{font-size:64px;font-weight:900;letter-spacing:2px;text-align:center;color:#13684d;}
+  .sub{text-align:center;font-size:18px;color:#555;margin-bottom:6px;}
+  #langBtn{position:absolute;right:16px;bottom:14px;z-index:60;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="table"></div>
+  <div id="topL">
+    <a class="btn ghost" href="../index.html" id="homeBtn">&#8962; Home</a>
+    <button class="ghost" id="newBtn">New Game</button>
+  </div>
+  <div id="topR">
+    <button class="ghost" id="helpBtn">How to Play</button>
+    <button class="ghost" id="langTop">中文</button>
+    <button class="ghost fsBtn">Full screen</button>
+  </div>
+  <div id="score"></div>
+  <div id="seats"></div>
+  <div id="acts"></div>
+  <div id="center"></div>
+  <div id="me"></div>
+  <div id="msg"></div>
+  <div id="hand"></div>
+  <div id="comboTip"></div>
+  <div id="btns">
+    <button id="playBtn">Play</button>
+    <button id="passBtn">Pass</button>
+    <button id="hintBtn">Hint</button>
+  </div>
+  <div id="toast"></div>
+
+  <!-- title screen -->
+  <div class="ov" id="titleOv"><div class="box" style="width:640px;text-align:center">
+    <div class="title">SIX PLAYER</div>
+    <div class="sub" id="tSub"></div>
+    <p id="tDesc" style="margin:10px 0"></p>
+    <div class="row">
+      <button class="go" id="startBtn">Play</button>
+      <button id="tHelpBtn">How to Play</button>
+    </div>
+    <div class="row"><a class="btn" href="../index.html" id="tHome" style="border:2px solid #1d1d1d;box-shadow:0 3px 0 #1d1d1d">&#8962; Home</a></div>
+  </div><button class="ghost" id="langBtn">中文</button></div>
+
+  <!-- how to play -->
+  <div class="ov hidden" id="helpOv"><div class="box" style="width:820px" id="helpBox"></div></div>
+
+  <!-- end of one game -->
+  <div class="ov hidden" id="roundOv"><div class="box" style="width:800px;text-align:center" id="roundBox"></div></div>
+
+  <!-- full screen help -->
+  <div class="ov hidden" id="fsHelpOv"><div class="box" style="width:600px" id="fsBox"></div></div>
+
+</div>
+
+<script>
+'use strict';
+/* ================= language ================= */
+const TXT={
+  en:{home:'⌂ Home',newGame:'New Game',help:'How to Play',full:'Full screen',exitFull:'Exit full screen',play:'Play',pass:'Pass',hint:'Hint',
+    lang:'中文',sub:'Za Liu Jia · the Tianjin team card game',
+    desc:'You and two bots (Team A) against three bots (Team B). Get rid of your cards first, and make sure someone on the other team is stuck last. Best of three games.',
+    you:'You',bot:n=>'Bot '+n,team:'Team',cards:n=>n+(n===1?' card':' cards'),gameN:n=>'Game '+n,bo3:'Best of 3',
+    yourTurnLead:'Your lead: play anything',yourTurnBeat:c=>'Beat '+c+' or pass',waiting:n=>n+' is thinking…',youOut:'You are out! Watching the others…',
+    leads:(n,c)=>n+' has the '+c+' and leads',wins:n=>n+' wins the trick',freeLead:n=>n+' leads anything',
+    single:'Single',pair:'Pair',triple:'Triple',four:'Four',of:(t,r)=>t+' '+r,
+    sel:'Tap cards to choose',bad:'Not a valid set',low:c=>'Too low: needs '+c,ok:c=>c,
+    noPlay:'No cards can beat it: pass',
+    first:'1st out · Top',last:'Last · Stuck',nth:n=>['1st','2nd','3rd','4th','5th','6th'][n]+' out',
+    winA:'Team A wins this game!',winB:'Team B wins this game!',draw:'Draw: Top and Stuck are on the same team',
+    next:'Next Game',matchA:'Your team wins the match!',matchB:'Team B wins the match',again:'Play Again',share:'Share',
+    score:'Score',helpTitle:'How to Play',
+    fsTitle:'Full screen',fsText:'This browser cannot switch to full screen by itself. Add SIX PLAYER to your home screen and open it from the icon.',
+    fsSteps:'<b>iPhone / iPad (Safari):</b> tap Share, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the ⋮ menu, then <b>Add to Home screen</b>.<br><b>In an app (WeChat and others):</b> open this page in your phone\'s browser first.',
+    ok:'OK',close:'Close',shareText:(a,b)=>'Our team won SIX PLAYER '+a+'–'+b+'!',
+    helpHtml:`<h2>How to Play</h2>
+<h3>Teams</h3><p>Six players, 9 cards each (54 cards with both Jokers). Seats alternate: <b style="color:#1677d6">Team A</b> is You, Bot 2 and Bot 4; <b style="color:#e0661a">Team B</b> is Bot 1, Bot 3 and Bot 5.</p>
+<h3>Playing</h3><ul><li>Whoever holds the <b>4♥</b> leads first, with any set.</li>
+<li>Sets: a <b>Single</b>, a <b>Pair</b>, a <b>Triple</b> or a <b>Four</b> of the same rank.</li>
+<li>Next players must play the same kind of set, higher, or <b>Pass</b>.</li>
+<li>When everyone else passes, the last player to play wins the trick and leads anything.</li></ul>
+<h3>Card order (high to low)</h3><p>Big Joker, Small Joker, 3, 2, A, K, Q, J, 10, 9, 8, 7, 6, 5, 4</p>
+<h3>Wild cards <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#f2c94c;border:1px solid #a57a00;vertical-align:-1px"></span></h3>
+<ul><li>Both Jokers, the 3s and the 2s are wild. They can stand in for any card from 4 to A to make Pairs, Triples and Fours. Example: Big Joker + 4 is a Pair of 4s.</li>
+<li>Played alone, a wild card is a Single of its own value.</li>
+<li>A set made only of wild cards counts as its lowest card. Example: Big Joker + 3 is a Pair of 3s.</li></ul>
+<h3>Winning</h3><p>The first player out is <b>Top</b>, the one left holding cards is <b>Stuck</b>. If Top and Stuck are on different teams, Top's team wins the game. If they are on the same team, it is a draw. First team to win 2 games wins the match.</p>`},
+  zh:{home:'⌂ 主页',newGame:'新游戏',help:'玩法',full:'全屏',exitFull:'退出全屏',play:'出牌',pass:'过',hint:'提示',
+    lang:'English',sub:'砸六家 · 天津扑克',
+    desc:'你和两个电脑（A 队）对三个电脑（B 队）。抢先出完手里的牌，还要让对方有人落家。三盘两胜。',
+    you:'你',bot:n=>n+' 号',team:'队',cards:n=>n+' 张',gameN:n=>'第 '+n+' 盘',bo3:'三盘两胜',
+    yourTurnLead:'你先出：随便出',yourTurnBeat:c=>'压过 '+c+'，或者过',waiting:n=>n+' 在想…',youOut:'你出完了！看其他人打…',
+    leads:(n,c)=>n+' 有 '+c+'，先出',wins:n=>n+' 这轮最大',freeLead:n=>n+' 自由出牌',
+    single:'单张',pair:'对子',triple:'三张',four:'四张',of:(t,r)=>t+' '+r,
+    sel:'点牌选择',bad:'不是合法牌型',low:c=>'太小：要大过 '+c,ok:c=>c,
+    noPlay:'没有能压的牌：请点过',
+    first:'第 1 名 · 大贡',last:'最后 · 落家',nth:n=>'第 '+(n+1)+' 名',
+    winA:'A 队赢了这盘！',winB:'B 队赢了这盘！',draw:'平局：大贡和落家是同一队',
+    next:'下一盘',matchA:'你们队赢了整局！',matchB:'B 队赢了整局',again:'再来一局',share:'分享',
+    score:'比分',helpTitle:'玩法',
+    fsTitle:'全屏',fsText:'这个浏览器不能直接全屏。把 SIX PLAYER 添加到主屏幕，再从图标打开。',
+    fsSteps:'<b>iPhone / iPad（Safari）：</b>点分享，再点<b>添加到主屏幕</b>。<br><b>安卓（Chrome）：</b>点 ⋮ 菜单，再点<b>添加到主屏幕</b>。<br><b>在微信等应用里：</b>先用手机浏览器打开这个网页。',
+    ok:'好的',close:'关闭',shareText:(a,b)=>'我们队 '+a+':'+b+' 赢了砸六家 SIX PLAYER！',
+    helpHtml:`<h2>玩法</h2>
+<h3>分队</h3><p>六个人，每人 9 张牌（54 张，含大小王）。隔一个座位是队友：<b style="color:#1677d6">A 队</b>是你、2 号、4 号；<b style="color:#e0661a">B 队</b>是 1 号、3 号、5 号。</p>
+<h3>出牌</h3><ul><li>拿到<b>红桃 4</b> 的人先出，牌型随意。</li>
+<li>牌型：<b>单张、对子、三张、四张</b>（同点数）。</li>
+<li>下家要出同样的牌型并且更大，否则就<b>过</b>。</li>
+<li>其他人都过了，最后出牌的人赢这一轮，再自由出牌。</li></ul>
+<h3>大小（从大到小）</h3><p>大王、小王、3、2、A、K、Q、J、10、9、8、7、6、5、4</p>
+<h3>混儿 <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#f2c94c;border:1px solid #a57a00;vertical-align:-1px"></span></h3>
+<ul><li>大王、小王、3、2 是混儿，可以当 4 到 A 的任何牌，凑对子、三张、四张。例如：大王 + 4 = 一对 4。</li>
+<li>混儿单出时按自己的大小算。</li>
+<li>一手牌全是混儿时，按其中最小的那张算。例如：大王 + 3 = 一对 3。</li></ul>
+<h3>输赢</h3><p>第一个出完的是<b>大贡</b>，最后手里还有牌的是<b>落家</b>。大贡和落家不同队，大贡那队赢这盘；同一队就是平局。先赢两盘的队赢整局。</p>`}
+};
+let LANG='en';
+try{ if(localStorage.getItem('sixLang')==='zh') LANG='zh'; }catch(e){}
+const T=k=>TXT[LANG][k];
+
+/* ================= cards & the wild-card (混儿) rules ================= */
+// rank values: 4=2 ... A=12, 2=13, 3=14, Small Joker=15, Big Joker=16. Ranks 13+ are wild.
+const FACE={2:'4',3:'5',4:'6',5:'7',6:'8',7:'9',8:'10',9:'J',10:'Q',11:'K',12:'A',13:'2',14:'3'};
+const SUITS=['♠','♥','♣','♦']; // spade, heart, club, diamond
+const HEART4_ID=1*13+0; // suit 1 (heart), rank value 2 (face 4)
+function makeDeck(){
+  const d=[];
+  for(let s=0;s<4;s++) for(let r=2;r<=14;r++) d.push({id:s*13+(r-2),r,s});
+  d.push({id:52,r:15,s:-1},{id:53,r:16,s:-1});
+  return d;
+}
+const isWild=c=>c.r>=13;
+const rankName=r=>r===16?(LANG==='zh'?'大王':'Big Joker'):r===15?(LANG==='zh'?'小王':'Small Joker'):FACE[r];
+const cardName=c=>c.s<0?rankName(c.r):FACE[c.r]+SUITS[c.s];
+
+// Wild-card resolver. Any 1-4 cards -> {n, rank} or null.
+// A single is always its own value (a lone wild is not a stand-in). For 2-4 cards, the ordinary
+// cards (4..A) must all share one rank, and every wild card stands in for that rank. If every card
+// is wild, nothing is being substituted and the set counts as its lowest card (Big Joker + 3 = pair of 3s).
+function analyze(cs){
+  const n=cs.length; if(n<1||n>4) return null;
+  if(n===1) return {n:1,rank:cs[0].r};
+  const nat=cs.filter(c=>!isWild(c));
+  if(nat.length){ const r=nat[0].r; return nat.every(c=>c.r===r)?{n,rank:r}:null; }
+  return {n,rank:Math.min(...cs.map(c=>c.r))};
+}
+const beats=(a,b)=>!!a&&a.n===b.n&&a.rank>b.rank;
+function comboName(cb){
+  const t=[T('single'),T('pair'),T('triple'),T('four')][cb.n-1];
+  let r=rankName(cb.rank); if(cb.n>1&&LANG==='en'&&cb.rank<=14) r+='s';
+  return T('of')(t,r);
+}
+
+/* every set a hand can make: {cards, n, rank, wild (wild cards spent), brk (ordinary cards of that rank left behind)} */
+function candidates(hand){
+  const out=[], wild=hand.filter(isWild).sort((a,b)=>a.r-b.r), groups={};
+  for(const c of hand){ out.push({cards:[c],n:1,rank:c.r,wild:isWild(c)?1:0,brk:0}); if(!isWild(c)) (groups[c.r]=groups[c.r]||[]).push(c); }
+  for(const r in groups){ const g=groups[r];
+    for(let n=2;n<=4;n++) for(let k=Math.min(g.length,n);k>=1;k--){ const need=n-k; if(need>wild.length) continue;
+      out.push({cards:g.slice(0,k).concat(wild.slice(0,need)),n,rank:+r,wild:need,brk:g.length-k}); break; } }
+  // all-wild sets: keep the cheapest way to make each (size, rank)
+  const best={}, W=wild.length;
+  for(let m=1;m<(1<<W);m++){ const sub=[]; for(let i=0;i<W;i++) if(m>>i&1) sub.push(wild[i]);
+    if(sub.length<2||sub.length>4) continue; const cb=analyze(sub), key=cb.n+'_'+cb.rank, cost=sub.reduce((s,c)=>s+c.r,0);
+    if(!best[key]||best[key].cost>cost) best[key]={cards:sub,n:cb.n,rank:cb.rank,wild:sub.length,brk:0,cost}; }
+  for(const k in best) out.push(best[k]);
+  return out;
+}
+
+/* ================= game state ================= */
+const G={hands:[[],[],[],[],[],[]],turn:0,trick:null,passed:new Set(),out:[],acts:{},game:1,score:[0,0],results:[],
+  busy:false,over:false,matchOver:false,sel:new Set(),timer:null,leadMsg:''};
+const team=p=>p%2;            // 0 = Team A (seats 0,2,4), 1 = Team B
+const active=()=>[0,1,2,3,4,5].filter(p=>G.hands[p].length>0);
+const nextActive=p=>{ for(let i=1;i<=6;i++){ const q=(p+i)%6; if(G.hands[q].length) return q; } return p; };
+const pname=p=>p===0?T('you'):T('bot')(p);
+const sortHand=h=>h.sort((a,b)=>a.r-b.r||a.s-b.s);
+
+function shuffle(a,rnd){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function deal(rnd){
+  const d=shuffle(makeDeck(),rnd||Math.random);
+  for(let p=0;p<6;p++) G.hands[p]=sortHand(d.slice(p*9,p*9+9));
+  G.trick=null; G.passed=new Set(); G.out=[]; G.acts={}; G.over=false; G.sel.clear();
+  G.turn=[0,1,2,3,4,5].find(p=>G.hands[p].some(c=>c.id===HEART4_ID));
+}
+
+/* one action: cards = array to play, or null to pass. Returns 'trick' when a trick just ended, 'end' at game end. */
+function act(p,cards){
+  if(cards){
+    const cb=analyze(cards);
+    const ids=new Set(cards.map(c=>c.id)); G.hands[p]=G.hands[p].filter(c=>!ids.has(c.id));
+    G.trick={cards,combo:cb,by:p}; G.passed=new Set(); G.acts[p]={cards};
+    if(!G.hands[p].length) G.out.push(p);
+    if(active().length<=1){ G.over=true; return 'end'; }
+  } else { G.passed.add(p); G.acts[p]={pass:true}; }
+  const by=G.trick.by, others=active().filter(q=>q!==by);
+  if(others.every(q=>G.passed.has(q))){
+    G.turn=G.hands[by].length?by:nextActive(by); G.lastWinner=by; return 'trick';
+  }
+  G.turn=nextActive(p); return 'go';
+}
+function clearTrick(){ G.trick=null; G.passed=new Set(); G.acts={}; }
+function roundResult(){
+  const last=active()[0], order=G.out.concat([last]), top=order[0];
+  return {order,top,last,winner:team(top)!==team(last)?team(top):-1};
+}
+
+/* ================= AI ================= */
+// Uses only its own hand plus what is public (cards played, card counts). No peeking.
+function aiChoose(p){
+  const hand=G.hands[p], cands=candidates(hand);
+  const opps=active().filter(q=>team(q)!==team(p)), minOpp=opps.length?Math.min(...opps.map(q=>G.hands[q].length)):9;
+  const whole=cands.find(c=>c.cards.length===hand.length);
+  if(!G.trick){ // free lead
+    if(whole) return whole.cards;
+    const nat=hand.filter(c=>!isWild(c));
+    if(nat.length){
+      // lowest ordinary rank, played as the whole group (single, pair, triple or four)
+      const r=nat[0].r, g=nat.filter(c=>c.r===r);
+      // an opponent about to go out on a single: lead a group instead of a lone low card if we can
+      if(minOpp===1&&g.length===1){ const grp=cands.find(c=>c.n>1&&c.wild===0); if(grp) return grp.cards;
+        const hi=nat[nat.length-1]; return [hi]; }
+      return g;
+    }
+    // only wild cards left: play them out lowest first, pairs of the same value together
+    const w=hand.slice().sort((a,b)=>a.r-b.r), same=w.filter(c=>c.r===w[0].r);
+    return same.length>1&&same.length<=4?same:[w[0]];
+  }
+  const t=G.trick.combo, mate=team(G.trick.by)===team(p);
+  const legal=cands.filter(c=>c.n===t.n&&c.rank>t.rank);
+  if(!legal.length) return null;
+  const finish=legal.find(c=>c.cards.length===hand.length);
+  if(finish) return finish.cards;
+  const cost=c=>c.wild*30+c.rank+c.brk*4+(c.n===1&&isWild(c.cards[0])?c.rank:0);
+  legal.sort((a,b)=>cost(a)-cost(b));
+  const best=legal[0];
+  if(mate){ // a teammate is winning: let them, unless it is a cheap low card
+    if(t.rank>=12||best.wild>0||best.brk>0||best.rank>9) return null;
+    return Math.random()<0.4?best.cards:null;
+  }
+  const danger=minOpp<=2||G.hands[G.trick.by].length<=2;
+  const maxWild=danger?2:1;
+  if(best.wild>maxWild) return null;
+  if(best.wild===1&&!danger&&hand.length>4&&t.rank<8) return null; // save wild cards early on
+  return best.cards;
+}
+// the human's Hint: the cheapest set that beats the table (or the lowest group to lead)
+function hintFor(p){
+  if(!G.trick) return aiChoose(p);
+  const t=G.trick.combo, legal=candidates(G.hands[p]).filter(c=>c.n===t.n&&c.rank>t.rank);
+  if(!legal.length) return null;
+  legal.sort((a,b)=>(a.wild*30+a.rank+a.brk*4)-(b.wild*30+b.rank+b.brk*4));
+  return legal[0].cards;
+}
+
+/* ================= flow ================= */
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>G.timer=setTimeout(r,ms));
+const speed=()=>G.hands[0].length?1:0.45;
+let runId=0;
+
+function newMatch(){ G.game=1; G.score=[0,0]; G.results=[]; G.matchOver=false; startRound(); }
+function startRound(){
+  runId++; clearTimeout(G.timer);
+  deal(); hideOv('roundOv');
+  const holder=G.turn, h4=G.hands[holder].find(c=>c.id===HEART4_ID);
+  render(); toast(T('leads')(pname(holder),cardName(h4)),1800);
+  loop(runId);
+}
+async function loop(id){
+  await sleep(900);
+  while(id===runId&&!G.over){
+    const p=G.turn;
+    if(p===0){ render(); return; } // wait for the human
+    render(); await sleep(650*speed()+Math.random()*350*speed()); if(id!==runId) return;
+    const r=act(p,aiChoose(p)); render();
+    if(r==='trick'){ await afterTrick(id); if(id!==runId) return; }
+    if(r==='end'){ await sleep(900); if(id!==runId) return; return endRound(); }
+  }
+}
+async function afterTrick(id){
+  await sleep(1000*speed()); if(id!==runId) return;
+  const w=G.lastWinner; clearTrick(); render();
+  toast(G.hands[w].length?T('wins')(pname(w)):T('freeLead')(pname(G.turn)),1100);
+  await sleep(500*speed());
+}
+async function humanAct(cards){
+  if(G.turn!==0||G.over) return;
+  const id=runId; G.sel.clear();
+  const r=act(0,cards); render();
+  if(r==='trick'){ await afterTrick(id); if(id!==runId) return; }
+  if(r==='end'){ await sleep(900); if(id!==runId) return; return endRound(); }
+  loop(id);
+}
+function endRound(){
+  const res=roundResult(); G.results.push(res);
+  if(res.winner>=0) G.score[res.winner]++;
+  if(G.score[0]>=2||G.score[1]>=2) G.matchOver=true;
+  showRound(res); render();
+}
+
+/* ================= drawing ================= */
+const SEAT_POS=[null,[118,390],[250,128],[640,62],[1030,128],[1162,390]];
+const ACT_POS=[[640,470],[330,380],[430,235],[640,180],[850,235],[950,380]];
+function cardHTML(c,big){
+  const red=c.s===1||c.s===3||c.r===16, cls='card'+(big?' big':'')+(red?' red':'')+(c.s<0?' joker':'');
+  const w=isWild(c)?'<span class="wild"></span>':'';
+  if(c.s<0) return `<div class="${cls}" data-id="${c.id}"><span class="tl">JOKER</span><span class="mid">★</span>${w}</div>`;
+  return `<div class="${cls}" data-id="${c.id}"><span class="tl">${FACE[c.r]}<i>${SUITS[c.s]}</i></span><span class="mid">${SUITS[c.s]}</span>${w}</div>`;
+}
+function seatInner(p){
+  const out=G.out.indexOf(p), n=G.hands[p].length, tm=team(p)?'B':'A';
+  return `${G.turn===p&&!G.over?'<div class="arrow">▼</div>':''}
+    <div class="ava ${tm}">${p===0?'★':p}</div>
+    <div><div class="sname">${pname(p)}<span class="badge ${tm}">${tm}</span></div>
+    <div class="scount">${n?`<span class="mini"></span>${T('cards')(n)}`:'✔'}</div></div>
+    ${out>=0?`<div class="place">${out===0?(LANG==='zh'?'大贡':'Top'):'#'+(out+1)}</div>`:''}`;
+}
+function render(){
+  // static labels
+  $('homeBtn').innerHTML=T('home'); $('tHome').innerHTML=T('home'); $('newBtn').textContent=T('newGame');
+  $('helpBtn').textContent=T('help'); $('tHelpBtn').textContent=T('help'); $('startBtn').textContent=T('play');
+  $('langTop').textContent=T('lang'); $('langBtn').textContent=T('lang');
+  $('playBtn').textContent=T('play'); $('passBtn').textContent=T('pass'); $('hintBtn').textContent=T('hint');
+  $('tSub').textContent=T('sub'); $('tDesc').textContent=T('desc'); $('helpBox').innerHTML=T('helpHtml')+`<div class="row"><button class="go" id="helpOk">${T('close')}</button></div>`;
+  $('helpOk').onclick=()=>hideOv('helpOv');
+  paintFs&&paintFs();
+  // score
+  $('score').innerHTML=`<div>${T('gameN')(G.game)} · ${T('bo3')}</div><div class="big"><b class="a">A ${G.score[0]}</b> – <b class="b">${G.score[1]} B</b></div>`;
+  // seats
+  let s=''; for(let p=1;p<6;p++){ const [x,y]=SEAT_POS[p];
+    s+=`<div class="seat${G.turn===p&&!G.over?' turn':''}${G.hands[p].length?'':' out'}" style="left:${x}px;top:${y}px">${seatInner(p)}</div>`; }
+  $('seats').innerHTML=s;
+  $('me').innerHTML=`<div class="seat${G.turn===0&&!G.over?' turn':''}" style="left:0;top:0;transform:translate(-50%,-50%) scale(.92)">${seatInner(0)}</div>`;
+  $('me').style.left='96px'; $('me').style.top='648px';
+  // what each player last did this trick (the current top set is shown big in the middle)
+  let a=''; for(let p=0;p<6;p++){ const v=G.acts[p]; if(!v) continue; if(G.trick&&v.cards&&G.trick.by===p) continue;
+    const [x,y]=ACT_POS[p]; a+=`<div class="act" style="left:${x}px;top:${y}px">${v.pass?`<div class="passTag">${T('pass')}</div>`:v.cards.map(c=>cardHTML(c)).join('')}</div>`; }
+  $('acts').innerHTML=a;
+  // centre
+  if(G.trick){ const t=G.trick;
+    $('center').innerHTML=`<div class="cards">${t.cards.map(c=>cardHTML(c,true)).join('')}</div><div class="who"><span style="color:${team(t.by)?'var(--teamB)':'var(--teamA)'}">${pname(t.by)}</span> · ${comboName(t.combo)}</div>`;
+  } else $('center').innerHTML='';
+  // hand
+  $('hand').innerHTML=G.hands[0].map(c=>cardHTML(c,true).replace('class="card','class="card'+(G.sel.has(c.id)?' sel':''))).join('');
+  $('hand').querySelectorAll('.card').forEach(el=>el.onclick=()=>{ const id=+el.dataset.id; G.sel.has(id)?G.sel.delete(id):G.sel.add(id); render(); });
+  // buttons and message
+  const my=G.turn===0&&!G.over&&G.hands[0].length>0;
+  const sel=G.hands[0].filter(c=>G.sel.has(c.id)), cb=sel.length?analyze(sel):null;
+  const okPlay=my&&cb&&(!G.trick||beats(cb,G.trick.combo));
+  $('playBtn').disabled=!okPlay; $('passBtn').disabled=!my||!G.trick; $('hintBtn').disabled=!my;
+  let tip='';
+  if(my){ if(!sel.length) tip=G.trick&&!hintFor(0)?T('noPlay'):T('sel'); else if(!cb) tip=T('bad'); else if(G.trick&&!beats(cb,G.trick.combo)) tip=T('low')(comboName(G.trick.combo)); else tip=comboName(cb); }
+  $('comboTip').textContent=tip;
+  let m='';
+  if(!G.hands[0].length&&!G.over) m=T('youOut');
+  else if(my) m=G.trick?T('yourTurnBeat')(comboName(G.trick.combo)):T('yourTurnLead');
+  else if(!G.over&&G.turn!=null) m=T('waiting')(pname(G.turn));
+  $('msg').textContent=m; $('msg').classList.toggle('hidden',!m||G.over);
+  $('btns').style.visibility=G.hands[0].length?'visible':'hidden';
+}
+let toastT=null;
+function toast(t,ms){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),ms||1400); }
+const showOv=id=>$(id).classList.remove('hidden'), hideOv=id=>$(id).classList.add('hidden');
+
+function showRound(res){
+  const oc=res.order.map((p,i)=>{ const tm=team(p)?'B':'A', cls=i===0?' first':i===5?' last':'';
+    return `<div class="o${cls}"><div class="ava ${tm}">${p===0?'★':p}</div><div class="n">${pname(p)} <span class="badge ${tm}">${tm}</span></div>
+      <div class="t">${i===0?T('first'):i===5?T('last'):T('nth')(i)}</div></div>`; }).join('');
+  const rt=res.winner===0?`<div class="res a">${T('winA')}</div>`:res.winner===1?`<div class="res b">${T('winB')}</div>`:`<div class="res">${T('draw')}</div>`;
+  let tail='', btns='';
+  if(G.matchOver){
+    const won=G.score[0]>=2;
+    tail=`<div class="res ${won?'a':'b'}" style="font-size:34px;margin-top:14px">${won?T('matchA'):T('matchB')}</div>`;
+    btns=`<button class="go" id="againBtn">${T('again')}</button>${won&&window.EmilyShare?`<button id="shareBtn">${T('share')}</button>`:''}`;
+    if(won&&window.EmilyShare) snapShare();
+  } else btns=`<button class="go" id="nextBtn">${T('next')}</button>`;
+  $('roundBox').innerHTML=`<h2>${T('gameN')(G.game)}</h2><div class="order">${oc}</div>${rt}
+    <div style="font-size:22px;font-weight:800;margin-top:10px"><span style="color:#1677d6">A ${G.score[0]}</span> – <span style="color:#e0661a">${G.score[1]} B</span></div>${tail}
+    <div class="row">${btns}</div>`;
+  showOv('roundOv');
+  if($('nextBtn')) $('nextBtn').onclick=()=>{ G.game++; startRound(); };
+  if($('againBtn')) $('againBtn').onclick=()=>newMatch();
+  if($('shareBtn')) $('shareBtn').onclick=()=>EmilyShare.open();
+}
+// share picture: the match result drawn on a small green table
+function snapShare(){
+  const c=document.createElement('canvas'); c.width=1200; c.height=534; const x=c.getContext('2d');
+  const g=x.createRadialGradient(600,250,50,600,267,700); g.addColorStop(0,'#1a7a5a'); g.addColorStop(1,'#0a3d2e');
+  x.fillStyle=g; x.fillRect(0,0,1200,534);
+  x.textAlign='center'; x.fillStyle='#fff'; x.font='900 84px system-ui, sans-serif'; x.fillText('SIX PLAYER',600,120);
+  x.font='bold 30px system-ui, sans-serif'; x.fillStyle='#cfe9dc'; x.fillText(LANG==='zh'?'砸六家':'Za Liu Jia',600,168);
+  x.font='900 120px system-ui, sans-serif'; x.fillStyle='#3aa0ff'; x.fillText('A '+G.score[0],470,330);
+  x.fillStyle='#fff'; x.fillText('–',600,330); x.fillStyle='#ff8a3d'; x.fillText(G.score[1]+' B',730,330);
+  x.font='bold 34px system-ui, sans-serif'; x.fillStyle='#f2c94c'; x.fillText(T('matchA'),600,410);
+  // a fan of wild cards
+  [['3','♥',1],['2','♠',0],['★','',1]].forEach((v,i)=>{ x.save(); x.translate(180+i*40,440); x.rotate((i-1)*.2);
+    x.fillStyle='#fff'; x.fillRect(-40,-110,80,112); x.fillStyle=v[2]?'#c8262c':'#1d1d1d'; x.font='bold 34px system-ui'; x.fillText(v[0],-14,-74); x.fillText(v[1],-14,-40); x.restore(); });
+  EmilyShare.snap({canvas:c,game:'SIX PLAYER',text:T('shareText')(G.score[0],G.score[1]),path:'six-player/'});
+}
+
+/* ================= stage scaling, buttons, full screen ================= */
+const IS_PHONE=matchMedia('(pointer: coarse)').matches&&Math.min(screen.width,screen.height)<600;
+function fit(){
+  const vw=innerWidth, vh=innerHeight, st=$('stage');
+  const rot=IS_PHONE&&vh>vw; // upright phone: turn the game sideways
+  const s=rot?Math.min(vh/1280,vw/720):Math.min(vw/1280,vh/720);
+  st.style.transform=`translate(-50%,-50%) ${rot?'rotate(90deg) ':''}scale(${s})`;
+}
+addEventListener('resize',fit); addEventListener('orientationchange',()=>setTimeout(fit,200)); fit();
+
+function setLang(l){ LANG=l; try{ localStorage.setItem('sixLang',l); }catch(e){} document.documentElement.lang=l==='zh'?'zh-CN':'en';
+  render(); if(!$('roundOv').classList.contains('hidden')&&G.results.length) showRound(G.results[G.results.length-1]); paintFsHelp(); }
+$('langBtn').onclick=$('langTop').onclick=()=>setLang(LANG==='en'?'zh':'en');
+$('startBtn').onclick=()=>{ hideOv('titleOv'); newMatch(); };
+$('newBtn').onclick=()=>{ hideOv('roundOv'); newMatch(); };
+$('helpBtn').onclick=$('tHelpBtn').onclick=()=>showOv('helpOv');
+$('playBtn').onclick=()=>{ const sel=G.hands[0].filter(c=>G.sel.has(c.id)), cb=analyze(sel);
+  if(G.turn===0&&cb&&(!G.trick||beats(cb,G.trick.combo))) humanAct(sel); };
+$('passBtn').onclick=()=>{ if(G.turn===0&&G.trick) humanAct(null); };
+$('hintBtn').onclick=()=>{ const h=hintFor(0); G.sel=new Set(h?h.map(c=>c.id):[]); render(); if(!h) toast(T('noPlay'),1400); };
+
+const root=document.documentElement;
+const standalone=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches||navigator.standalone===true;
+const fsOn=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+var paintFs=()=>document.querySelectorAll('.fsBtn').forEach(b=>{ b.classList.toggle('hidden',standalone); b.textContent=fsOn()?'✕ '+T('exitFull'):'⛶ '+T('full'); });
+const req=root.requestFullscreen||root.webkitRequestFullscreen;
+const lockLand=()=>{ try{ const o=screen.orientation; if(IS_PHONE&&o&&o.lock) o.lock('landscape').catch(()=>{}); }catch(e){} };
+const enterFs=()=>{ try{ const r=req.call(root,{navigationUI:'hide'}); if(r&&r.then) r.then(lockLand).catch(()=>{}); }catch(e){} };
+function paintFsHelp(){ $('fsBox').innerHTML=`<h2>${T('fsTitle')}</h2><p>${T('fsText')}</p><p style="margin-top:8px">${T('fsSteps')}</p><div class="row"><button class="go" id="fsOk">${T('ok')}</button></div>`;
+  $('fsOk').onclick=()=>hideOv('fsHelpOv'); }
+paintFsHelp();
+const fsHelp=()=>showOv('fsHelpOv');
+document.querySelectorAll('.fsBtn').forEach(b=>b.onclick=()=>{
+  if(fsOn()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); return; }
+  if(!req) return fsHelp();
+  let r=null; try{ r=req.call(root,{navigationUI:'hide'}); }catch(e){ return fsHelp(); }
+  if(r&&r.then) r.then(lockLand).catch(()=>fsHelp()); else setTimeout(()=>{ if(!fsOn()) fsHelp(); },500);
+});
+document.addEventListener('fullscreenchange',()=>{ paintFs(); setTimeout(fit,100); }); document.addEventListener('webkitfullscreenchange',()=>{ paintFs(); setTimeout(fit,100); });
+if(req&&!standalone&&matchMedia('(pointer: coarse)').matches){
+  const once=e=>{ if(e.target.closest&&e.target.closest('a,.fsBtn')) return; document.removeEventListener('pointerup',once,true); if(!fsOn()) enterFs(); };
+  document.addEventListener('pointerup',once,true);
+}
+document.documentElement.lang=LANG==='zh'?'zh-CN':'en';
+deal(); G.turn=null; render();
+
+/* test hooks: whole games played by six bots, no screen updates */
+window.__six={G,analyze,candidates,aiChoose,makeDeck,
+  sim(n,seed){ let s=seed||1; const rnd=()=>(s=(s*16807)%2147483647)/2147483647; const tally={A:0,B:0,draw:0,maxSteps:0,lens:[]};
+    for(let i=0;i<n;i++){ deal(rnd); let steps=0;
+      while(!G.over&&steps<2000){ const p=G.turn, ch=aiChoose(p);
+        if(ch){ const cb=analyze(ch); if(!cb||(G.trick&&!beats(cb,G.trick.combo))) throw new Error('illegal AI play'); }
+        else if(!G.trick) throw new Error('AI passed on a free lead');
+        const r=act(p,ch); if(r==='trick') clearTrick(); steps++; }
+      if(!G.over) throw new Error('stuck');
+      tally.maxSteps=Math.max(tally.maxSteps,steps); const res=roundResult(); tally[res.winner===0?'A':res.winner===1?'B':'draw']++; }
+    G.turn=null; return tally; }};
+</script>
+</body>
+</html>
