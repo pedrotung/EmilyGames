@@ -98,6 +98,15 @@
   #btns button{font-size:20px;padding:12px 0;}
   #playBtn{background:var(--gold);grid-column:1 / 3;}
   #comboTip{position:absolute;right:22px;top:548px;width:250px;text-align:center;font-size:14px;opacity:.9;z-index:8;}
+  #calls{position:absolute;left:18px;top:440px;width:170px;display:grid;gap:7px;z-index:8;}
+  #calls .h{font-size:13px;font-weight:700;opacity:.85;text-align:center;}
+  #calls button{font-size:15px;padding:7px 0;background:rgba(255,255,255,.9);}
+  #calls button.on{background:var(--gold);}
+  .bubble{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#1d1d1d;font-weight:800;font-size:16px;padding:6px 12px;border-radius:14px;
+    white-space:nowrap;z-index:9;box-shadow:0 3px 8px rgba(0,0,0,.4);animation:pop .25s ease-out;}
+  .bubble:after{content:'';position:absolute;left:50%;bottom:-8px;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:#fff;}
+  .bubble.A{border:3px solid var(--teamA);} .bubble.B{border:3px solid var(--teamB);}
+  @keyframes pop{from{transform:translate(-50%,-100%) scale(.5);opacity:0;}}
   /* overlays */
   .ov{position:absolute;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:50;}
   .box{background:#fff;color:#1d1d1d;border-radius:18px;padding:22px 28px;max-width:860px;max-height:660px;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.5);}
@@ -141,6 +150,8 @@
   <div id="msg"></div>
   <div id="hand"></div>
   <div id="comboTip"></div>
+  <div id="calls"></div>
+  <div id="bubbles"></div>
   <div id="btns">
     <button id="playBtn">Play</button>
     <button id="passBtn">Pass</button>
@@ -185,10 +196,12 @@ const TXT={
     sel:'Tap cards to choose',bad:'Not a valid set',low:c=>'Too low: needs '+c,ok:c=>c,
     noPlay:'No cards can beat it: pass',
     first:'1st out · Top',last:'Stuck',nth:n=>['1st','2nd','3rd','4th','5th','6th'][n]+' out',
-    winA:'Team A wins this game!',winB:'Team B wins this game!',draw:'Draw: Top and Stuck are on the same team',
+    winA:'Team A wins this hand!',winB:'Team B wins this hand!',draw:'Draw: Top and Stuck are on the same team',
     next:'Next Hand',matchA:'Team A wins the pot!',matchB:'Team B wins the pot',again:'New Pot',share:'Share',potBtn:'Pot Results',
     potTitle:'Pot Results',hands:'Hands',draws:'Draws',tops:'Top',stucks:'Stuck',dr:'Draw',
     jiefeng:n=>n+' takes the lead for a teammate',
+    signals:'Signal your team',call:{pair:'Pretty one!',triple:'Wicked one!',bridge:'Bridge me!'},
+    callBtn:{pair:'Pretty one',triple:'Wicked one',bridge:'Bridge me'},
     score:'Score',helpTitle:'How to Play',
     fsTitle:'Full screen',fsText:'This browser cannot switch to full screen by itself. Add SIX PLAYER to your home screen and open it from the icon.',
     fsSteps:'<b>iPhone / iPad (Safari):</b> tap Share, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the ⋮ menu, then <b>Add to Home screen</b>.<br><b>In an app (WeChat and others):</b> open this page in your phone\'s browser first.',
@@ -205,7 +218,10 @@ const TXT={
 <ul><li>Both Jokers, the 3s and the 2s are wild. They can stand in for any card from 4 to A to make Pairs, Triples and Fours. Example: Big Joker + 4 is a Pair of 4s.</li>
 <li>Played alone, a wild card is a Single of its own value.</li>
 <li>A set made only of wild cards counts as its lowest card. Example: Big Joker + 3 is a Pair of 3s.</li></ul>
-<h3>Winning</h3><p>The first player out is <b>Top</b>, the one left holding cards is <b>Stuck</b>. As soon as one whole team is out, the hand ends: the players still holding cards are Stuck. If Top and Stuck are on different teams, Top's team wins the game. If they are on the same team, it is a draw and nobody scores.</p><h3>A pot</h3><p>Ten hands make a <b>pot</b>. The team with more wins takes the pot. If it is tied after ten hands, keep playing until one team is ahead.</p>`},
+<h3>Team signals</h3><p>You can't show your cards, but you can drop a hint. Tap a signal button any time; your teammates (and the bots) use them too:</p>
+<ul><li><b>Pretty one</b>: "lead a Pair, please".</li><li><b>Wicked one</b>: "lead a Triple, please".</li>
+<li><b>Bridge me</b>: "I have one small card left, lead a low Single so I can beat it and go out".</li></ul>
+<h3>Winning</h3><p>The first player out is <b>Top</b>, the one left holding cards is <b>Stuck</b>. As soon as one whole team is out, the hand ends: the players still holding cards are Stuck. If Top and Stuck are on different teams, Top's team wins the hand. If they are on the same team, it is a draw and nobody scores.</p><h3>A pot</h3><p>Ten hands make a <b>pot</b>. The team with more wins takes the pot. If it is tied after ten hands, keep playing until one team is ahead.</p>`},
   zh:{home:'⌂ 主页',newGame:'新游戏',help:'玩法',full:'全屏',exitFull:'退出全屏',play:'出牌',pass:'过',hint:'提示',
     lang:'English',sub:'砸六家 · 天津扑克',
     desc:'你和两个电脑（A 队）对三个电脑（B 队）。抢先出完手里的牌，还要让对方有人落家。10 把牌为一锅，赢得多的队赢这一锅。',
@@ -216,10 +232,12 @@ const TXT={
     sel:'点牌选择',bad:'不是合法牌型',low:c=>'太小：要大过 '+c,ok:c=>c,
     noPlay:'没有能压的牌：请点过',
     first:'第 1 名 · 大贡',last:'落家',nth:n=>'第 '+(n+1)+' 名',
-    winA:'A 队赢了这盘！',winB:'B 队赢了这盘！',draw:'平局：大贡和落家是同一队',
+    winA:'A 队赢了这把！',winB:'B 队赢了这把！',draw:'平局：大贡和落家是同一队',
     next:'下一把',matchA:'A 队赢了这一锅！',matchB:'B 队赢了这一锅',again:'再开一锅',share:'分享',potBtn:'看这一锅统计',
     potTitle:'这一锅统计',hands:'把数',draws:'平局',tops:'大贡',stucks:'落家',dr:'平',
     jiefeng:n=>n+' 接风',
+    signals:'暗语',call:{pair:'来个漂亮的！',triple:'来个邪活！',bridge:'过桥！'},
+    callBtn:{pair:'漂亮的',triple:'邪活',bridge:'过桥'},
     score:'比分',helpTitle:'玩法',
     fsTitle:'全屏',fsText:'这个浏览器不能直接全屏。把 SIX PLAYER 添加到主屏幕，再从图标打开。',
     fsSteps:'<b>iPhone / iPad（Safari）：</b>点分享，再点<b>添加到主屏幕</b>。<br><b>安卓（Chrome）：</b>点 ⋮ 菜单，再点<b>添加到主屏幕</b>。<br><b>在微信等应用里：</b>先用手机浏览器打开这个网页。',
@@ -236,7 +254,10 @@ const TXT={
 <ul><li>大王、小王、3、2 是混儿，可以当 4 到 A 的任何牌，凑对子、三张、四张。例如：大王 + 4 = 一对 4。</li>
 <li>混儿单出时按自己的大小算。</li>
 <li>一手牌全是混儿时，按其中最小的那张算。例如：大王 + 3 = 一对 3。</li></ul>
-<h3>输赢</h3><p>第一个出完的是<b>大贡</b>，最后手里还有牌的是<b>落家</b>。一队三个人全部出完，这把就直接结束，手里还有牌的都算落家。大贡和落家不同队，大贡那队赢这盘；同一队就是平局，不算分。</p><h3>一锅</h3><p>10 把牌为一<b>锅</b>，赢得多的队赢这一锅。10 把打完还是平，就继续打，直到一队领先。</p>`}
+<h3>暗语</h3><p>不能明着报牌，但可以喊暗语。随时点暗语按钮，电脑队友也会喊：</p>
+<ul><li><b>漂亮的</b>：一对。“来个漂亮的”就是请队友出一对。</li><li><b>邪活</b>：三张，比如三个 5。</li>
+<li><b>过桥</b>：我只剩一张小牌，请队友出一张小单张让我管上，抢先走掉。</li></ul>
+<h3>输赢</h3><p>第一个出完的是<b>大贡</b>，最后手里还有牌的是<b>落家</b>。一队三个人全部出完，这把就直接结束，手里还有牌的都算落家。大贡和落家不同队，大贡那队赢这把；同一队就是平局，不算分。</p><h3>一锅</h3><p>10 把牌为一<b>锅</b>，赢得多的队赢这一锅。10 把打完还是平，就继续打，直到一队领先。</p>`}
 };
 let LANG='en';
 try{ if(localStorage.getItem('sixLang')==='zh') LANG='zh'; }catch(e){}
@@ -293,7 +314,7 @@ function candidates(hand){
 
 /* ================= game state ================= */
 const G={hands:[[],[],[],[],[],[]],turn:0,trick:null,passed:new Set(),out:[],acts:{},game:1,score:[0,0],results:[],
-  busy:false,over:false,matchOver:false,sel:new Set(),timer:null,leadMsg:''};
+  calls:{},busy:false,over:false,matchOver:false,sel:new Set(),timer:null,leadMsg:''};
 const team=p=>p%2;            // 0 = Team A (seats 0,2,4), 1 = Team B
 const active=()=>[0,1,2,3,4,5].filter(p=>G.hands[p].length>0);
 const nextActive=p=>{ for(let i=1;i<=6;i++){ const q=(p+i)%6; if(G.hands[q].length) return q; } return p; };
@@ -307,7 +328,7 @@ function shuffle(a,rnd){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()
 function deal(rnd){
   const d=shuffle(makeDeck(),rnd||Math.random);
   for(let p=0;p<6;p++) G.hands[p]=sortHand(d.slice(p*9,p*9+9));
-  G.trick=null; G.passed=new Set(); G.out=[]; G.acts={}; G.over=false; G.sel.clear();
+  G.trick=null; G.passed=new Set(); G.out=[]; G.acts={}; G.calls={}; G.over=false; G.sel.clear();
   G.turn=[0,1,2,3,4,5].find(p=>G.hands[p].some(c=>c.id===HEART4_ID));
 }
 
@@ -316,8 +337,9 @@ function act(p,cards){
   if(cards){
     const cb=analyze(cards);
     const ids=new Set(cards.map(c=>c.id)); G.hands[p]=G.hands[p].filter(c=>!ids.has(c.id));
+    if(!G.trick) for(const q in G.calls){ const c=G.calls[q]; if(+q!==p&&team(+q)===team(p)&&((c==='pair'&&cb.n===2)||(c==='triple'&&cb.n===3)||(c==='bridge'&&cb.n===1))) delete G.calls[q]; }
     G.trick={cards,combo:cb,by:p}; G.passed=new Set(); G.acts[p]={cards};
-    if(!G.hands[p].length) G.out.push(p);
+    if(!G.hands[p].length){ G.out.push(p); delete G.calls[p]; }
     // once one whole team is out the Stuck player must be on the other team, so the hand is decided
     if(teamOut(0)||teamOut(1)){ G.over=true; return 'end'; }
   } else { G.passed.add(p); G.acts[p]={pass:true}; }
@@ -335,12 +357,36 @@ function roundResult(){
 
 /* ================= AI ================= */
 // Uses only its own hand plus what is public (cards played, card counts). No peeking.
+// a teammate's signal: Bridge (they have one card: lead my lowest single), Pretty one (a pair), Wicked one (a triple)
+function answerCall(p,cands){
+  const mates=active().filter(q=>q!==p&&team(q)===team(p));
+  const bridge=mates.find(q=>G.hands[q].length===1&&(G.calls[q]==='bridge'||q!==0));
+  if(bridge!=null){ const lo=G.hands[p].filter(c=>!isWild(c)); return [lo.length?lo[0]:G.hands[p][0]]; }
+  for(const [type,n] of [['pair',2],['triple',3]]){
+    if(!mates.some(q=>G.calls[q]===type)) continue;
+    const ok=cands.filter(c=>c.n===n&&c.wild<=1&&c.rank<=11).sort((a,b)=>(a.wild*30+a.rank+a.brk*3)-(b.wild*30+b.rank+b.brk*3));
+    if(ok.length) return ok[0].cards;
+  }
+  return null;
+}
+// bots signal when a teammate is about to lead: one card left -> Bridge, a spare low pair or triple -> ask for one
+function botCalls(leader){
+  for(const q of active()){ if(q===0||q===leader||team(q)!==team(leader)||G.calls[q]) continue;
+    const h=G.hands[q], nat=h.filter(c=>!isWild(c)), cnt={}; nat.forEach(c=>cnt[c.r]=(cnt[c.r]||0)+1);
+    let call=null;
+    if(h.length===1&&h[0].r<=9) call='bridge';
+    else if(Object.entries(cnt).some(([r,k])=>k===3&&+r<=10)) call='triple';
+    else if(Object.entries(cnt).filter(([r,k])=>k===2&&+r<=10).length>=1&&h.length>2) call='pair';
+    if(call&&Math.random()<0.6){ G.calls[q]=call; G.callAt=Date.now(); }
+  }
+}
 function aiChoose(p){
   const hand=G.hands[p], cands=candidates(hand);
   const opps=active().filter(q=>team(q)!==team(p)), minOpp=opps.length?Math.min(...opps.map(q=>G.hands[q].length)):9;
   const whole=cands.find(c=>c.cards.length===hand.length);
   if(!G.trick){ // free lead
     if(whole) return whole.cards;
+    const ans=answerCall(p,cands); if(ans) return ans;
     const nat=hand.filter(c=>!isWild(c));
     if(nat.length){
       // lowest ordinary rank, played as the whole group (single, pair, triple or four)
@@ -408,7 +454,7 @@ async function loop(id){
 }
 async function afterTrick(id){
   await sleep(1000*speed()); if(id!==runId) return;
-  const w=G.lastWinner; clearTrick(); render();
+  const w=G.lastWinner; clearTrick(); botCalls(G.turn); render();
   toast(G.hands[w].length?T('wins')(pname(w)):team(G.turn)===team(w)?T('jiefeng')(pname(G.turn)):T('freeLead')(pname(G.turn)),1300);
   await sleep(500*speed());
 }
@@ -465,6 +511,13 @@ function render(){
   let a=''; for(let p=0;p<6;p++){ const v=G.acts[p]; if(!v) continue; if(G.trick&&v.cards&&G.trick.by===p) continue;
     const [x,y]=ACT_POS[p]; a+=`<div class="act" style="left:${x}px;top:${y}px">${v.pass?`<div class="passTag">${T('pass')}</div>`:v.cards.map(c=>cardHTML(c)).join('')}</div>`; }
   $('acts').innerHTML=a;
+  let bb=''; for(const q in G.calls){ const p=+q, [x,y]=p===0?[262,578]:SEAT_POS[p];
+    bb+=`<div class="bubble ${team(p)?'B':'A'}" style="left:${x}px;top:${y-(p===0?0:44)}px">${T('call')[G.calls[q]]}</div>`; }
+  $('bubbles').innerHTML=bb;
+  const canCall=G.hands[0].length>0&&!G.over&&G.turn!=null;
+  $('calls').innerHTML=`<div class="h">${T('signals')}</div>`+['pair','triple','bridge'].map(k=>`<button data-k="${k}" class="${G.calls[0]===k?'on':''}"${canCall?'':' disabled'}>${T('callBtn')[k]}</button>`).join('');
+  $('calls').querySelectorAll('button').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(G.calls[0]===k) delete G.calls[0]; else G.calls[0]=k; render(); });
+  $('calls').style.visibility=G.hands[0].length?'visible':'hidden';
   // centre
   if(G.trick){ const t=G.trick;
     $('center').innerHTML=`<div class="cards">${t.cards.map(c=>cardHTML(c,true)).join('')}</div><div class="who"><span style="color:${team(t.by)?'var(--teamB)':'var(--teamA)'}">${pname(t.by)}</span> · ${comboName(t.combo)}</div>`;
@@ -597,7 +650,7 @@ window.__six={G,analyze,candidates,aiChoose,makeDeck,
       while(!G.over&&steps<2000){ const p=G.turn, ch=aiChoose(p);
         if(ch){ const cb=analyze(ch); if(!cb||(G.trick&&!beats(cb,G.trick.combo))) throw new Error('illegal AI play'); }
         else if(!G.trick) throw new Error('AI passed on a free lead');
-        const r=act(p,ch); if(r==='trick') clearTrick(); steps++; }
+        const r=act(p,ch); if(r==='trick'){ clearTrick(); botCalls(G.turn); } steps++; }
       if(!G.over) throw new Error('stuck');
       tally.maxSteps=Math.max(tally.maxSteps,steps); const res=roundResult(); tally[res.winner===0?'A':res.winner===1?'B':'draw']++; }
     G.turn=null; return tally; }};
