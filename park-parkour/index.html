@@ -733,7 +733,7 @@ function spawnThings() {
       const o = weighted(list);
       ob = { kind: o.id, spr: o.spr, w: o.spr.width, h: o.spr.height, inset: o.inset, walk: 0 };
     }
-    let x = G.nextObs; while (onCreek(x - 8, ob.w + 16)) x += 16;   // nothing on the bridge
+    let x = G.nextObs; while (onCreek(x - 16, ob.w + 32)) x += 16;   // nothing on the bridge
     ob.x = x; G.obstacles.push(ob);
     G.lastTall = ob.h >= C.tallHeight;
     // sometimes two small things side by side (one jump still clears both)
@@ -931,7 +931,7 @@ function collect(c) {
   G.mult = mult;
   const pts = (c.flower ? C.flowerPoints : C.coinPoints) * mult;
   G.pickPts += pts; if (c.flower) G.flowers++; else G.coins++;
-  if (c.flower || mult > 1) G.popups.push({ x: c.x - G.cam, y: c.y - 4, t: 0, s: '+' + pts, col: c.flower ? '#ff8080' : '#fff3a0' });
+  if (c.flower) G.popups.push({ x: c.x - G.cam, y: c.y - 4, t: 0, s: '+' + pts, col: c.flower ? '#ff8080' : '#fff3a0' });
   for (let k = 0; k < 6; k++) particle(c.x - G.cam + 3, c.y + 3, rnd(-50, 50), rnd(-70, 10), rnd(0.3, 0.6), c.flower ? pick(['#d23a2a', '#ff8080']) : pick(['#f2c230', '#fff3a0']), 1);
   if (c.flower) SFX.flower(); else SFX.coin();
   // the park reacts: a flower wakes a kookaburra on screen, and lorikeets overhead scatter
@@ -1045,18 +1045,32 @@ function drawPlayer() {
   ctx.drawImage(PC, Math.round(PLAYER_X - 6 + 10 - w / 2), Math.round(p.y) - h + 1, w, h);
 }
 function drawSnake(ob, X) {
-  const t = ob.t * 6;
+  const t = ob.t * 6, hy = GROUND_Y - 4 + Math.round(Math.sin(t) * 1.2);
+  // black outline first, like the other things you must jump
+  for (let i = 0; i < 18; i += 2) { const y = GROUND_Y - 3 + Math.round(Math.sin(i * 0.6 + t) * 1.2); px(ctx, 'k', X + 1 + i, y - 1, 4, 4); }
+  px(ctx, 'k', X - 1, hy - 1, 5, 5);
   for (let i = 0; i < 18; i += 2) { const y = GROUND_Y - 3 + Math.round(Math.sin(i * 0.6 + t) * 1.2);
     px(ctx, (i / 2) % 2 ? 'B' : 'b', X + 2 + i, y, 2, 2); px(ctx, 'o', X + 2 + i, y + 1, 1, 1); }
-  const hy = GROUND_Y - 4 + Math.round(Math.sin(t) * 1.2);
-  px(ctx, 'B', X, hy, 3, 3); px(ctx, 'k', X, hy, 1, 1); px(ctx, 'q', X - 2, hy + 2, 2, 1);   // head, eye, tongue
+  px(ctx, 'B', X, hy, 3, 3); px(ctx, 'w', X, hy, 1, 1); px(ctx, 'q', X - 3, hy + 2, 2, 1);   // head, eye, tongue
 }
+// Things you must jump get a black outline (made once per sprite) and a shadow,
+// so they stand out from the paler park in the background.
+const OUTLINED = new Map();
+function outlined(spr) {
+  let o = OUTLINED.get(spr); if (o) return o;
+  const [c, x] = makeCanvas(spr.width + 2, spr.height + 2), [sil, sx] = makeCanvas(spr.width, spr.height);
+  sx.drawImage(spr, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = PAL.k; sx.fillRect(0, 0, spr.width, spr.height);
+  for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2], [0, 0], [2, 0], [0, 2], [2, 2]]) x.drawImage(sil, dx, dy);
+  x.drawImage(spr, 1, 1); OUTLINED.set(spr, c); return c;
+}
+function shadow(X, w) { ctx.globalAlpha = 0.35; px(ctx, '#000000', X - 1, GROUND_Y, w + 2, 2); ctx.globalAlpha = 1; }
 function drawThings() {
   for (const ob of G.obstacles) {
     const X = Math.round(ob.x - G.cam);
-    if (ob.spr) ctx.drawImage(ob.spr, X, GROUND_Y - ob.h);
+    shadow(X, ob.w);
+    if (ob.spr) ctx.drawImage(outlined(ob.spr), X - 1, GROUND_Y - ob.h - 1);
     else if (ob.kind === 'snake') drawSnake(ob, X);
-    else ctx.drawImage(SPR[ob.kind], X, GROUND_Y - ob.h - (Math.floor(ob.t * 6) % 2));   // waddle
+    else ctx.drawImage(outlined(SPR[ob.kind]), X - 1, GROUND_Y - ob.h - 1 - (Math.floor(ob.t * 6) % 2));   // waddle
   }
   for (const c of G.pickups) { const bob = Math.round(Math.sin(G.cam / 20 + c.t) * 1.5);
     ctx.drawImage(c.flower ? SPR.flower : SPR.coin, Math.round(c.x - G.cam), Math.round(c.y + bob)); }
@@ -1141,7 +1155,10 @@ function drawDebug() {
 }
 function draw() {
   ctx.imageSmoothingEnabled = false;
-  drawSky(); drawSkyAnimals(); drawBackPark(); drawGround(); drawBugs(); drawThings(); drawPlayer(); drawFx(); drawHud();
+  drawSky(); drawSkyAnimals(); drawBackPark();
+  // light haze over the background park, so it reads as far away and never looks like something to jump
+  ctx.globalAlpha = 0.38; ctx.fillStyle = '#d8eeff'; ctx.fillRect(0, 0, W, GROUND_Y); ctx.globalAlpha = 1;
+  drawGround(); drawBugs(); drawThings(); drawPlayer(); drawFx(); drawHud();
 }
 
 // =====================================================================
