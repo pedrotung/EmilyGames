@@ -192,7 +192,7 @@ const FONT = {
   8:[14,17,17,14,17,17,14], 9:[14,17,17,15,1,2,12], ' ':[0,0,0,0,0,0,0], '!':[4,4,4,4,4,0,4],
   '?':[14,17,1,2,4,0,4], '.':[0,0,0,0,0,12,12], ':':[0,12,12,0,12,12,0], '-':[0,0,0,31,0,0,0],
   "'":[4,4,8,0,0,0,0], ',':[0,0,0,0,12,4,8], '/':[1,1,2,4,8,16,16], '*':[0,17,10,4,10,17,0], '=':[0,0,31,0,31,0,0], '+':[0,4,4,31,4,4,0],
-  '>':[8,4,2,1,2,4,8], '%':[24,25,2,4,8,19,3],
+  '>':[8,4,2,1,2,4,8], '<':[2,4,8,16,8,4,2], '%':[24,25,2,4,8,19,3],
 };
 function textWidth(s, scale = 1) { return s.length * 6 * scale - scale; }
 // draw text with a dark drop shadow; align: 'left' | 'center' | 'right'
@@ -884,6 +884,8 @@ function menuKey(k) {
   else if (state === 'clear') { if (k === 'ok') afterClear(); }
   else if (state === 'fail') { if (k === 'ok') startLevel(G.tour.city.id); else if (k === 'back') goMap(G.tour.city.id); }
   else if (state === 'complete') { if (k === 'ok') goMap(); }
+  else if (state === 'guide') { if (k === 'back' || k === 'ok') { state = guideFrom; showButtons(); } }
+  else if (state === 'card') { if (k === 'left' || k === 'right') { const h = HITS.find(b => b.key === k); if (h) h.fn(); } else { state = 'guide'; showButtons(); } }
 }
 function dust(x, y, n, col = '#c9b48a') {
   for (let k = 0; k < n; k++) particle(x, y, rnd(-40, 10), rnd(-50, -10), rnd(0.25, 0.5), col, 2);
@@ -1267,6 +1269,8 @@ function draw() {
   if (state === 'flight') { drawFlight(); return; }
   if (state === 'map') { drawMapScreen(); return; }
   if (state === 'complete') { drawComplete(); snapIfNeeded(); return; }
+  if (state === 'guide') { drawGuide(); return; }
+  if (state === 'card') { drawCard(); return; }
   const T = G.tour, sp = T && SPECIAL[T.city.id], prog = T && tourProg();
   drawSky(); drawSkyAnimals(); drawBackPark();
   // light haze over the background park, so it reads as far away and never looks like something to jump (dark blue at night)
@@ -1711,7 +1715,7 @@ const totalStars = () => CITIES.reduce((n, c) => n + (tourSave.stars[c.id] || 0)
 let HITS = [];
 const hit = (x, y, w, h, fn) => HITS.push({ x, y, w, h, fn });
 function uiTap(gx, gy) { for (let i = HITS.length - 1; i >= 0; i--) { const b = HITS[i]; if (gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.h) { audio(); b.fn(); return true; } } return false; }
-const MENU_STATES = ['title', 'map', 'flight', 'clear', 'fail', 'complete'];
+const MENU_STATES = ['title', 'map', 'flight', 'clear', 'fail', 'complete', 'guide', 'card'];
 // Minecraft button drawn on the canvas
 function mcButton(x, y, w, h, label, green, fn) {
   x = Math.round(x); y = Math.round(y);
@@ -2042,8 +2046,14 @@ function drawTitle() {
   const order = CITIES.map(c => c.name), route = order.slice(titleSel).concat(order.slice(0, titleSel));
   drawText(ctx, 'ROUTE: ' + route.slice(0, W >= 300 ? 4 : 3).join(' > ') + ' > ...', W / 2, 144, '#1b1b20', 1, 'center', null);
   const cont = tourSave.cleared > 0 && titleSel === tourSave.start, label = cont ? (tourSave.cleared >= 8 ? 'TOUR MAP' : 'CONTINUE') : 'START TOUR';
-  mcButton(W / 2 - 70, 156, 80, 16, label, true, () => startTour(titleSel));
-  mcButton(W / 2 + 18, 156, 52, 16, 'FREE RUN', false, () => start());
+  if (tourSave.cleared >= 8) {   // the whole tour is done: the animal guide opens from here too
+    mcButton(W / 2 - 93, 156, 70, 16, label, true, () => startTour(titleSel));
+    mcButton(W / 2 - 17, 156, 52, 16, 'FREE RUN', false, () => start());
+    mcButton(W / 2 + 41, 156, 52, 16, 'ANIMALS', false, () => goGuide('title'));
+  } else {
+    mcButton(W / 2 - 70, 156, 80, 16, label, true, () => startTour(titleSel));
+    mcButton(W / 2 + 18, 156, 52, 16, 'FREE RUN', false, () => start());
+  }
 }
 function drawMapScreen() {
   const cardW = W >= 320 ? 114 : 100, narrow = W < 300, K = Math.min(3.8, (W - cardW - (narrow ? 14 : 56)) / 44, (H - 28) / 34.5), m = buildMap(K);   // room for the labels
@@ -2169,11 +2179,12 @@ function drawComplete() {
   ctx.fillStyle = '#1f4a28'; ctx.fillRect(0, 0, W, H);
   for (let i = 0; i < 40; i++) px(ctx, ['#f2c230', '#d23a2a', '#3c6fd0', '#ffffff'][i % 4], (i * 67 + Math.floor(performance.now() / 30)) % W, (i * 41 + Math.floor(performance.now() / 20)) % H, 2, 2);
   drawText(ctx, 'AUSTRALIA COMPLETE!', W / 2, W >= 300 ? 6 : 10, '#f2c230', W >= 300 ? 2 : 1, 'center', '#4a2f1c');
-  drawText(ctx, 'ALL 8 CITIES   STARS ' + totalStars() + '/24', W / 2, 24, '#ffffff', 1, 'center');
+  drawText(ctx, (W >= 300 ? 'STARS ' + totalStars() + '/24   ' : '') + 'TAP AN ANIMAL TO LEARN MORE', W / 2, 24, '#ffffff', 1, 'center');
   const cw = Math.min(36, Math.floor((W - 8) / 8)), x0 = Math.round(W / 2 - cw * 4);
   CITIES.forEach((c, i) => c.animals.forEach((a, j) => { const spr = ASPR[a.k], X = x0 + i * cw, Y = 36 + j * 34, sc = Math.min(1, (cw - 4) / spr.width, 26 / spr.height);
     px(ctx, '#2f6a38', X + 1, Y, cw - 2, 30);
-    ctx.drawImage(spr, Math.round(X + cw / 2 - spr.width * sc / 2), Math.round(Y + 28 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc)); }));
+    ctx.drawImage(spr, Math.round(X + cw / 2 - spr.width * sc / 2), Math.round(Y + 28 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc));
+    hit(X + 1, Y, cw - 2, 30, () => { guideFrom = 'complete'; openCard(i * 3 + j); }); }));
   CITIES.forEach((c, i) => drawText(ctx, c.state, x0 + i * cw + cw / 2, 140, '#c6e6c0', 1, 'center', null));
   mcButton(W / 2 - 56, 156, 50, 16, 'MAP', true, () => goMap());
   if (window.EmilyShare) mcButton(W / 2 + 6, 156, 50, 16, 'SHARE', false, () => EmilyShare.open());
@@ -2587,7 +2598,7 @@ function songNotes(song) {
 // ---------- the music player: the title tune on the menus, the city's song in its level ----------
 let music = null;                                   // { id, out, t0, i, notes }
 function musicWanted() {
-  if (['title', 'map', 'flight', 'complete'].includes(state)) return 'title';
+  if (['title', 'map', 'flight', 'complete', 'guide', 'card'].includes(state)) return 'title';
   if (state === 'play') return G.tour ? G.tour.city.id : 'title';
   return null;                                      // quiet on the clear / fail / game over screens
 }
@@ -2613,6 +2624,393 @@ function musicTick() {
     m.i++;
   }
 }
+
+// =====================================================================
+// ANIMAL GUIDE - every tour animal gets a card: a big pixel portrait, where it
+// lives, its habits and a fun fact. Opened from the Australia Complete screen
+// and from the title page once the tour is done.
+// =====================================================================
+const GUIDE = {
+  gangGang: { size: '35 CM LONG', home: 'Mountain forests of south-east Australia. In winter they visit Canberra gardens.', habits: 'Eat gum nuts and seeds. Dads have a red head, mums are grey all over.', fun: 'Their call sounds like a creaky door! It is the bird emblem of the ACT.' },
+  greyRoo: { size: 'UP TO 2 M TALL', home: 'Grassland and open bush of eastern Australia.', habits: 'Live in groups called mobs. They graze at dawn and dusk.', fun: 'A baby (a joey) lives in its mum\'s pouch for about 11 months.' },
+  bogong: { size: '5 CM WINGS', home: 'Farms of NSW and QLD. In summer they fly up to cool caves in the Alps.', habits: 'Fly at night. Thousands rest packed together on cave walls.', fun: 'They find their way by the stars! Some get lost in Parliament House lights.' },
+  platypus: { size: '40-50 CM LONG', home: 'Rivers and creeks of eastern Australia and Tasmania.', habits: 'Hunts underwater with eyes shut. Its bill feels the tiny sparks made by prey.', fun: 'A mammal that lays eggs! Dads have a poison spur on their back legs.' },
+  kookaburra: { size: '45 CM LONG', home: 'Open forest and parks of eastern Australia.', habits: 'Families laugh together at dawn and dusk to say: this is our patch.', fun: 'The biggest kingfisher in the world. It even eats snakes!' },
+  ibis: { size: '70 CM LONG', home: 'Wetlands, and now city parks too.', habits: 'Pokes its long curved beak into mud and grass for worms and bugs.', fun: 'City people call it the bin chicken, because it digs food out of bins.' },
+  koala: { size: '60-85 CM TALL', home: 'Gum tree forests of eastern Australia.', habits: 'Eats only gum leaves and sleeps up to 20 hours a day.', fun: 'Not a bear! It is a marsupial, and has fingerprints just like ours.' },
+  brolga: { size: 'UP TO 1.3 M TALL', home: 'Wetlands and grassland of northern and eastern Australia.', habits: 'Famous dancers: they bow, jump and trumpet to each other.', fun: 'One of Australia\'s tallest birds, and the bird emblem of Queensland.' },
+  brushTurkey: { size: '70 CM LONG', home: 'Rainforest and leafy suburbs of the east coast.', habits: 'Dad rakes a huge mound of leaves that keeps the eggs warm.', fun: 'He checks the mound\'s heat with his beak. Chicks can fly on day one!' },
+  croc: { size: 'UP TO 6 M LONG', home: 'Rivers, swamps and coast of northern Australia.', habits: 'Floats very still, then ambushes animals that come to drink.', fun: 'The biggest reptile on Earth. Never swim where crocs live!' },
+  frilledLizard: { size: '90 CM LONG', home: 'Tropical woodland of northern Australia.', habits: 'Lives in trees and eats insects. Comes down to hunt after rain.', fun: 'When scared it opens a huge frill, hisses, then runs away on two legs!' },
+  eagle: { size: '2.3 M WINGS', home: 'All over Australia, from deserts to mountains.', habits: 'Soars for hours on warm air. Pairs stay together for life.', fun: 'Australia\'s biggest bird of prey. Look for its diamond-shaped tail.' },
+  quokka: { size: '50 CM LONG', home: 'Rottnest Island and a few forests in the south-west of WA.', habits: 'Sleeps in the day, eats leaves and grass at night.', fun: 'Its face looks like a smile. Rottnest means rat\'s nest: explorers thought quokkas were rats!' },
+  numbat: { size: '40 CM LONG', home: 'Woodland in the south-west of Western Australia.', habits: 'Awake in the day, digging for termites in logs and soil.', fun: 'Eats up to 20,000 termites a day with a long sticky tongue. WA\'s animal emblem.' },
+  blackSwan: { size: '1.3 M LONG', home: 'Lakes and rivers. Perth\'s Swan River is named after them.', habits: 'Eat water plants. Babies, called cygnets, are fluffy and grey.', fun: 'It is on the flag of Western Australia. Most swans in the world are white!' },
+  wombat: { size: '1 M LONG', home: 'Dry plains of South Australia.', habits: 'Digs big burrows and sleeps in them all day.', fun: 'Its poo is shaped like little cubes! SA\'s animal emblem.' },
+  magpie: { size: '40 CM LONG', home: 'Parks, farms and towns all over Australia.', habits: 'One of the best singers in the world. It can copy other sounds.', fun: 'In spring some swoop to guard their nest. They remember people\'s faces!' },
+  seaLion: { size: 'UP TO 2.5 M LONG', home: 'Beaches and islands of South and Western Australia.', habits: 'Dives deep for fish and squid, then rests on the sand.', fun: 'Unlike seals, it can walk on land on its flippers. One of the rarest sea lions.' },
+  penguin: { size: '33 CM TALL', home: 'Southern coasts, even St Kilda pier in Melbourne.', habits: 'Fishes at sea all day, then waddles home in groups at sunset.', fun: 'The smallest penguin in the world. Watch the penguin parade at Phillip Island!' },
+  possum: { size: '30 CM WITH TAIL', home: 'Tall mountain ash forests of Victoria.', habits: 'Lives in tree hollows with its family and comes out at night.', fun: 'People thought it was extinct until it was found again in 1961. VIC\'s emblem.' },
+  flyingFox: { size: '1 M WINGS', home: 'Forests and city parks of the east coast.', habits: 'Sleeps upside down in big camps, flies out at night for fruit and flowers.', fun: 'Gardener of the forest: it carries pollen and seeds far away.' },
+  devil: { size: '65 CM LONG', home: 'Only in Tasmania.', habits: 'Comes out at night and eats almost anything, even bones.', fun: 'Its loud screech sounds scary. The biggest meat-eating marsupial alive.' },
+  pademelon: { size: '60 CM LONG', home: 'Forests of Tasmania.', habits: 'Hides in thick bush by day, eats grass at the edge at night.', fun: 'A small wallaby that thumps its feet to warn others of danger.' },
+  echidna: { size: '40 CM LONG', home: 'All over Australia, from snow to desert.', habits: 'Eats ants and termites with a long sticky tongue. It has no teeth.', fun: 'It lays eggs like the platypus. A baby echidna is called a puggle!' },
+};
+
+// ---------- big portraits: drawn with chunky ellipses, then a black outline ----------
+function portraitKit(w, h) {
+  const [c, x] = makeCanvas(w, h);
+  const P = (col, X, Y, ww = 1, hh = 1) => px(x, col, Math.round(X), Math.round(Y), ww, hh);
+  const E = (col, cx, cy, rx, ry) => { for (let Y = Math.floor(cy - ry); Y <= cy + ry; Y++) for (let X = Math.floor(cx - rx); X <= cx + rx; X++)
+    if (((X + 0.5 - cx) / rx) ** 2 + ((Y + 0.5 - cy) / ry) ** 2 <= 1) P(col, X, Y); };
+  const L = (col, x0, y0, x1, y1, t = 1) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let i = 0; i <= n; i++) P(col, x0 + (x1 - x0) * i / n - (t >> 1), y0 + (y1 - y0) * i / n - (t >> 1), t, t); };
+  const outline = (col = '#1b1b20') => { const d = x.getImageData(0, 0, w, h), a = i => d.data[i * 4 + 3] > 0, out = [];
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) if (!a(Y * w + X) && ((X > 0 && a(Y * w + X - 1)) || (X < w - 1 && a(Y * w + X + 1)) || (Y > 0 && a((Y - 1) * w + X)) || (Y < h - 1 && a((Y + 1) * w + X)))) out.push([X, Y]);
+    for (const [X, Y] of out) P(col, X, Y); };
+  const F = (col, pts) => { const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);   // filled polygon
+    for (let Y = Math.floor(Math.min(...ys)); Y <= Math.max(...ys); Y++) for (let X = Math.floor(Math.min(...xs)); X <= Math.max(...xs); X++) {
+      let inside = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j];
+        if ((yi > Y + 0.5) !== (yj > Y + 0.5) && X + 0.5 < (xj - xi) * (Y + 0.5 - yi) / (yj - yi) + xi) inside = !inside; }
+      if (inside) P(col, X, Y); } };
+  return { c, x, P, E, L, F, outline };
+}
+const PORTRAIT = {
+  koala() {   // sitting in the fork of a gum tree, holding a leafy twig
+    const k = portraitKit(80, 64), { P, E, L } = k;
+    L('#8a6a48', 4, 62, 30, 44, 5); L('#8a6a48', 40, 62, 76, 40, 5);              // branches
+    E('#7e7e88', 38, 42, 16, 15); E('#6a6a74', 33, 47, 10, 9); E('#e2ddd2', 44, 45, 8, 10);   // body, shade, belly
+    E('#7e7e88', 26, 14, 9, 9); E('#7e7e88', 60, 14, 9, 9); E('#ece8e0', 26, 15, 6, 6); E('#ece8e0', 60, 15, 6, 6);   // fluffy ears
+    E('#8e8e98', 43, 25, 15, 12); E('#9e9ea8', 46, 22, 9, 6);                       // head and its light side
+    E('#2a2a30', 45, 29, 4.5, 6.5); P('#5a5a64', 44, 25, 2, 2);                        // big nose
+    P('#1b1b20', 36, 23, 3, 3); P('#1b1b20', 52, 23, 3, 3); P('#ffffff', 37, 23, 1, 1); P('#ffffff', 53, 23, 1, 1);   // eyes
+    L('#6a6a74', 52, 40, 62, 34, 4); L('#6a6a74', 30, 40, 24, 46, 4);               // arms
+    L('#5a7a3a', 60, 36, 70, 22, 1); for (const [a, b] of [[64, 30], [68, 25], [71, 21], [62, 34]]) E('#6aa65e', a, b, 3, 2);   // gum twig
+    P('#2a2a30', 62, 33, 2, 2); P('#2a2a30', 22, 46, 2, 2);                           // claws
+    k.outline(); return k.c;
+  },
+  platypus() {   // swimming at the surface, bill first
+    const k = portraitKit(80, 64), { P, E, L } = k;
+    E('#5e3e24', 14, 38, 11, 6); for (let i = 0; i < 5; i++) L('#4a301c', 6 + i * 4, 35, 8 + i * 4, 41);   // flat furry tail
+    E('#7a5232', 38, 37, 19, 9); E('#946644', 40, 33, 14, 4); E('#5e3e24', 36, 43, 15, 4);           // body with light back
+    E('#7a5232', 56, 35, 8, 7); E('#3a3a42', 67, 37, 9, 4); E('#54545e', 67, 35, 7, 2);           // head and duck bill
+    P('#1b1b20', 70, 35, 1, 1); P('#1b1b20', 73, 35, 1, 1);                                          // nostrils
+    P('#1b1b20', 57, 32, 2, 2); P('#ffffff', 57, 32, 1, 1);                                           // eye
+    L('#3a3a42', 48, 44, 54, 50, 2); E('#3a3a42', 55, 51, 4, 2);                                     // webbed front foot
+    L('#3a3a42', 24, 44, 22, 50, 2); E('#3a3a42', 21, 51, 3, 2);                                     // back foot
+    k.outline();
+    for (let X = 0; X < 80; X++) { const y = 40 + Math.round(Math.sin(X / 5) * 1.2); k.x.globalAlpha = 0.55; P('#3d7fe0', X, y, 1, 64 - y); k.x.globalAlpha = 1; P('#8fc2ff', X, y, 1, 1); }   // the water line
+    return k.c;
+  },
+};
+const BACKDROP = {   // a little scene behind each portrait
+  koala: ['#bfe0f0', '#86b89a'], platypus: ['#9fd0e8', '#3d7fe0'],
+};
+
+// ---------- the guide grid and the animal card ----------
+const PIC = {};   // portraits are drawn once, then kept
+let guideSel = 0, guideFrom = 'complete';
+const GUIDE_LIST = () => CITIES.flatMap(c => c.animals.map(a => ({ a, c })));
+function goGuide(from) { guideFrom = from; state = 'guide'; showButtons(); }
+function openCard(i) { guideSel = i; state = 'card'; SFX.coin(); showButtons(); }
+function drawGuide() {
+  ctx.fillStyle = '#1f4a28'; ctx.fillRect(0, 0, W, H);
+  drawText(ctx, 'AUSTRALIAN ANIMALS', W / 2, 6, '#f2c230', W >= 300 ? 2 : 1, 'center', '#4a2f1c');
+  drawText(ctx, 'TAP AN ANIMAL TO LEARN ABOUT IT', W / 2, 24, '#ffffff', 1, 'center');
+  const list = GUIDE_LIST(), cw = Math.min(36, Math.floor((W - 8) / 8)), x0 = Math.round(W / 2 - cw * 4);
+  list.forEach(({ a }, n) => { const i = n / 3 | 0, j = n % 3, spr = ASPR[a.k], X = x0 + i * cw, Y = 36 + j * 34, sc = Math.min(1, (cw - 4) / spr.width, 26 / spr.height), got = tourSeen.includes(a.k);
+    px(ctx, '#2f6a38', X + 1, Y, cw - 2, 30);
+    ctx.drawImage(got ? spr : silOf(spr, '#1b3a20'), Math.round(X + cw / 2 - spr.width * sc / 2), Math.round(Y + 28 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc));
+    if (got) hit(X + 1, Y, cw - 2, 30, () => openCard(n)); });
+  CITIES.forEach((c, i) => drawText(ctx, c.state, x0 + i * cw + cw / 2, 140, '#c6e6c0', 1, 'center', null));
+  mcButton(W / 2 - 25, 156, 50, 16, 'BACK', true, () => { state = guideFrom; showButtons(); });
+}
+function drawCard() {
+  const list = GUIDE_LIST(), { a, c } = list[guideSel], g = GUIDE[a.k];
+  ctx.fillStyle = '#1f4a28'; ctx.fillRect(0, 0, W, H);
+  const big = textWidth(a.name, 2) <= W - 16;
+  drawText(ctx, a.name, W / 2, 5, '#f2c230', big ? 2 : 1, 'center', '#4a2f1c');
+  // portrait in a frame, with where it was found and how big it is
+  const fx = 8, fy = 26, bd = BACKDROP[a.k] || ['#bfe0f0', '#86b89a'];
+  px(ctx, '#1b1b20', fx - 2, fy - 2, 88, 72); px(ctx, '#c6c6c6', fx - 1, fy - 1, 86, 70);
+  px(ctx, bd[0], fx + 1, fy + 1, 82, 44); px(ctx, bd[1], fx + 1, fy + 45, 82, 22);
+  const pic = PORTRAIT[a.k] ? (PIC[a.k] || (PIC[a.k] = PORTRAIT[a.k]())) : null;
+  if (pic) ctx.drawImage(pic, fx + 2, fy + 2); else { const s = ASPR[a.k], sc = Math.min(3, 70 / s.width, 56 / s.height); ctx.drawImage(s, Math.round(fx + 42 - s.width * sc / 2), Math.round(fy + 62 - s.height * sc), Math.round(s.width * sc), Math.round(s.height * sc)); }
+  drawText(ctx, c.name + ' ' + c.state, fx + 42, fy + 72, '#c6e6c0', 1, 'center', null);
+  drawText(ctx, g.size, fx + 42, fy + 82, '#ffffff', 1, 'center', null);
+  // three short sections of text
+  const tx = fx + 96, maxc = Math.floor((W - tx - 6) / 6);
+  let y = fy;
+  for (const [h, t] of [['HOME', g.home], ['HABITS', g.habits], ['FUN FACT', g.fun]]) {
+    drawText(ctx, h, tx, y, '#f2c230', 1, 'left', null); y += 9;
+    for (const line of wrapWords(t.toUpperCase(), maxc)) { drawText(ctx, line, tx, y, '#ffffff', 1, 'left', null); y += 8; }
+    y += 3;
+  }
+  // browse
+  const step = d => { let i = guideSel; do i = (i + d + list.length) % list.length; while (!tourSeen.includes(list[i].a.k) && i !== guideSel); return i; };
+  const prev = step(-1), next = step(1);
+  mcButton(8, 158, 40, 14, '< PREV', false, () => openCard(prev)); HITS[HITS.length - 1].key = 'left';
+  mcButton(W / 2 - 24, 158, 48, 14, 'ALL', true, () => { state = 'guide'; showButtons(); });
+  mcButton(W - 48, 158, 40, 14, 'NEXT >', false, () => openCard(next)); HITS[HITS.length - 1].key = 'right';
+  drawText(ctx, (guideSel + 1) + ' OF 24', fx + 42, fy + 94, '#8fbf8a', 1, 'center', null);
+}
+
+// the other 22 portraits; each returns an 80x64 canvas
+Object.assign(PORTRAIT, {
+  gangGang() {   // male gang-gang on a branch: red head with a curly crest, grey scalloped feathers
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#8a6a48', 0, 54, 80, 50, 4);
+    E('#5e5e66', 30, 54, 6, 9);                                                      // tail
+    E('#6a6a72', 38, 38, 12, 16); for (let y = 26; y < 52; y += 4) for (let x = 29; x < 49; x += 4) P('#a0a0aa', x + ((y / 4) % 2) * 2, y, 2, 1);   // scallops
+    E('#55555d', 33, 40, 7, 12);                                                     // wing
+    E('#d23a2a', 46, 18, 9, 9); E('#e85a44', 48, 15, 5, 4);                          // red head
+    for (let i = 0; i < 5; i++) L('#d23a2a', 42 - i * 2, 11 - i, 38 - i * 3, 4 + (i % 2) * 2, 2);   // curly crest
+    E('#d8d0bc', 55, 21, 3.5, 3.5); P('#9a9282', 57, 22, 2, 2);                       // pale hooked beak
+    P('#1b1b20', 49, 16, 2, 2); P('#ffffff', 49, 16, 1, 1);
+    P('#4a4a52', 36, 52, 2, 4); P('#4a4a52', 41, 52, 2, 4);                           // feet
+    k.outline(); return k.c;
+  },
+  greyRoo() {   // eastern grey standing tall, a joey peeking out of the pouch
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    for (let i = 0; i < 18; i++) L('#8a8078', 27 - i, 50 + i * 0.6, 27 - i, 50 + i * 0.6, Math.max(2, 5 - (i / 5 | 0)));   // tail
+    E('#9a9088', 34, 50, 10, 7); L('#8a8078', 36, 56, 52, 61, 3);                   // big hind leg and foot
+    E('#9a9088', 36, 36, 11, 16); E('#d0c8bc', 42, 40, 6, 11);                       // body, pale chest
+    E('#a89e96', 46, 40, 4, 3); E('#8a8078', 47, 37, 2.5, 2.5); P('#1b1b20', 48, 36, 1, 1);   // joey in the pouch
+    L('#8a8078', 46, 28, 52, 33, 2);                                                 // little arm
+    E('#a49a92', 48, 16, 6, 5); E('#a49a92', 55, 18, 5, 3); P('#1b1b20', 59, 17, 2, 2);   // head and snout, nose
+    F('#a49a92', [[43, 4], [46, 3], [48, 13], [44, 13]]); F('#d0c8bc', [[44, 6], [45, 5], [46, 11], [45, 11]]);   // ear
+    P('#1b1b20', 50, 14, 2, 2); P('#ffffff', 50, 14, 1, 1);
+    k.outline(); return k.c;
+  },
+  bogong() {   // a moth resting on the cave wall, wings open
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    F('#7a5a3a', [[40, 22], [8, 14], [12, 34], [40, 38]]); F('#7a5a3a', [[40, 22], [72, 14], [68, 34], [40, 38]]);   // fore wings
+    F('#9a7a52', [[40, 36], [16, 36], [22, 50], [40, 44]]); F('#9a7a52', [[40, 36], [64, 36], [58, 50], [40, 44]]);  // hind wings
+    for (const s of [-1, 1]) { E('#3a2a1e', 40 + s * 18, 26, 4, 3); E('#e8d8b0', 40 + s * 18, 26, 2, 1.5); E('#3a2a1e', 40 + s * 26, 22, 2.5, 2);
+      L('#5e4228', 40 + s * 6, 30, 40 + s * 28, 18, 1); }                                                       // the two spots on each wing
+    E('#4a3424', 40, 32, 3, 12); E('#6a4a30', 40, 22, 4, 3);                           // body and head
+    L('#4a3424', 38, 20, 30, 8, 1); L('#4a3424', 42, 20, 50, 8, 1);                    // feelers
+    k.outline(); return k.c;
+  },
+  kookaburra() {   // perched, big beak, brown eye stripe, blue on the wing
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#8a6a48', 0, 52, 80, 54, 4);
+    for (let i = 0; i < 6; i++) L(i % 2 ? '#c06030' : '#7a4a2a', 30 - i, 46 + i * 2, 28 - i, 48 + i * 2, 5);   // barred tail
+    E('#e8e0cc', 40, 36, 11, 14); E('#7a5232', 34, 36, 8, 12);                       // body and wing
+    for (const [a, b] of [[32, 32], [35, 36], [31, 40], [36, 41]]) P('#3c8ad0', a, b, 2, 2);
+    E('#e8e0cc', 46, 18, 10, 9); E('#7a5232', 44, 12, 7, 3);                         // head with a brown cap
+    L('#4a3020', 38, 19, 52, 18, 2); P('#1b1b20', 49, 17, 2, 2);                      // eye stripe and eye
+    F('#2a2a30', [[54, 16], [72, 20], [54, 21]]); F('#c8b89a', [[54, 21], [70, 21], [54, 24]]);   // beak
+    P('#6a6a6a', 38, 50, 2, 3); P('#6a6a6a', 43, 50, 2, 3);
+    k.outline(); return k.c;
+  },
+  ibis() {   // white ibis with its black head and long curved beak, next to a wheelie bin
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    P('#3a7a3a', 62, 40, 14, 22); P('#d23a2a', 61, 38, 16, 3); P('#2a5a2a', 64, 44, 10, 1);   // the bin
+    L('#1b1b20', 32, 40, 30, 60, 1); L('#1b1b20', 36, 40, 38, 60, 1);                 // legs
+    E('#f4f4f4', 34, 34, 13, 9); E('#d8d8d8', 30, 38, 9, 4); E('#1b1b20', 21, 36, 5, 3);   // body, black tail plumes
+    L('#f4f4f4', 44, 30, 48, 16, 4); E('#1b1b20', 49, 13, 4, 4);                      // neck and bald head
+    for (let i = 0; i <= 14; i++) P('#1b1b20', 52 + i, 13 + Math.round(i * i / 14), 2, 1);   // curved beak
+    P('#ffffff', 50, 12, 1, 1);
+    k.outline(); return k.c;
+  },
+  brolga() {   // dancing: wings up, head back, red cheek
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#3a3a42', 34, 42, 30, 62, 1); L('#3a3a42', 38, 42, 44, 62, 1);
+    F('#8f95a0', [[32, 30], [8, 8], [14, 20], [10, 24], [30, 38]]); for (let i = 0; i < 4; i++) L('#6a707a', 10 + i * 3, 10 + i * 4, 28, 34, 1);   // raised wing
+    E('#a8adb6', 36, 34, 13, 8); E('#8f95a0', 26, 36, 6, 4);                         // body and tail
+    L('#a8adb6', 46, 30, 50, 10, 3); E('#a8adb6', 51, 8, 4, 4); E('#d23a2a', 49, 10, 3, 2.5);   // neck, head, red patch
+    L('#3a3a42', 54, 8, 64, 10, 2); P('#1b1b20', 52, 7, 1, 1);
+    k.outline(); return k.c;
+  },
+  brushTurkey() {   // black bird with a red bare head, yellow wattle and a big leaf mound
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    E('#6a4a2a', 18, 60, 20, 9); for (let i = 0; i < 14; i++) P(['#8a6a3a', '#5a7a3a', '#a07a4a'][i % 3], 4 + (i * 17) % 30, 53 + (i * 7) % 8, 3, 2);   // leaf mound
+    E('#1b1b20', 26, 32, 6, 13);                                                     // upright fan tail
+    E('#26262b', 38, 40, 13, 10); E('#3a3a42', 40, 36, 8, 4);                        // body
+    L('#3a3a42', 36, 48, 34, 58, 2); L('#3a3a42', 42, 48, 46, 58, 2);
+    L('#d23a2a', 46, 34, 50, 26, 4); E('#d23a2a', 52, 22, 5, 5); E('#f2c230', 50, 32, 4, 3.5);   // red neck and head, yellow wattle
+    F('#4a4a52', [[56, 21], [62, 23], [56, 24]]); P('#1b1b20', 53, 20, 2, 2); P('#ffffff', 53, 20, 1, 1);
+    k.outline(); return k.c;
+  },
+  croc() {   // a saltwater crocodile cruising, eyes and back above the water
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    for (let i = 0; i < 18; i++) L('#4f6b2a', 18 - i, 46 + i * 0.2, 18 - i, 46 + i * 0.2, Math.max(1, 5 - (i / 4 | 0)));   // tail
+    E('#4f6b2a', 38, 44, 22, 7); E('#6a8a3a', 40, 48, 18, 3);                         // body, pale belly
+    for (let x = 18; x < 58; x += 4) F('#3a5020', [[x, 38], [x + 2, 34], [x + 4, 38]]);   // ridges on the back
+    F('#4f6b2a', [[56, 40], [78, 44], [78, 48], [56, 50]]); E('#5e7a32', 58, 39, 4, 3);   // long snout, eye bump
+    P('#f2c230', 58, 37, 2, 2); P('#1b1b20', 59, 37, 1, 2);                           // yellow eye
+    L('#2a3a14', 60, 47, 78, 46, 1); for (let x = 62; x < 78; x += 3) P('#ffffff', x, 47, 1, 1);   // jaw and teeth
+    k.outline();
+    for (let X = 0; X < 80; X++) { const y = 46 + Math.round(Math.sin(X / 6) * 1); k.x.globalAlpha = 0.5; P('#3d6a6a', X, y, 1, 64 - y); k.x.globalAlpha = 1; P('#9ac8b0', X, y, 1, 1); }
+    return k.c;
+  },
+  frilledLizard() {   // frill wide open, mouth open, up on its back legs
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    for (let i = 0; i < 22; i++) L('#8a6a48', 30 - i, 46 + i * 0.6, 30 - i, 46 + i * 0.6, Math.max(1, 3 - (i / 8 | 0)));   // tail
+    L('#a07a50', 34, 44, 30, 58, 2); L('#a07a50', 40, 44, 44, 58, 2);                // back legs
+    E('#a07a50', 38, 40, 9, 6);                                                      // body
+    E('#c8402a', 52, 26, 14, 16); E('#e8843a', 52, 26, 12, 14); for (let a = 0; a < 12; a++) L('#c8402a', 52, 26, 52 + Math.cos(a / 12 * Math.PI * 2) * 12, 26 + Math.sin(a / 12 * Math.PI * 2) * 14, 1);   // frill
+    E('#a07a50', 58, 26, 6, 4.5); F('#f2c230', [[60, 27], [68, 24], [68, 31]]); F('#e07a9a', [[61, 28], [67, 26], [67, 30]]);   // head, open mouth
+    P('#1b1b20', 57, 24, 2, 2);
+    k.outline(); return k.c;
+  },
+  eagle() {   // wedge-tailed eagle soaring with wings spread
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    F('#3a2a1e', [[36, 24], [2, 16], [4, 22], [8, 24], [6, 28], [12, 28], [36, 36]]); F('#3a2a1e', [[44, 24], [78, 16], [76, 22], [72, 24], [74, 28], [68, 28], [44, 36]]);   // wings with finger tips
+    L('#5a4430', 8, 22, 34, 28, 1); L('#5a4430', 72, 22, 46, 28, 1);
+    F('#3a2a1e', [[36, 38], [44, 38], [48, 50], [40, 58], [32, 50]]);                 // the wedge tail
+    E('#3a2a1e', 40, 30, 6, 10); E('#8a6a3a', 40, 18, 4.5, 4);                        // body, golden head
+    F('#c8b070', [[38, 14], [42, 14], [41, 10], [40, 10]]); P('#1b1b20', 41, 17, 1, 1);
+    k.outline(); return k.c;
+  },
+  quokka() {   // sitting up and smiling, a leaf in its paws
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#7a5a3e', 28, 54, 10, 60, 3);                                                 // tail
+    E('#8a6a48', 38, 44, 12, 14); E('#c8a880', 42, 46, 6, 9);                        // body, pale belly
+    E('#8a6a48', 33, 56, 6, 3); E('#8a6a48', 45, 57, 6, 3);                          // feet
+    E('#8a6a48', 42, 24, 10, 9); E('#9a7a56', 44, 22, 6, 5);                         // round head
+    E('#8a6a48', 36, 15, 3.5, 3.5); E('#8a6a48', 48, 15, 3.5, 3.5); P('#c8a880', 35, 14, 2, 2); P('#c8a880', 47, 14, 2, 2);   // ears
+    P('#1b1b20', 39, 22, 2, 2); P('#1b1b20', 46, 22, 2, 2); P('#ffffff', 39, 22, 1, 1); P('#ffffff', 46, 22, 1, 1);
+    E('#1b1b20', 43, 27, 1.8, 1.4); P('#4a3020', 40, 30, 1, 1); P('#4a3020', 41, 31, 4, 1); P('#4a3020', 45, 30, 1, 1);   // nose and the smile
+    E('#5a9a3a', 50, 40, 4, 2); L('#3a6a2a', 46, 40, 54, 40, 1); L('#7a5a3e', 44, 38, 49, 41, 2);   // leaf and paw
+    k.outline(); return k.c;
+  },
+  numbat() {   // white stripes, bushy tail up, long tongue licking termites
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    for (let i = 0; i < 14; i++) L('#7a4a2a', 22 - i * 0.6, 40 - i * 1.6, 22 - i * 0.6, 40 - i * 1.6, 5);   // bushy tail
+    for (let i = 0; i < 12; i++) P('#d8c8b0', 15 + (i % 3) * 3, 20 + i * 2, 1, 1);
+    E('#b06a3a', 38, 42, 16, 8); E('#d8b88a', 40, 47, 12, 3);                        // body
+    for (let x = 24; x < 40; x += 4) P('#f4f4f4', x, 35, 2, 9);                      // white stripes
+    E('#b06a3a', 54, 40, 6, 5); F('#b06a3a', [[58, 37], [68, 41], [58, 44]]);         // head and pointed snout
+    L('#1b1b20', 50, 39, 60, 40, 1); P('#1b1b20', 56, 39, 2, 2); P('#ffffff', 56, 39, 1, 1);   // dark eye stripe
+    E('#9a5a2e', 50, 34, 2, 2.5);                                                     // ear
+    L('#3a2a1e', 32, 48, 32, 54, 2); L('#3a2a1e', 46, 48, 48, 54, 2);
+    k.outline();
+    L('#e07a9a', 68, 42, 76, 54, 1); for (const [a, b] of [[72, 56], [75, 58], [70, 59], [77, 56]]) P('#3a2a1e', a, b, 1, 1);   // tongue and termites
+    return k.c;
+  },
+  blackSwan() {   // gliding on the river, red beak with a white band
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    E('#1b1b20', 36, 42, 16, 8); for (let x = 24; x < 46; x += 4) F('#3a3a46', [[x, 36], [x + 4, 34], [x + 5, 38]]);   // ruffled wing feathers
+    L('#1b1b20', 48, 38, 52, 26, 4); L('#1b1b20', 52, 26, 49, 16, 4); E('#1b1b20', 51, 13, 4, 3.5);   // S-shaped neck
+    F('#d23a2a', [[54, 12], [64, 15], [54, 16]]); P('#f4f4f4', 61, 14, 2, 2); P('#d23a2a', 52, 11, 1, 1);
+    k.outline('#4a4a52');
+    for (let X = 0; X < 80; X++) { const y = 46 + Math.round(Math.sin(X / 5) * 1); k.x.globalAlpha = 0.55; P('#3d7fe0', X, y, 1, 64 - y); k.x.globalAlpha = 1; P('#8fc2ff', X, y, 1, 1); }
+    return k.c;
+  },
+  wombat() {   // stocky hairy-nosed wombat by its burrow, with cube poos
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    E('#6a5038', 14, 50, 13, 10); E('#2a1e14', 14, 52, 8, 6);                        // the burrow
+    E('#8a8478', 40, 46, 18, 12); E('#9a948a', 42, 41, 12, 5);                       // round body
+    E('#8a8478', 58, 42, 9, 8); E('#b0a49a', 64, 44, 4, 3.5);                         // head, wide hairy nose
+    E('#7a7468', 54, 34, 2.5, 3); E('#7a7468', 59, 34, 2.5, 3);                       // little ears
+    P('#1b1b20', 59, 39, 2, 2); P('#4a4a52', 65, 43, 2, 1);
+    for (const x of [30, 38, 46, 52]) P('#5a5448', x, 56, 4, 3);                       // short legs
+    k.outline();
+    for (const [a, b] of [[66, 58], [70, 59], [73, 57]]) { P('#1b1b20', a - 1, b - 1, 5, 5); P('#6a4a30', a, b, 3, 3); }   // cube poo!
+    return k.c;
+  },
+  magpie() {   // singing on a fence post
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    P('#8a6a48', 30, 50, 20, 14); P('#a07a50', 30, 50, 20, 2);                        // post
+    L('#1b1b20', 26, 40, 16, 52, 4); P('#f4f4f4', 25, 40, 3, 3);                      // tail
+    E('#1b1b20', 38, 36, 12, 10); E('#f4f4f4', 34, 33, 6, 4); E('#f4f4f4', 40, 26, 6, 4);   // body, white shoulder and nape
+    E('#1b1b20', 48, 22, 6, 5); F('#d8dce8', [[52, 20], [64, 18], [52, 24]]); L('#1b1b20', 56, 21, 64, 18, 1);   // head, pale beak
+    P('#8a3a1e', 48, 20, 2, 2);
+    L('#1b1b20', 36, 46, 36, 50, 1); L('#1b1b20', 41, 46, 41, 50, 1);
+    k.outline('#3a3a42');
+    for (const [a, b] of [[64, 8], [72, 2]]) { P('#1b1b20', a + 2, b, 1, 7); P('#1b1b20', a, b + 6, 3, 2); P('#1b1b20', a + 3, b, 2, 1); P('#1b1b20', a + 4, b + 1, 1, 1); }   // song notes
+    return k.c;
+  },
+  seaLion() {   // propped up on its flippers on the sand
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    F('#6a5a46', [[6, 50], [16, 44], [16, 54]]);                                       // back flippers
+    E('#8a7a62', 32, 46, 20, 8); E('#b0a084', 34, 50, 16, 3);                         // body
+    L('#8a7a62', 48, 42, 56, 30, 9); E('#8a7a62', 58, 26, 7, 6); E('#b0a084', 64, 28, 4, 3);   // neck, head, snout
+    P('#1b1b20', 58, 24, 2, 2); P('#ffffff', 58, 24, 1, 1); P('#1b1b20', 67, 27, 1, 1); P('#6a5a46', 54, 22, 2, 2);
+    F('#6a5a46', [[46, 46], [52, 46], [56, 58], [44, 58]]);                           // front flipper
+    k.outline();
+    for (const d of [-1, 1]) L('#f4f4f4', 66, 29, 72, 29 + d * 2, 1);                  // whiskers
+    return k.c;
+  },
+  penguin() {   // little penguin waddling home at sunset
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    E('#3a5a8a', 40, 38, 10, 16); E('#f4f4f4', 43, 41, 6, 12);                        // blue back, white front
+    E('#3a5a8a', 41, 20, 8, 7); E('#f4f4f4', 44, 23, 4, 3);
+    F('#1b1b20', [[48, 19], [55, 21], [48, 22]]); P('#1b1b20', 44, 18, 2, 2); P('#ffffff', 44, 18, 1, 1);
+    F('#2e4a74', [[32, 30], [28, 46], [34, 44]]);                                      // flipper
+    E('#e8a0a0', 37, 55, 4, 1.5); E('#e8a0a0', 45, 55, 4, 1.5);                        // pink feet
+    k.outline(); return k.c;
+  },
+  possum() {   // Leadbeater's possum on a tree at night, big black eyes
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    P('#5a4434', 46, 0, 14, 64); P('#4a3628', 50, 0, 2, 64); P('#6a5444', 56, 0, 2, 64);   // the trunk
+    L('#8a8a92', 36, 44, 22, 62, 3); E('#7a7a82', 21, 61, 4, 3);                       // club-ended tail
+    E('#9a9aa2', 40, 36, 8, 12); L('#3a3a42', 40, 26, 40, 46, 2);                       // body with a dark stripe
+    E('#a8a8b0', 42, 20, 8, 7); L('#3a3a42', 40, 15, 41, 22, 1);
+    E('#9a9aa2', 36, 13, 3, 3.5); E('#9a9aa2', 48, 13, 3, 3.5); P('#e8c8c8', 36, 12, 1, 2); P('#e8c8c8', 48, 12, 1, 2);
+    E('#1b1b20', 38, 20, 2.5, 2.5); E('#1b1b20', 46, 20, 2.5, 2.5); P('#ffffff', 37, 19, 1, 1); P('#ffffff', 45, 19, 1, 1);   // big eyes
+    P('#e8a0b0', 42, 24, 2, 1);
+    L('#8a8a92', 46, 32, 50, 30, 2); L('#8a8a92', 46, 44, 50, 46, 2);                   // paws on the trunk
+    k.outline(); return k.c;
+  },
+  flyingFox() {   // hanging upside down from a branch, one wing open
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#6a4a30', 0, 6, 80, 9, 4);
+    L('#2a2020', 37, 8, 38, 16, 1); L('#2a2020', 43, 8, 42, 16, 1);                    // feet hooked on
+    F('#2a2020', [[34, 18], [10, 26], [16, 34], [12, 42], [22, 40], [34, 44]]); for (const t of [[10, 26], [16, 34], [12, 42]]) L('#4a3a32', 34, 20, t[0], t[1], 1);   // open wing
+    E('#3a2a24', 40, 28, 7, 13); E('#d08a3a', 40, 41, 7, 4);                            // body, golden collar
+    E('#6a5a50', 40, 48, 6, 5); F('#6a5a50', [[37, 51], [43, 51], [40, 58]]);          // fox face (upside down)
+    F('#3a2a24', [[35, 46], [33, 42], [37, 44]]); F('#3a2a24', [[45, 46], [47, 42], [43, 44]]);   // ears
+    P('#1b1b20', 37, 49, 2, 2); P('#1b1b20', 42, 49, 2, 2); P('#ffffff', 37, 49, 1, 1); P('#ffffff', 42, 49, 1, 1); P('#1b1b20', 39, 57, 2, 1);
+    k.outline('#0c0c10');
+    E('#f0f0e0', 68, 22, 5, 5);                                                         // the moon
+    return k.c;
+  },
+  devil() {   // Tasmanian devil screeching, white chest band, pink ears
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    L('#1b1b20', 22, 44, 12, 50, 4);                                                    // thick tail
+    E('#1b1b20', 36, 44, 15, 10); P('#f4f4f4', 42, 36, 3, 14);                         // body and white band
+    for (const x of [26, 34, 42, 48]) P('#1b1b20', x, 52, 4, 6);
+    E('#1b1b20', 54, 36, 9, 8);
+    E('#e07a9a', 50, 27, 3, 3); E('#e07a9a', 58, 27, 3, 3);                            // pink ears
+    F('#e07a9a', [[58, 38], [70, 34], [70, 44]]); for (let x = 61; x < 70; x += 2) { P('#ffffff', x, 36 - Math.round((x - 61) * 0.2), 1, 1); P('#ffffff', x, 42, 1, 1); }   // open mouth, teeth
+    P('#e85a5a', 56, 33, 2, 2); P('#e07a9a', 66, 33, 2, 1);                             // eye and nose
+    k.outline('#4a4a5a'); return k.c;
+  },
+  pademelon() {   // a small wallaby nibbling grass at the edge of the bush
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    for (let i = 0; i < 12; i++) L('#6a4a32', 26 - i, 52 + i * 0.4, 26 - i, 52 + i * 0.4, Math.max(2, 4 - (i / 5 | 0)));   // tail
+    E('#7a5a3e', 36, 46, 13, 10); E('#b06a3a', 40, 50, 8, 5);                          // body, red belly
+    E('#7a5a3e', 32, 54, 8, 4); L('#6a4a32', 32, 57, 46, 59, 2);                       // hind leg and foot
+    L('#7a5a3e', 46, 46, 50, 56, 2);                                                    // front paw down
+    E('#7a5a3e', 52, 42, 6, 5); E('#8a6a4a', 57, 45, 4, 3); P('#1b1b20', 60, 45, 2, 1);   // head, snout down to the grass
+    E('#7a5a3e', 49, 36, 2.5, 3.5); P('#c8a080', 49, 35, 1, 2);
+    P('#1b1b20', 53, 41, 2, 2); P('#ffffff', 53, 41, 1, 1);
+    k.outline();
+    for (let x = 52; x < 74; x += 3) L('#5a9a3a', x, 62, x + 1, 56 + (x % 5), 1);         // grass
+    return k.c;
+  },
+  echidna() {   // spiky ball with a long snout, sniffing for ants
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    E('#5a3e28', 38, 46, 18, 11);
+    for (let i = 0; i < 40; i++) { const a = Math.PI * (0.05 + 0.9 * (i % 20) / 19), r = i < 20 ? 15 : 10, x = 38 - Math.cos(a) * r, y = 47 - Math.sin(a) * r * 0.75;
+      L('#e8dcc0', x, y, x - Math.cos(a) * 4, y - Math.sin(a) * 4, 1); P('#1b1b20', x - Math.cos(a) * 5, y - Math.sin(a) * 5, 1, 1); }   // spines with dark tips
+    L('#3a2a1e', 54, 48, 70, 54, 3); P('#1b1b20', 52, 45, 2, 2);                        // long snout, eye
+    for (const x of [28, 46]) { P('#3a2a1e', x, 55, 4, 4); P('#1b1b20', x + 3, 59, 2, 1); }
+    k.outline();
+    L('#e07a9a', 71, 55, 75, 57, 1); for (const [a, b] of [[76, 60], [73, 61], [78, 58]]) P('#1b1b20', a, b, 1, 1);   // tongue and ants
+    return k.c;
+  },
+});
+Object.assign(BACKDROP, {
+  gangGang: ['#cfe6f0', '#86b89a'], greyRoo: ['#bfe0f0', '#c8b070'], bogong: ['#20284a', '#5a5048'], kookaburra: ['#bfe0f0', '#86b89a'],
+  ibis: ['#bfe0f0', '#7ab060'], brolga: ['#cfe0f0', '#6a9a8a'], brushTurkey: ['#a8d0a0', '#5a7a3a'], croc: ['#bfe0f0', '#86a070'],
+  frilledLizard: ['#f0d8a0', '#b07a4a'], eagle: ['#8fc2ff', '#c87a4a'], quokka: ['#bfe0f0', '#e8d8a0'], numbat: ['#e8e0c0', '#b08a5a'],
+  blackSwan: ['#bfe0f0', '#86b89a'], wombat: ['#e8e0c0', '#a88a60'], magpie: ['#bfe0f0', '#86b89a'], seaLion: ['#8fc2ff', '#e8d8a0'],
+  penguin: ['#f0b080', '#2a4a7a'], possum: ['#1c2440', '#2a3a2a'], flyingFox: ['#1c2440', '#2a3a2a'], devil: ['#2a3050', '#3a4a3a'],
+  pademelon: ['#9ac090', '#4a6a3a'], echidna: ['#e0e8d0', '#a88a60'],
+});
 
 // =====================================================================
 // PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
