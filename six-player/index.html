@@ -12,10 +12,10 @@
 <meta name="theme-color" content="#0f4d3a">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<meta name="description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Best of three.">
+<meta name="description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Ten hands make a pot.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="SIX PLAYER">
-<meta property="og:description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Best of three.">
+<meta property="og:description" content="Za Liu Jia, the Tianjin team card game: you and two bots against three bots, with Jokers, 3s and 2s as wild cards. Ten hands make a pot.">
 <meta property="og:url" content="https://pedrotung.github.io/EmilyGames/six-player/">
 <meta property="og:image" content="https://pedrotung.github.io/EmilyGames/six-player/cover.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -39,8 +39,9 @@
   button:active,.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35);}
   button:disabled{opacity:.4;cursor:default;transform:none;}
   .ghost{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;border:1px solid rgba(255,255,255,.35);font-size:14px;padding:6px 11px;}
-  #topL{position:absolute;left:14px;top:12px;display:flex;gap:8px;z-index:20;}
-  #topR{position:absolute;right:14px;top:12px;display:flex;gap:8px;z-index:20;}
+  #topL{position:absolute;left:14px;top:12px;display:flex;gap:8px;z-index:55;}
+  #topR{position:absolute;right:14px;top:12px;display:flex;gap:8px;z-index:55;}
+  #helpOv,#fsHelpOv{z-index:70;}
   #score{position:absolute;left:14px;top:56px;background:var(--panel);border-radius:12px;padding:8px 12px;font-size:15px;line-height:1.35;z-index:5;}
   #score b.a{color:var(--teamA);} #score b.b{color:var(--teamB);}
   #score .big{font-size:22px;font-weight:800;}
@@ -176,60 +177,66 @@
 const TXT={
   en:{home:'⌂ Home',newGame:'New Game',help:'How to Play',full:'Full screen',exitFull:'Exit full screen',play:'Play',pass:'Pass',hint:'Hint',
     lang:'中文',sub:'Za Liu Jia · the Tianjin team card game',
-    desc:'You and two bots (Team A) against three bots (Team B). Get rid of your cards first, and make sure someone on the other team is stuck last. Best of three games.',
-    you:'You',bot:n=>'Bot '+n,team:'Team',cards:n=>n+(n===1?' card':' cards'),gameN:n=>'Game '+n,bo3:'Best of 3',
+    desc:'You and two bots (Team A) against three bots (Team B). Get rid of your cards first, and make sure someone on the other team is stuck last. Ten hands make a pot; the team with more wins takes it.',
+    you:'You',bot:n=>'Bot '+n,team:'Team',cards:n=>n+(n===1?' card':' cards'),gameN:n=>'Hand '+n,bo3:'Pot of 10 hands',extra:'Extra hand: the pot is tied',
     yourTurnLead:'Your lead: play anything',yourTurnBeat:c=>'Beat '+c+' or pass',waiting:n=>n+' is thinking…',youOut:'You are out! Watching the others…',
     leads:(n,c)=>n+' has the '+c+' and leads',wins:n=>n+' wins the trick',freeLead:n=>n+' leads anything',
     single:'Single',pair:'Pair',triple:'Triple',four:'Four',of:(t,r)=>t+' '+r,
     sel:'Tap cards to choose',bad:'Not a valid set',low:c=>'Too low: needs '+c,ok:c=>c,
     noPlay:'No cards can beat it: pass',
-    first:'1st out · Top',last:'Last · Stuck',nth:n=>['1st','2nd','3rd','4th','5th','6th'][n]+' out',
+    first:'1st out · Top',last:'Stuck',nth:n=>['1st','2nd','3rd','4th','5th','6th'][n]+' out',
     winA:'Team A wins this game!',winB:'Team B wins this game!',draw:'Draw: Top and Stuck are on the same team',
-    next:'Next Game',matchA:'Your team wins the match!',matchB:'Team B wins the match',again:'Play Again',share:'Share',
+    next:'Next Hand',matchA:'Team A wins the pot!',matchB:'Team B wins the pot',again:'New Pot',share:'Share',potBtn:'Pot Results',
+    potTitle:'Pot Results',hands:'Hands',draws:'Draws',tops:'Top',stucks:'Stuck',dr:'Draw',
+    jiefeng:n=>n+' takes the lead for a teammate',
     score:'Score',helpTitle:'How to Play',
     fsTitle:'Full screen',fsText:'This browser cannot switch to full screen by itself. Add SIX PLAYER to your home screen and open it from the icon.',
     fsSteps:'<b>iPhone / iPad (Safari):</b> tap Share, then <b>Add to Home Screen</b>.<br><b>Android (Chrome):</b> tap the ⋮ menu, then <b>Add to Home screen</b>.<br><b>In an app (WeChat and others):</b> open this page in your phone\'s browser first.',
-    ok:'OK',close:'Close',shareText:(a,b)=>'Our team won SIX PLAYER '+a+'–'+b+'!',
+    ok:'OK',close:'Close',shareText:(a,b)=>'Our team won a pot of SIX PLAYER '+a+'\u2013'+b+'!',
     helpHtml:`<h2>How to Play</h2>
 <h3>Teams</h3><p>Six players, 9 cards each (54 cards with both Jokers). Seats alternate: <b style="color:#1677d6">Team A</b> is You, Bot 2 and Bot 4; <b style="color:#e0661a">Team B</b> is Bot 1, Bot 3 and Bot 5.</p>
 <h3>Playing</h3><ul><li>Whoever holds the <b>4♥</b> leads first, with any set.</li>
 <li>Sets: a <b>Single</b>, a <b>Pair</b>, a <b>Triple</b> or a <b>Four</b> of the same rank.</li>
 <li>Next players must play the same kind of set, higher, or <b>Pass</b>.</li>
-<li>When everyone else passes, the last player to play wins the trick and leads anything.</li></ul>
+<li>When everyone else passes, the last player to play wins the trick and leads anything.</li>
+<li>If that player is already out of cards, a teammate still holding cards takes the lead for them.</li></ul>
 <h3>Card order (high to low)</h3><p>Big Joker, Small Joker, 3, 2, A, K, Q, J, 10, 9, 8, 7, 6, 5, 4</p>
 <h3>Wild cards <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#f2c94c;border:1px solid #a57a00;vertical-align:-1px"></span></h3>
 <ul><li>Both Jokers, the 3s and the 2s are wild. They can stand in for any card from 4 to A to make Pairs, Triples and Fours. Example: Big Joker + 4 is a Pair of 4s.</li>
 <li>Played alone, a wild card is a Single of its own value.</li>
 <li>A set made only of wild cards counts as its lowest card. Example: Big Joker + 3 is a Pair of 3s.</li></ul>
-<h3>Winning</h3><p>The first player out is <b>Top</b>, the one left holding cards is <b>Stuck</b>. If Top and Stuck are on different teams, Top's team wins the game. If they are on the same team, it is a draw. First team to win 2 games wins the match.</p>`},
+<h3>Winning</h3><p>The first player out is <b>Top</b>, the one left holding cards is <b>Stuck</b>. As soon as one whole team is out, the hand ends: the players still holding cards are Stuck. If Top and Stuck are on different teams, Top's team wins the game. If they are on the same team, it is a draw and nobody scores.</p><h3>A pot</h3><p>Ten hands make a <b>pot</b>. The team with more wins takes the pot. If it is tied after ten hands, keep playing until one team is ahead.</p>`},
   zh:{home:'⌂ 主页',newGame:'新游戏',help:'玩法',full:'全屏',exitFull:'退出全屏',play:'出牌',pass:'过',hint:'提示',
     lang:'English',sub:'砸六家 · 天津扑克',
-    desc:'你和两个电脑（A 队）对三个电脑（B 队）。抢先出完手里的牌，还要让对方有人落家。三盘两胜。',
-    you:'你',bot:n=>n+' 号',team:'队',cards:n=>n+' 张',gameN:n=>'第 '+n+' 盘',bo3:'三盘两胜',
+    desc:'你和两个电脑（A 队）对三个电脑（B 队）。抢先出完手里的牌，还要让对方有人落家。10 把牌为一锅，赢得多的队赢这一锅。',
+    you:'你',bot:n=>n+' 号',team:'队',cards:n=>n+' 张',gameN:n=>'第 '+n+' 把',bo3:'一锅 10 把',extra:'加打：这一锅打平了',
     yourTurnLead:'你先出：随便出',yourTurnBeat:c=>'压过 '+c+'，或者过',waiting:n=>n+' 在想…',youOut:'你出完了！看其他人打…',
     leads:(n,c)=>n+' 有 '+c+'，先出',wins:n=>n+' 这轮最大',freeLead:n=>n+' 自由出牌',
     single:'单张',pair:'对子',triple:'三张',four:'四张',of:(t,r)=>t+' '+r,
     sel:'点牌选择',bad:'不是合法牌型',low:c=>'太小：要大过 '+c,ok:c=>c,
     noPlay:'没有能压的牌：请点过',
-    first:'第 1 名 · 大贡',last:'最后 · 落家',nth:n=>'第 '+(n+1)+' 名',
+    first:'第 1 名 · 大贡',last:'落家',nth:n=>'第 '+(n+1)+' 名',
     winA:'A 队赢了这盘！',winB:'B 队赢了这盘！',draw:'平局：大贡和落家是同一队',
-    next:'下一盘',matchA:'你们队赢了整局！',matchB:'B 队赢了整局',again:'再来一局',share:'分享',
+    next:'下一把',matchA:'A 队赢了这一锅！',matchB:'B 队赢了这一锅',again:'再开一锅',share:'分享',potBtn:'看这一锅统计',
+    potTitle:'这一锅统计',hands:'把数',draws:'平局',tops:'大贡',stucks:'落家',dr:'平',
+    jiefeng:n=>n+' 接风',
     score:'比分',helpTitle:'玩法',
     fsTitle:'全屏',fsText:'这个浏览器不能直接全屏。把 SIX PLAYER 添加到主屏幕，再从图标打开。',
     fsSteps:'<b>iPhone / iPad（Safari）：</b>点分享，再点<b>添加到主屏幕</b>。<br><b>安卓（Chrome）：</b>点 ⋮ 菜单，再点<b>添加到主屏幕</b>。<br><b>在微信等应用里：</b>先用手机浏览器打开这个网页。',
-    ok:'好的',close:'关闭',shareText:(a,b)=>'我们队 '+a+':'+b+' 赢了砸六家 SIX PLAYER！',
+    ok:'好的',close:'关闭',shareText:(a,b)=>'我们队 '+a+':'+b+' 赢了一锅砸六家 SIX PLAYER！',
     helpHtml:`<h2>玩法</h2>
 <h3>分队</h3><p>六个人，每人 9 张牌（54 张，含大小王）。隔一个座位是队友：<b style="color:#1677d6">A 队</b>是你、2 号、4 号；<b style="color:#e0661a">B 队</b>是 1 号、3 号、5 号。</p>
 <h3>出牌</h3><ul><li>拿到<b>红桃 4</b> 的人先出，牌型随意。</li>
 <li>牌型：<b>单张、对子、三张、四张</b>（同点数）。</li>
 <li>下家要出同样的牌型并且更大，否则就<b>过</b>。</li>
-<li>其他人都过了，最后出牌的人赢这一轮，再自由出牌。</li></ul>
+<li>其他人都过了，最后出牌的人赢这一轮，再自由出牌。</li>
+<li>如果他已经出完牌，由还有牌的队友<b>接风</b>出牌。</li></ul>
 <h3>大小（从大到小）</h3><p>大王、小王、3、2、A、K、Q、J、10、9、8、7、6、5、4</p>
 <h3>混儿 <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#f2c94c;border:1px solid #a57a00;vertical-align:-1px"></span></h3>
 <ul><li>大王、小王、3、2 是混儿，可以当 4 到 A 的任何牌，凑对子、三张、四张。例如：大王 + 4 = 一对 4。</li>
 <li>混儿单出时按自己的大小算。</li>
 <li>一手牌全是混儿时，按其中最小的那张算。例如：大王 + 3 = 一对 3。</li></ul>
-<h3>输赢</h3><p>第一个出完的是<b>大贡</b>，最后手里还有牌的是<b>落家</b>。大贡和落家不同队，大贡那队赢这盘；同一队就是平局。先赢两盘的队赢整局。</p>`}
+<h3>输赢</h3><p>第一个出完的是<b>大贡</b>，最后手里还有牌的是<b>落家</b>。一队三个人全部出完，这把就直接结束，手里还有牌的都算落家。大贡和落家不同队，大贡那队赢这盘；同一队就是平局，不算分。</p><h3>一锅</h3><p>10 把牌为一<b>锅</b>，赢得多的队赢这一锅。10 把打完还是平，就继续打，直到一队领先。</p>`}
 };
 let LANG='en';
 try{ if(localStorage.getItem('sixLang')==='zh') LANG='zh'; }catch(e){}
@@ -290,6 +297,9 @@ const G={hands:[[],[],[],[],[],[]],turn:0,trick:null,passed:new Set(),out:[],act
 const team=p=>p%2;            // 0 = Team A (seats 0,2,4), 1 = Team B
 const active=()=>[0,1,2,3,4,5].filter(p=>G.hands[p].length>0);
 const nextActive=p=>{ for(let i=1;i<=6;i++){ const q=(p+i)%6; if(G.hands[q].length) return q; } return p; };
+// 接风: a player who wins a trick after going out hands the lead to a teammate still holding cards
+const jiefeng=p=>{ for(const i of [2,4]){ const q=(p+i)%6; if(G.hands[q].length) return q; } return nextActive(p); };
+const teamOut=t=>[t,t+2,t+4].every(q=>!G.hands[q].length);
 const pname=p=>p===0?T('you'):T('bot')(p);
 const sortHand=h=>h.sort((a,b)=>a.r-b.r||a.s-b.s);
 
@@ -308,18 +318,19 @@ function act(p,cards){
     const ids=new Set(cards.map(c=>c.id)); G.hands[p]=G.hands[p].filter(c=>!ids.has(c.id));
     G.trick={cards,combo:cb,by:p}; G.passed=new Set(); G.acts[p]={cards};
     if(!G.hands[p].length) G.out.push(p);
-    if(active().length<=1){ G.over=true; return 'end'; }
+    // once one whole team is out the Stuck player must be on the other team, so the hand is decided
+    if(teamOut(0)||teamOut(1)){ G.over=true; return 'end'; }
   } else { G.passed.add(p); G.acts[p]={pass:true}; }
   const by=G.trick.by, others=active().filter(q=>q!==by);
   if(others.every(q=>G.passed.has(q))){
-    G.turn=G.hands[by].length?by:nextActive(by); G.lastWinner=by; return 'trick';
+    G.turn=G.hands[by].length?by:jiefeng(by); G.lastWinner=by; return 'trick';
   }
   G.turn=nextActive(p); return 'go';
 }
 function clearTrick(){ G.trick=null; G.passed=new Set(); G.acts={}; }
 function roundResult(){
-  const last=active()[0], order=G.out.concat([last]), top=order[0];
-  return {order,top,last,winner:team(top)!==team(last)?team(top):-1};
+  const left=active(), order=G.out.concat(left), top=order[0];
+  return {order,top,left,cards:left.map(p=>G.hands[p].length),winner:team(top)!==team(left[0])?team(top):-1};
 }
 
 /* ================= AI ================= */
@@ -376,7 +387,7 @@ const sleep=ms=>new Promise(r=>G.timer=setTimeout(r,ms));
 const speed=()=>G.hands[0].length?1:0.45;
 let runId=0;
 
-function newMatch(){ G.game=1; G.score=[0,0]; G.results=[]; G.matchOver=false; startRound(); }
+function newMatch(){ G.showingPot=false; G.game=1; G.score=[0,0]; G.results=[]; G.matchOver=false; startRound(); }
 function startRound(){
   runId++; clearTimeout(G.timer);
   deal(); hideOv('roundOv');
@@ -398,7 +409,7 @@ async function loop(id){
 async function afterTrick(id){
   await sleep(1000*speed()); if(id!==runId) return;
   const w=G.lastWinner; clearTrick(); render();
-  toast(G.hands[w].length?T('wins')(pname(w)):T('freeLead')(pname(G.turn)),1100);
+  toast(G.hands[w].length?T('wins')(pname(w)):team(G.turn)===team(w)?T('jiefeng')(pname(G.turn)):T('freeLead')(pname(G.turn)),1300);
   await sleep(500*speed());
 }
 async function humanAct(cards){
@@ -412,7 +423,7 @@ async function humanAct(cards){
 function endRound(){
   const res=roundResult(); G.results.push(res);
   if(res.winner>=0) G.score[res.winner]++;
-  if(G.score[0]>=2||G.score[1]>=2) G.matchOver=true;
+  if(G.game>=10&&G.score[0]!==G.score[1]) G.matchOver=true;
   showRound(res); render();
 }
 
@@ -443,7 +454,7 @@ function render(){
   $('helpOk').onclick=()=>hideOv('helpOv');
   paintFs&&paintFs();
   // score
-  $('score').innerHTML=`<div>${T('gameN')(G.game)} · ${T('bo3')}</div><div class="big"><b class="a">A ${G.score[0]}</b> – <b class="b">${G.score[1]} B</b></div>`;
+  $('score').innerHTML=`<div>${T('gameN')(G.game)} \u00b7 ${G.game>10?T('extra'):T('bo3')}</div><div class="big"><b class="a">A ${G.score[0]}</b> – <b class="b">${G.score[1]} B</b></div>`;
   // seats
   let s=''; for(let p=1;p<6;p++){ const [x,y]=SEAT_POS[p];
     s+=`<div class="seat${G.turn===p&&!G.over?' turn':''}${G.hands[p].length?'':' out'}" style="left:${x}px;top:${y}px">${seatInner(p)}</div>`; }
@@ -481,23 +492,40 @@ function toast(t,ms){ const el=$('toast'); el.textContent=t; el.classList.add('s
 const showOv=id=>$(id).classList.remove('hidden'), hideOv=id=>$(id).classList.add('hidden');
 
 function showRound(res){
-  const oc=res.order.map((p,i)=>{ const tm=team(p)?'B':'A', cls=i===0?' first':i===5?' last':'';
+  const nOut=res.order.length-res.left.length;
+  const oc=res.order.map((p,i)=>{ const tm=team(p)?'B':'A', stuck=i>=nOut, cls=i===0?' first':stuck?' last':'';
     return `<div class="o${cls}"><div class="ava ${tm}">${p===0?'★':p}</div><div class="n">${pname(p)} <span class="badge ${tm}">${tm}</span></div>
-      <div class="t">${i===0?T('first'):i===5?T('last'):T('nth')(i)}</div></div>`; }).join('');
+      <div class="t">${i===0?T('first'):stuck?T('last')+'<br>'+T('cards')(res.cards[i-nOut]):T('nth')(i)}</div></div>`; }).join('');
   const rt=res.winner===0?`<div class="res a">${T('winA')}</div>`:res.winner===1?`<div class="res b">${T('winB')}</div>`:`<div class="res">${T('draw')}</div>`;
   let tail='', btns='';
   if(G.matchOver){
-    const won=G.score[0]>=2;
-    tail=`<div class="res ${won?'a':'b'}" style="font-size:34px;margin-top:14px">${won?T('matchA'):T('matchB')}</div>`;
-    btns=`<button class="go" id="againBtn">${T('again')}</button>${won&&window.EmilyShare?`<button id="shareBtn">${T('share')}</button>`:''}`;
-    if(won&&window.EmilyShare) snapShare();
+    btns=`<button class="go" id="potBtn">${T('potBtn')}</button>`;
   } else btns=`<button class="go" id="nextBtn">${T('next')}</button>`;
   $('roundBox').innerHTML=`<h2>${T('gameN')(G.game)}</h2><div class="order">${oc}</div>${rt}
     <div style="font-size:22px;font-weight:800;margin-top:10px"><span style="color:#1677d6">A ${G.score[0]}</span> – <span style="color:#e0661a">${G.score[1]} B</span></div>${tail}
     <div class="row">${btns}</div>`;
   showOv('roundOv');
   if($('nextBtn')) $('nextBtn').onclick=()=>{ G.game++; startRound(); };
-  if($('againBtn')) $('againBtn').onclick=()=>newMatch();
+  if($('potBtn')) $('potBtn').onclick=()=>showPot();
+}
+// end of a pot: score, every hand's result, and how often each player was Top or Stuck
+function showPot(){
+  G.showingPot=true;
+  const won=G.score[0]>G.score[1], draws=G.results.filter(r=>r.winner<0).length;
+  const strip=G.results.map((r,i)=>{ const c=r.winner===0?'#3aa0ff':r.winner===1?'#ff8a3d':'#bbb', t=r.winner===0?'A':r.winner===1?'B':T('dr');
+    return `<div style="width:46px;text-align:center"><div style="font-size:12px;color:#777">${i+1}</div><div style="background:${c};color:#fff;border-radius:8px;font-weight:800;padding:6px 0">${t}</div></div>`; }).join('');
+  const rows=[0,1,2,3,4,5].map(p=>{ const tm=team(p)?'B':'A', top=G.results.filter(r=>r.top===p).length, st=G.results.filter(r=>r.left.includes(p)).length;
+    return `<tr><td style="text-align:left;padding:4px 10px"><b>${pname(p)}</b> <span class="badge ${tm}">${tm}</span></td><td>${top}</td><td>${st}</td></tr>`; }).join('');
+  $('roundBox').innerHTML=`<h2>${T('potTitle')}</h2>
+    <div class="res ${won?'a':'b'}" style="font-size:34px">${won?T('matchA'):T('matchB')}</div>
+    <div style="font-size:30px;font-weight:900;margin:6px 0"><span style="color:#1677d6">A ${G.score[0]}</span> \u2013 <span style="color:#e0661a">${G.score[1]} B</span></div>
+    <div style="font-size:16px">${T('hands')} ${G.results.length} \u00b7 ${T('draws')} ${draws}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${strip}</div>
+    <table style="margin:0 auto;border-collapse:collapse;font-size:16px;text-align:center"><tr style="color:#777"><td></td><td style="padding:4px 14px">${T('tops')}</td><td style="padding:4px 14px">${T('stucks')}</td></tr>${rows}</table>
+    <div class="row"><button class="go" id="againBtn">${T('again')}</button>${won&&window.EmilyShare?`<button id="shareBtn">${T('share')}</button>`:''}</div>`;
+  showOv('roundOv');
+  if(won&&window.EmilyShare) snapShare();
+  $('againBtn').onclick=()=>newMatch();
   if($('shareBtn')) $('shareBtn').onclick=()=>EmilyShare.open();
 }
 // share picture: the match result drawn on a small green table
@@ -506,7 +534,7 @@ function snapShare(){
   const g=x.createRadialGradient(600,250,50,600,267,700); g.addColorStop(0,'#1a7a5a'); g.addColorStop(1,'#0a3d2e');
   x.fillStyle=g; x.fillRect(0,0,1200,534);
   x.textAlign='center'; x.fillStyle='#fff'; x.font='900 84px system-ui, sans-serif'; x.fillText('SIX PLAYER',600,120);
-  x.font='bold 30px system-ui, sans-serif'; x.fillStyle='#cfe9dc'; x.fillText(LANG==='zh'?'砸六家':'Za Liu Jia',600,168);
+  x.font='bold 30px system-ui, sans-serif'; x.fillStyle='#cfe9dc'; x.fillText((LANG==='zh'?'砸六家 \u00b7 ':'Za Liu Jia \u00b7 ')+T('hands')+' '+G.results.length,600,168);
   x.font='900 120px system-ui, sans-serif'; x.fillStyle='#3aa0ff'; x.fillText('A '+G.score[0],470,330);
   x.fillStyle='#fff'; x.fillText('–',600,330); x.fillStyle='#ff8a3d'; x.fillText(G.score[1]+' B',730,330);
   x.font='bold 34px system-ui, sans-serif'; x.fillStyle='#f2c94c'; x.fillText(T('matchA'),600,410);
@@ -527,7 +555,7 @@ function fit(){
 addEventListener('resize',fit); addEventListener('orientationchange',()=>setTimeout(fit,200)); fit();
 
 function setLang(l){ LANG=l; try{ localStorage.setItem('sixLang',l); }catch(e){} document.documentElement.lang=l==='zh'?'zh-CN':'en';
-  render(); if(!$('roundOv').classList.contains('hidden')&&G.results.length) showRound(G.results[G.results.length-1]); paintFsHelp(); }
+  render(); if(!$('roundOv').classList.contains('hidden')&&G.results.length) G.showingPot?showPot():showRound(G.results[G.results.length-1]); paintFsHelp(); }
 $('langBtn').onclick=$('langTop').onclick=()=>setLang(LANG==='en'?'zh':'en');
 $('startBtn').onclick=()=>{ hideOv('titleOv'); newMatch(); };
 $('newBtn').onclick=()=>{ hideOv('roundOv'); newMatch(); };
