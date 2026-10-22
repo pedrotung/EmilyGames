@@ -81,6 +81,11 @@
   #homePanel { background: #fff; z-index: 2; }
   @media (max-width: 380px) { .chip { padding: 5px 6px; } .hud-right, .hud-left { gap: 3px; } }
   .panel .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  /* Phones: bigger top buttons, easy to hit with a thumb. */
+  html.phone .chip { min-height: 44px; padding: 10px 16px; font-size: 16px; box-sizing: border-box; display: inline-flex; align-items: center; }
+  html.phone .chip svg { width: 20px !important; height: 20px !important; }
+  html.phone .hud-left, html.phone .hud-right { gap: 8px; }
+  html.phone .hud { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
   .panel button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
   .progress {
     position: fixed; left: 0; right: 0; top: 0; height: 4px;
@@ -1382,6 +1387,7 @@ function seasonEvents() {
 
 // A phone: touch screen whose short side is small (tablets keep their own orientation).
 const IS_PHONE = (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)) && Math.min(screen.width, screen.height) < 600;
+if (IS_PHONE) document.documentElement.classList.add('phone');
 // Once full screen (see toggleFullscreen), also lock to landscape where the browser allows it (mostly Android Chrome).
 function lockLandscape() {
   if (!IS_PHONE || !fsOn()) return;
@@ -1415,9 +1421,9 @@ function placeStart(w, h) {
   if (IS_PHONE) {
     // Use the whole width left of JUMP; shrink the faces only if the panel would not fit the height.
     sp.style.left = '12px'; sp.style.width = (jumpLeft - 22) + 'px'; sp.style.removeProperty('--face');
-    const img = sp.querySelector('.av img'), room = h - 52 - 8;
+    const img = sp.querySelector('.av img'), room = h - 60 - 8;
     if (img && sp.offsetHeight > room) sp.style.setProperty('--face', Math.max(40, img.offsetWidth - (sp.offsetHeight - room)) + 'px');
-    sp.style.top = Math.round(Math.max(52, Math.min((h - sp.offsetHeight) / 2 + 12, h - 8 - sp.offsetHeight))) + 'px';
+    sp.style.top = Math.round(Math.max(60, Math.min((h - sp.offsetHeight) / 2 + 14, h - 8 - sp.offsetHeight))) + 'px';
     return;
   }
   // Full width is 452px; shrink to stay left of JUMP if that still leaves room for the faces.
