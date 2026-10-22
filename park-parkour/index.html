@@ -24,10 +24,12 @@
   /* MOBILE: touch-action none + user-scalable=no stop scrolling, pinch and double-tap zoom */
   html, body { margin: 0; height: 100%; background: #2b1d12; overflow: hidden; touch-action: none; overscroll-behavior: none;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
-  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* PHONE: everything sits in #stage, which turns 90 degrees when a phone is held upright */
+  #stage { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; transform-origin: 0 0; }
+  #wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
   /* the canvas is drawn small and blown up with hard pixel edges */
   #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
-  .mc { position: fixed; z-index: 10; font: bold 14px/1 "Courier New", monospace; color: #fff; text-shadow: 2px 2px 0 #3a3a3a;
+  .mc { position: absolute; z-index: 10; font: bold 14px/1 "Courier New", monospace; color: #fff; text-shadow: 2px 2px 0 #3a3a3a;
     background: #8b8b8b; border: 3px solid #1b1b20; box-shadow: inset 3px 3px 0 #b5b5b5, inset -3px -3px 0 #5a5a5a;
     padding: 9px 12px; cursor: pointer; text-decoration: none; letter-spacing: 1px; }
   .mc:active { background: #7a7a7a; box-shadow: inset 3px 3px 0 #5a5a5a, inset -3px -3px 0 #b5b5b5; }
@@ -39,7 +41,7 @@
     font: 16px/1.4 "Courier New", monospace; color: #1b1b20; }
   #fsHelp button { margin-top: 12px; position: static; }
   #soundBtn { bottom: max(8px, env(safe-area-inset-bottom)); right: max(8px, env(safe-area-inset-right)); font-size: 11px; padding: 7px 8px; }
-  #endBtns { position: fixed; z-index: 10; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 0 8px; }
+  #endBtns { position: absolute; z-index: 10; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 0 8px; }
   #endBtns .mc { position: static; }
   #againBtn { background: #4c9a2a; box-shadow: inset 3px 3px 0 #7cc24a, inset -3px -3px 0 #2f6b1a; font-size: 18px; padding: 12px 22px; }
   #shareBtn { font-size: 18px; padding: 12px 18px; }
@@ -47,11 +49,12 @@
   /* MOBILE: in portrait the game sits in the middle; a hint asks to turn the phone */
   #rotateHint { position: fixed; z-index: 5; left: 0; right: 0; top: 18%; text-align: center; color: #f2c230; font: bold 15px/1.4 "Courier New", monospace;
     text-shadow: 2px 2px 0 #000; display: none; padding: 0 16px; pointer-events: none; }
-  @media (orientation: portrait) and (max-width: 700px) { #rotateHint { display: block; } }
+  #rotateHint.on { display: block; }
   @media (max-width: 520px), (max-height: 500px) { #fsBtn, #home { font-size: 11px; padding: 7px 8px; } }
 </style>
 </head>
 <body>
+<div id="stage">
 <div id="wrap"><canvas id="game"></canvas></div>
 <a id="home" class="mc" href="../">&#9664; GAMES</a>
 <button id="soundBtn" class="mc">SOUND ON</button>
@@ -61,6 +64,7 @@
   <button id="againBtn" class="mc">RUN AGAIN</button>
   <button id="shareBtn" class="mc">SHARE</button>
   <button id="clearBtn" class="mc">CLEAR RECORDS</button>
+</div>
 </div>
 <div id="fsHelp" class="hidden"><div>
   <b>Play full screen on iPhone:</b><br>tap the Share button in Safari, then <b>Add to Home Screen</b>, and open Park Parkour from your home screen.<br><br>
@@ -1179,16 +1183,33 @@ function frame(now) {
 // =====================================================================
 // SCREEN SIZE (game logic always uses the small logical canvas)
 // =====================================================================
+// PHONE: a touch screen whose short side is small. Held upright, the whole game (canvas and buttons)
+// turns 90 degrees so it always plays in landscape (Jason). Taps anywhere jump, so no tap mapping is needed.
+const IS_PHONE = (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)) && Math.min(screen.width, screen.height) < 600;
+const stage = document.getElementById('stage');
+let rotated = false;
 function resize() {
-  const vw = window.innerWidth, vh = window.innerHeight;
+  rotated = IS_PHONE && innerHeight > innerWidth;
+  const vw = rotated ? innerHeight : innerWidth, vh = rotated ? innerWidth : innerHeight;
+  stage.style.width = vw + 'px'; stage.style.height = vh + 'px';
+  stage.style.transform = rotated ? `translateX(${innerWidth}px) rotate(90deg)` : '';
   W = Math.max(240, Math.min(400, Math.round(H * vw / vh)));
   cv.width = W; cv.height = H;
-  const s = Math.min(vw / W, vh / H);          // MOBILE: in portrait this leaves bars above and below
+  const s = Math.min(vw / W, vh / H);          // MOBILE: a tablet held upright gets bars above and below
   cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
   ctx.imageSmoothingEnabled = false;
+  // tablets held upright still get the "turn sideways" hint
+  document.getElementById('rotateHint').classList.toggle('on', !IS_PHONE && matchMedia('(pointer: coarse)').matches && innerHeight > innerWidth);
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+// once full screen, also lock to landscape where the browser allows it (mostly Android Chrome)
+function lockLandscape() {
+  if (!IS_PHONE || !(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  try { const r = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  setTimeout(resize, 200);
+}
+document.addEventListener('fullscreenchange', lockLandscape); document.addEventListener('webkitfullscreenchange', lockLandscape);
 // MOBILE: the bars around the game in portrait are filled with dirt blocks instead of plain black
 (function borderPattern() {
   const [c, x] = makeCanvas(32, 32);
