@@ -2975,15 +2975,17 @@ Object.assign(PORTRAIT, {
     E('#f0f0e0', 73, 18, 3.5, 3.5);                                                         // the moon
     return k.c;
   },
-  devil() {   // Tasmanian devil screeching, white chest band, pink ears
+  devil() {   // Tasmanian devil screeching side-on: pointed ears, white chest band, jaws wide open
     const k = portraitKit(80, 64), { P, E, L, F } = k;
     L('#1b1b20', 22, 44, 12, 50, 4);                                                    // thick tail
     E('#1b1b20', 36, 44, 15, 10); P('#f4f4f4', 42, 36, 3, 14);                         // body and white band
     for (const x of [26, 34, 42, 48]) P('#1b1b20', x, 52, 4, 6);
-    E('#1b1b20', 54, 36, 9, 8);
-    E('#e07a9a', 50, 27, 3, 3); E('#e07a9a', 58, 27, 3, 3);                            // pink ears
-    F('#e07a9a', [[58, 38], [70, 34], [70, 44]]); for (let x = 61; x < 70; x += 2) { P('#ffffff', x, 36 - Math.round((x - 61) * 0.2), 1, 1); P('#ffffff', x, 42, 1, 1); }   // open mouth, teeth
-    P('#e85a5a', 56, 33, 2, 2); P('#e07a9a', 66, 33, 2, 1);                             // eye and nose
+    E('#1b1b20', 54, 36, 9, 8); F('#1b1b20', [[57, 29], [68, 32], [72, 36], [71, 42], [66, 45], [57, 43]]);   // head and broad snout
+    F('#1b1b20', [[46, 31], [48, 22], [54, 29]]); F('#1b1b20', [[53, 30], [58, 21], [61, 30]]);   // pointed ears
+    F('#d07a8a', [[48, 29], [48, 25], [51, 29]]); F('#d07a8a', [[56, 29], [58, 24], [59, 29]]);   // pink inside the ears
+    k.x.globalCompositeOperation = 'destination-out'; F('#000', [[60, 38], [74, 33], [74, 45]]); k.x.globalCompositeOperation = 'source-over';   // gaping mouth: you see right through it
+    for (let x = 62; x <= 70; x += 2) { P('#ffffff', x, Math.floor(38 - (x - 60) * 5 / 14) - 1, 1, 1); P('#ffffff', x, Math.ceil(38 + (x - 60) * 7 / 14) + 1, 1, 1); }   // teeth along both jaws
+    P('#e85a5a', 58, 32, 2, 2); P('#e07a9a', 70, 33, 2, 1);                             // eye and nose
     k.outline('#4a4a5a'); return k.c;
   },
   pademelon() {   // a small wallaby nibbling grass at the edge of the bush
