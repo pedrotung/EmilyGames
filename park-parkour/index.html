@@ -931,7 +931,7 @@ function update(dt) {
     }
     if (T && state === 'play') {
       T.hurt = Math.max(0, T.hurt - dt);
-      const g2 = C.pickupGrow + 1;
+      const g2 = C.pickupGrow + 3;   // animals are easy to touch
       for (const an of T.animals) { an.t += dt; if (an.gone) continue;
         const bob = an.a.place === 'sky' ? Math.sin(an.t * 3) * 3 : 0;
         if (box.x < an.x + an.w + g2 && box.x + box.w > an.x - g2 && box.y < an.y + bob + an.h + g2 && box.y + box.h > an.y + bob - g2) collectAnimal(an); }
@@ -1778,7 +1778,7 @@ function setupTour(city) {
 function animalY(place, spr) {
   if (place === 'ground') return GROUND_Y - spr.height;
   if (place === 'tree') return GROUND_Y - 46 - Math.round(spr.height / 2);
-  return GROUND_Y - 84 - Math.round(spr.height / 2);
+  return GROUND_Y - 74 - Math.round(spr.height / 2);   // a double jump at any time reaches it
 }
 function spawnTourAnimals() {
   const T = G.tour;
