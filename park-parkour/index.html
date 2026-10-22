@@ -12,10 +12,10 @@
 <meta name="theme-color" content="#5fa83a">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<meta name="description" content="A blocky pixel runner through an Aussie park: jump benches, bins and bushes, grab gold blocks and spot kangaroos, koalas and kookaburras.">
+<meta name="description" content="A blocky pixel runner around Australia: one level in each capital city, collect 24 Aussie animals and fly from city to city.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="OZZIE PARKOUR">
-<meta property="og:description" content="A blocky pixel runner through an Aussie park: jump benches, bins and bushes, grab gold blocks and spot kangaroos, koalas and kookaburras.">
+<meta property="og:description" content="A blocky pixel runner around Australia: one level in each capital city, collect 24 Aussie animals and fly from city to city.">
 <meta property="og:url" content="https://pedrotung.github.io/EmilyGames/park-parkour/">
 <meta property="og:image" content="https://pedrotung.github.io/EmilyGames/park-parkour/cover.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -41,11 +41,12 @@
     font: 16px/1.4 "Courier New", monospace; color: #1b1b20; }
   #fsHelp button { margin-top: 12px; position: static; }
   #soundBtn { bottom: max(8px, env(safe-area-inset-bottom)); right: max(8px, env(safe-area-inset-right)); font-size: 11px; padding: 7px 8px; }
+  #mapBtn { bottom: max(8px, env(safe-area-inset-bottom)); right: calc(max(8px, env(safe-area-inset-right)) + 92px); font-size: 11px; padding: 7px 8px; }
   #endBtns { position: absolute; z-index: 10; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 0 8px; }
   #endBtns .mc { position: static; }
   #againBtn { background: #4c9a2a; box-shadow: inset 3px 3px 0 #7cc24a, inset -3px -3px 0 #2f6b1a; font-size: 18px; padding: 12px 22px; }
   #shareBtn { font-size: 18px; padding: 12px 18px; }
-  #clearBtn { font-size: 12px; padding: 8px 10px; align-self: center; }
+  #clearBtn, #menuBtn { font-size: 12px; padding: 8px 10px; align-self: center; }
   /* MOBILE: in portrait the game sits in the middle; a hint asks to turn the phone */
   #rotateHint { position: fixed; z-index: 5; left: 0; right: 0; top: 18%; text-align: center; color: #f2c230; font: bold 15px/1.4 "Courier New", monospace;
     text-shadow: 2px 2px 0 #000; display: none; padding: 0 16px; pointer-events: none; }
@@ -58,11 +59,13 @@
 <div id="wrap"><canvas id="game"></canvas></div>
 <a id="home" class="mc" href="../">&#9664; GAMES</a>
 <button id="soundBtn" class="mc">SOUND ON</button>
+<button id="mapBtn" class="mc hidden">MAP</button>
 <button id="fsBtn" class="mc">FULL SCREEN</button>
 <div id="rotateHint">Turn your phone sideways<br>for a bigger park!</div>
 <div id="endBtns" class="hidden">
   <button id="againBtn" class="mc">RUN AGAIN</button>
   <button id="shareBtn" class="mc">SHARE</button>
+  <button id="menuBtn" class="mc">MENU</button>
   <button id="clearBtn" class="mc">CLEAR RECORDS</button>
 </div>
 </div>
@@ -189,6 +192,7 @@ const FONT = {
   8:[14,17,17,14,17,17,14], 9:[14,17,17,15,1,2,12], ' ':[0,0,0,0,0,0,0], '!':[4,4,4,4,4,0,4],
   '?':[14,17,1,2,4,0,4], '.':[0,0,0,0,0,12,12], ':':[0,12,12,0,12,12,0], '-':[0,0,0,31,0,0,0],
   "'":[4,4,8,0,0,0,0], ',':[0,0,0,0,12,4,8], '/':[1,1,2,4,8,16,16], '*':[0,17,10,4,10,17,0], '=':[0,0,31,0,31,0,0], '+':[0,4,4,31,4,4,0],
+  '>':[8,4,2,1,2,4,8], '%':[24,25,2,4,8,19,3],
 };
 function textWidth(s, scale = 1) { return s.length * 6 * scale - scale; }
 // draw text with a dark drop shadow; align: 'left' | 'center' | 'right'
@@ -580,7 +584,7 @@ const BACK_TYPES = [
 ];
 const propCache = {};
 function getProp(type) { // trees and flowers get a few variations, the rest are made once
-  const varied = ['gum', 'wattle', 'paw', 'fern'].includes(type), v = varied ? irnd(0, 5) : 0, key = type + v;
+  const varied = ['gum', 'gumE', 'wattle', 'paw', 'fern', 'palm', 'jacaranda', 'vines'].includes(type), v = varied ? irnd(0, 5) : 0, key = type + v;
   return propCache[key] || (propCache[key] = PROPS[type](v * 131 + type.length * 17 + 3));
 }
 
@@ -645,7 +649,7 @@ function clearRecords() {
 }
 // spot an animal: counts for this run, and for the field guide forever
 function markSeen(id) {
-  if (!G || state !== 'play' || G.seenRun.has(id)) return;
+  if (!G || state !== 'play' || G.tour || G.seenRun.has(id)) return;
   G.seenRun.add(id);
   if (!seen.includes(id)) { seen.push(id); saveJSON(STORE.seen, seen); G.newAnimals.push(id); banner('NEW ANIMAL: ' + ANIMALS[id] + '!'); }
 }
@@ -689,7 +693,7 @@ let state = 'title';               // 'title' | 'play' | 'dead'
 let G;                             // the current run
 let held = false;                  // jump key / finger is down (for short hops)
 
-function newRun() {
+function newRun(city) {
   G = {
     cam: 0, speed: CONFIG.baseSpeed, time: 0, coins: 0, flowers: 0, deadT: 0, score: 0, pickPts: 0,
     combo: 0, mult: 1,
@@ -702,7 +706,9 @@ function newRun() {
     magpies: [], nextMagpie: rnd(12, 20), bugs: [], creekDone: -1,
     clouds: [], particles: [], popups: [], banners: [],
     seenRun: new Set(), newAnimals: [], result: null,
+    tour: city ? setupTour(city) : null, needSnap: false,
   };
+  if (G.tour) G.speed = G.tour.st.speed0;
   for (let i = 0; i < 6; i++) G.clouds.push({ x: rnd(0, 400), y: rnd(6, 60), c: pick(CLOUDS), s: rnd(0.05, 0.12) });
 }
 const metres = () => Math.floor(G.cam / 16);
@@ -718,9 +724,14 @@ function banner(s) { G.banners.push({ s, t: 0 }); SFX.newAnimal(); }
 function fillTiles() {
   while (G.nextTile * 16 < G.cam + W + 32) {
     const i = G.nextTile;
-    if (i < 20) { G.tiles[i] = 'grass'; G.nextTile++; continue; }
+    const gr = G.tour ? G.tour.city.ground : null, main = gr ? gr.main : 'grass';
+    if (i < 20) { G.tiles[i] = main; G.nextTile++; continue; }
     const r = Math.random(), prevCreek = (G.tiles[i - 1] || '').startsWith('creek');
-    const type = r < 0.6 ? 'grass' : r < 0.85 || prevCreek ? 'red' : 'creek';   // never two creeks in a row
+    let type = r < 0.6 ? 'grass' : r < 0.85 || prevCreek ? 'red' : 'creek';   // never two creeks in a row
+    if (gr) {   // tour: the city's own ground, no creek next to a waiting animal or at the flag
+      type = r < 0.72 ? main : r < 1 - gr.creek || prevCreek ? gr.alt : 'creek';
+      if (type === 'creek' && (nearAnimal(i * 16, 6 * 16, 40) || Math.abs(i * 16 - G.tour.finishX) < 200)) type = main;
+    }
     const len = type === 'creek' ? irnd(4, 6) : irnd(4, 12);
     for (let k = 0; k < len; k++) G.tiles[i + k] = type === 'creek' ? (k === 0 ? 'creekL' : k === len - 1 ? 'creekR' : 'creek') : type;
     if (type === 'creek') // butterflies and dragonflies play over the water
@@ -738,11 +749,17 @@ function weighted(list) {
   return list[0];
 }
 function spawnThings() {
-  const m = metres(), C = CONFIG;
+  const m = metres(), C = CONFIG, T = G.tour;
+  if (T) spawnTourAnimals();
   while (G.nextObs < G.cam + W + 60) {
-    const critterChance = m < C.critterFrom ? 0 : Math.min(C.critterMaxChance, C.critterChance + (m - C.critterFrom) * C.critterRamp);
+    if (T && G.nextObs > T.finishX - 120) { G.nextObs = Infinity; break; }        // the run-up to the flag stays clear
+    const critterChance = T || m < C.critterFrom ? 0 : Math.min(C.critterMaxChance, C.critterChance + (m - C.critterFrom) * C.critterRamp);
     let ob;
-    if (Math.random() < critterChance) {
+    if (T) {   // tour: no animals as obstacles, the city's own things instead
+      if (!T.obst) T.obst = tourObstacles(T.city);
+      const o = weighted(T.obst.filter(o => o.spr.height <= C.maxObstacleHeight && !(G.lastTall && o.spr.height >= C.tallHeight)));
+      ob = { kind: o.id, spr: o.spr, w: o.spr.width, h: o.spr.height, inset: o.inset, walk: 0 };
+    } else if (Math.random() < critterChance) {
       const c = weighted(CRITTERS.filter(c => !c.from || m >= c.from));
       ob = { kind: c.id, critter: c, w: c.w, h: c.h, inset: c.inset, walk: c.speed, t: Math.random() * 9 };
     } else {
@@ -751,12 +768,13 @@ function spawnThings() {
       const o = weighted(list);
       ob = { kind: o.id, spr: o.spr, w: o.spr.width, h: o.spr.height, inset: o.inset, walk: 0 };
     }
-    let x = G.nextObs; while (onCreek(x - 16, ob.w + 32)) x += 16;   // nothing on the bridge
+    let x = G.nextObs; while (onCreek(x - 16, ob.w + 32) || nearAnimal(x, ob.w)) x += 16;   // nothing on the bridge or next to a waiting animal
+    if (T && x > T.finishX - 120) { G.nextObs = Infinity; break; }
     ob.x = x; G.obstacles.push(ob);
     G.lastTall = ob.h >= C.tallHeight;
     // sometimes two small things side by side (one jump still clears both)
     let w = ob.w;
-    if (m > 80 && !ob.walk && ob.h <= 12 && ob.w <= 12 && Math.random() < C.pairChance && !onCreek(x + ob.w, ob.w + 4)) {
+    if ((T ? true : m > 80) && !ob.walk && ob.h <= 12 && ob.w <= 12 && Math.random() < (T ? T.st.pair : C.pairChance) && !onCreek(x + ob.w, ob.w + 4) && !nearAnimal(x + ob.w, ob.w + 4)) {
       G.obstacles.push({ ...ob, x: x + ob.w + 2 }); w = ob.w * 2 + 2;
     }
     // gold arcs over some obstacles, inside the jump curve
@@ -764,7 +782,7 @@ function spawnThings() {
     // the gap grows with speed and always gives at least minReactionTime to react.
     // A walking animal closes the gap faster, so it gets extra room.
     const k = G.speed / C.baseSpeed, closing = G.speed + (ob.walk || 0);
-    const gap = Math.max(rnd(C.minObstacleGap, C.maxObstacleGap) * k, closing * C.minReactionTime);
+    const gap = Math.max(rnd(C.minObstacleGap, C.maxObstacleGap) * k * (T ? T.st.gap : 1), closing * C.minReactionTime);
     G.nextObs = x + w + gap + (ob.walk ? ob.walk * 2 : 0);
   }
   // rows of pickups along the ground or at jump height, kept clear of obstacles
@@ -772,13 +790,14 @@ function spawnThings() {
     const n = irnd(3, 6), high = Math.random() < 0.5, y = high ? GROUND_Y - 40 : GROUND_Y - 14;
     const x0 = G.nextPick, x1 = x0 + n * C.coinSpacing;
     const clash = G.obstacles.some(ob => ob.x < x1 + 24 && ob.x + ob.w > x0 - 24);
-    if (!clash) for (let k = 0; k < n; k++) addPickup(x0 + k * C.coinSpacing, y);
+    if (!clash && !(T && x1 > T.finishX - 40)) for (let k = 0; k < n; k++) addPickup(x0 + k * C.coinSpacing, y);
     G.nextPick = x1 + rnd(C.coinRowGap[0], C.coinRowGap[1]);
   }
 }
 function addPickup(x, y) {
   const flower = Math.random() < CONFIG.flowerChance;
   G.pickups.push({ x, y: flower ? y - 1 : y, t: Math.random() * 6, flower, w: 7, h: flower ? 8 : 7 });
+  if (G.tour && !flower) G.tour.coinsMade++;
 }
 // three pickups following the top of a jump over an obstacle of height h
 function addArc(cx, h) {
@@ -791,7 +810,7 @@ function addArc(cx, h) {
 function spawnBack(dt) {
   const bcam = G.cam * CONFIG.backParallax;
   while (G.nextBack < bcam + W + 40) {
-    const t = weighted(BACK_TYPES.map(([type, weight]) => ({ type, weight }))).type;
+    const t = weighted(G.tour ? G.tour.back : BACK_TYPES.map(([type, weight]) => ({ type, weight }))).type;
     const img = getProp(t), item = { type: t, img, x: G.nextBack, animal: img.animal || null };
     G.back.push(item);
     if (t === 'lamp' && Math.random() < 0.6) G.kookas.push({ lamp: item, fly: false, x: 0, y: 0, vy: 0, t: 0 });
@@ -799,6 +818,7 @@ function spawnBack(dt) {
   }
   G.back = G.back.filter(b => b.x + b.img.width > bcam - 10);
 
+  if (G.tour) { G.kookas.length = 0; return; }   // tour: the only animals are the city's own
   if ((G.nextRoo -= dt) <= 0) {          // kangaroos hop across the back of the park
     const left = Math.random() < 0.6;
     G.roos.push({ x: left ? W + 20 : -24, dir: left ? -1 : 1, hop: 0, y: 0 });
@@ -825,7 +845,7 @@ function spawnBack(dt) {
 // =====================================================================
 function press() {
   audio();
-  if (state === 'title') { start(); return; }
+  if (MENU_STATES.includes(state)) { menuKey('ok'); return; }
   if (state === 'dead') { if (G.deadT > 0.8) start(); return; }
   held = true;
   const p = G.p;
@@ -844,7 +864,21 @@ function doJump(n) {
   p.onGround = false; p.coyote = 0; p.buffer = 0; p.jumps = n; p.stretch = 0.15;
   if (n === 1) { dust(PLAYER_X + 4, p.y, 4); SFX.jump(); } else { dust(PLAYER_X + 4, p.y, 5, '#ffffff'); SFX.jump2(); }
 }
-function start() { newRun(); state = 'play'; showEnd(false); fillTiles(); }
+function start() { newRun(); state = 'play'; showEnd(false); fillTiles(); showButtons(); }
+// keyboard on the menu screens: Space / Enter does the main thing, arrows move the choice
+function menuKey(k) {
+  if (state === 'title') {
+    if (k === 'ok') startTour(titleSel);
+    else { titleSel = (titleSel + (k === 'right' ? 1 : k === 'left' ? 7 : k === 'down' || k === 'up' ? 4 : 0)) % 8; SFX.coin(); }
+  } else if (state === 'map') {
+    if (k === 'ok') startLevel(CITIES[mapSel].id);
+    else if (k === 'back') goTitle();
+    else { const dir = k === 'right' || k === 'down' ? 1 : -1; for (let i = 1; i <= 8; i++) { const j = (mapSel + dir * i + 16) % 8; if (unlocked(CITIES[j].id)) { mapSel = j; SFX.coin(); break; } } }
+  } else if (state === 'flight') { if (k === 'ok') endFlight(); }
+  else if (state === 'clear') { if (k === 'ok') afterClear(); }
+  else if (state === 'fail') { if (k === 'ok') startLevel(G.tour.city.id); else if (k === 'back') goMap(G.tour.city.id); }
+  else if (state === 'complete') { if (k === 'ok') goMap(); }
+}
 function dust(x, y, n, col = '#c9b48a') {
   for (let k = 0; k < n; k++) particle(x, y, rnd(-40, 10), rnd(-50, -10), rnd(0.25, 0.5), col, 2);
 }
@@ -853,9 +887,11 @@ function dust(x, y, n, col = '#c9b48a') {
 // UPDATE (one fixed physics step)
 // =====================================================================
 function update(dt) {
-  const C = CONFIG, running = state === 'play';
+  if (state === 'flight') { updateFlight(dt); return; }
+  if (state === 'map' || state === 'complete') return;
+  const C = CONFIG, running = state === 'play', T = G.tour;
   const speed = state === 'title' ? 60 : running ? G.speed : 0;
-  if (running) { G.time += dt; G.speed = Math.min(C.maxSpeed, C.baseSpeed + metres() * C.speedRampRate); }
+  if (running) { G.time += dt; G.speed = T ? T.st.speed0 + (T.st.speed1 - T.st.speed0) * Math.min(1, G.cam / T.len) : Math.min(C.maxSpeed, C.baseSpeed + metres() * C.speedRampRate); }
   G.cam += speed * dt;
   fillTiles();
   if (running) spawnThings();
@@ -875,7 +911,8 @@ function update(dt) {
     }
     p.anim += dt * speed / 9;
   } else if (state === 'title') p.anim += dt * 6;
-  else { G.deadT += dt; p.vy += C.gravity * dt; p.y = Math.min(GROUND_Y, p.y + p.vy * dt); }
+  else if (state === 'dead') { G.deadT += dt; p.vy += C.gravity * dt; p.y = Math.min(GROUND_Y, p.y + p.vy * dt); }
+  else { p.vy = Math.min(C.maxFallSpeed, p.vy + C.gravity * dt); p.y = Math.min(GROUND_Y, p.y + p.vy * dt); }   // level over: just land
 
   // --- walking animals move towards the player, but never into the obstacle ahead of them ---
   for (const ob of G.obstacles) if (ob.walk && running) {
@@ -890,7 +927,19 @@ function update(dt) {
     const I = C.hitboxInset, box = { x: G.cam + PLAYER_X + I - 1, y: p.y - 24 + I, w: 9 - 2 * (I - 1), h: 24 - I };
     for (const ob of G.obstacles) {
       const [l, t, r, b] = ob.inset, ox = ob.x + l + I, oy = GROUND_Y - ob.h + t + I, ow = ob.w - l - r - 2 * I, oh = ob.h - t - b - I;
-      if (box.x < ox + ow && box.x + box.w > ox && box.y < oy + oh && box.y + box.h > oy) { die(); break; }
+      if (box.x < ox + ow && box.x + box.w > ox && box.y < oy + oh && box.y + box.h > oy) { if (T) tourHurt(); else die(); break; }
+    }
+    if (T && state === 'play') {
+      T.hurt = Math.max(0, T.hurt - dt);
+      const g2 = C.pickupGrow + 1;
+      for (const an of T.animals) { an.t += dt; if (an.gone) continue;
+        const bob = an.a.place === 'sky' ? Math.sin(an.t * 3) * 3 : 0;
+        if (box.x < an.x + an.w + g2 && box.x + box.w > an.x - g2 && box.y < an.y + bob + an.h + g2 && box.y + box.h > an.y + bob - g2) collectAnimal(an); }
+      T.animals = T.animals.filter(an => !an.gone && an.x + an.w > G.cam - 20);
+      if (G.cam + PLAYER_X >= T.finishX) {
+        if (T.got.every(Boolean)) endLevel(true);
+        else endLevel(false, 'NOT ALL ANIMALS!');
+      }
     }
     const g = C.pickupGrow;
     for (const c of G.pickups) {
@@ -900,6 +949,7 @@ function update(dt) {
     }
     G.score = metres() + G.pickPts;
   }
+  if (T) for (const c of T.cards) c.t += dt;
   for (let i = G.obstacles.length - 1; i >= 0; i--) if (G.obstacles[i].x + G.obstacles[i].w < G.cam - 20) G.obstacles.splice(i, 1);
   for (let i = G.pickups.length - 1; i >= 0; i--) if (G.pickups[i].got || G.pickups[i].x < G.cam - 20) G.pickups.splice(i, 1);
 
@@ -968,11 +1018,16 @@ function die() {
 // DRAW
 // =====================================================================
 function drawSky() {
-  const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-  g.addColorStop(0, '#5ea8ec'); g.addColorStop(1, '#c4e6ff');
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y), city = G.tour && G.tour.city;
+  g.addColorStop(0, city ? city.sky[0] : '#5ea8ec'); g.addColorStop(1, city ? city.sky[1] : '#c4e6ff');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, GROUND_Y);
   px(ctx, '#fff3a0', W - 46, 12, 16, 16); px(ctx, '#ffe066', W - 44, 14, 12, 12);   // block sun
   for (const c of G.clouds) ctx.drawImage(c.c, Math.round(c.x), Math.round(c.y));
+  if (city) {   // the city skyline with its landmark, far away
+    const far = cityFar(city), fwid = far.width;
+    for (let X = -Math.floor(G.cam * 0.15) % fwid; X < W; X += fwid) ctx.drawImage(far, X, BACK_Y - 66);
+    return;
+  }
   const hf = HILLS_FAR.width, hn = HILLS_NEAR.width;
   for (let X = -Math.floor(G.cam * 0.15) % hf; X < W; X += hf) ctx.drawImage(HILLS_FAR, X, BACK_Y - 66);
   for (let X = -Math.floor(G.cam * 0.3) % hn; X < W; X += hn) ctx.drawImage(HILLS_NEAR, X, BACK_Y - 64);
@@ -1013,7 +1068,8 @@ function drawGround() {
       px(ctx, 'b', X, GROUND_Y - 9, 16, 2);
       if (idx % 2 === 0) px(ctx, 'B', X + 1, GROUND_Y - 9, 2, 9);
     } else {
-      const red = type === 'red', top = (red ? TILES.red : TILES.grass)[idx % 3], low = (red ? TILES.reddirt : TILES.dirt)[idx % (red ? 2 : 3)];
+      const red = type === 'red', sand = type === 'sand';
+      const top = (sand ? TILES.sand : red ? TILES.red : TILES.grass)[idx % 3], low = (sand ? TILES.sanddirt : red ? TILES.reddirt : TILES.dirt)[idx % (red || sand ? 2 : 3)];
       ctx.drawImage(top, X, GROUND_Y); ctx.drawImage(low, X, GROUND_Y + 16);
     }
   }
@@ -1041,6 +1097,7 @@ function limb(X, Y, len, wdt, lean, col, col2) {
 function drawPlayer() {
   const p = G.p, dead = state === 'dead', air = !p.onGround && state === 'play';
   if (dead && Math.floor(G.deadT * 12) % 2) return;     // blink after a crash
+  if (G.tour && G.tour.hurt > 0 && Math.floor(G.tour.hurt * 14) % 2) return;   // blink while a bump can't hurt again
   const sw = air ? 0.55 : Math.sin(p.anim) * 0.6;       // leg swing
   pctx.clearRect(0, 0, 20, 34);
   const X = 6, by = 33, legTop = by - 8, bodyTop = by - 16, headTop = by - 24;
@@ -1110,17 +1167,7 @@ function panel(x, y, w, h, alpha = 0.92) {
 }
 const pad = (n, k) => String(n).padStart(k, ' ');
 function drawHud() {
-  const touch = isTouch;
-  if (state === 'title') {
-    ctx.globalAlpha = 0.35; px(ctx, '#000000', 0, 82, W, 48); ctx.globalAlpha = 1;   // dark band so the help text reads over the park
-    drawText(ctx, 'OZZIE', W / 2, 22, '#f2c230', 4, 'center', '#4a2f1c');
-    drawText(ctx, 'PARKOUR', W / 2, 56, '#ffffff', 3, 'center', '#3a3a3a');
-    if (Math.floor(performance.now() / 500) % 2) drawText(ctx, touch ? 'TAP THE SCREEN TO START' : 'PRESS SPACE OR CLICK TO START', W / 2, 86, '#ffffff', 1, 'center');
-    drawText(ctx, touch ? 'TAP = JUMP   TAP AGAIN = DOUBLE JUMP' : 'SPACE = JUMP   AGAIN = DOUBLE JUMP', W / 2, 98, '#ffffff', 1, 'center');
-    drawText(ctx, 'HOLD FOR A BIGGER JUMP', W / 2, 108, '#ffffff', 1, 'center');
-    drawText(ctx, (best ? 'BEST ' + best + '   ' : '') + 'ANIMALS ' + seen.length + '/' + Object.keys(ANIMALS).length, W / 2, 120, '#fff3a0', 1, 'center');
-    return;
-  }
+  if (G.tour) { drawTourHud(); if (CONFIG.DEBUG) drawDebug(); return; }
   if (state === 'dead' && G.deadT > 0.6) { drawGameOver(); if (CONFIG.DEBUG) drawDebug(); return; }
   // top bar, kept in the middle so the corner buttons never cover it
   drawText(ctx, 'SCORE ' + G.score, W / 2, 6, '#ffffff', 1, 'center');
@@ -1172,11 +1219,27 @@ function drawDebug() {
   drawText(ctx, 'FPS ' + Math.round(fps) + '  SPEED ' + Math.round(G.speed), 4, H - 10, '#ff00ff', 1, 'left', '#000');
 }
 function draw() {
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false; HITS = [];
+  if (state === 'flight') { drawFlight(); return; }
+  if (state === 'map') { drawMapScreen(); return; }
+  if (state === 'complete') { drawComplete(); snapIfNeeded(); return; }
   drawSky(); drawSkyAnimals(); drawBackPark();
   // light haze over the background park, so it reads as far away and never looks like something to jump
   ctx.globalAlpha = 0.38; ctx.fillStyle = '#d8eeff'; ctx.fillRect(0, 0, W, GROUND_Y); ctx.globalAlpha = 1;
-  drawGround(); drawBugs(); drawThings(); drawPlayer(); drawFx(); drawHud();
+  drawGround(); drawBugs();
+  if (G.tour) { drawFinish(); drawTourAnimals(); }
+  drawThings(); drawPlayer(); drawFx();
+  if (state === 'title') { drawTitle(); return; }
+  drawHud();
+  if (state === 'clear') { drawClear(); snapIfNeeded(); }
+  if (state === 'fail') drawFail();
+}
+// a sharp, bigger copy of the screen for the share picture, taken on the first frame of a win
+function snapIfNeeded() {
+  if (!G.needSnap || !window.EmilyShare) return; G.needSnap = false;
+  const k = 4, [big, bx] = makeCanvas(W * k, H * k); bx.imageSmoothingEnabled = false; bx.drawImage(cv, 0, 0, W * k, H * k);
+  const T = G.tour, txt = state === 'complete' ? `I flew around all of Australia in Ozzie Parkour! ${totalStars()}/24 stars` : `I cleared ${T.city.name} with ${endInfo.stars} stars in Ozzie Parkour!`;
+  EmilyShare.snap({ canvas: big, game: 'Ozzie Parkour', text: txt, path: 'park-parkour/' });
 }
 
 // =====================================================================
@@ -1236,6 +1299,13 @@ document.addEventListener('fullscreenchange', lockLandscape); document.addEventL
 // INPUT: keyboard, mouse and touch
 // =====================================================================
 window.addEventListener('keydown', e => {
+  if (window.EmilyShare && EmilyShare.isOpen && EmilyShare.isOpen()) return;
+  if (MENU_STATES.includes(state)) {
+    const k = { Space: 'ok', Enter: 'ok', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Escape: 'back' }[e.code];
+    if (k) { e.preventDefault(); if (!e.repeat) { audio(); menuKey(k); } }
+    return;
+  }
+  if (e.code === 'Escape' && state === 'play' && G.tour) { goMap(G.tour.city.id); return; }
   if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); if (!e.repeat) press(); }
 });
 window.addEventListener('keyup', e => { if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) release(); });
@@ -1247,7 +1317,15 @@ function onDown(e) {
   if (e.target.closest && e.target.closest('.mc, #fsHelp, #emilyShare')) return;
   e.preventDefault();
   if (isTouch && !triedFs) { triedFs = true; goFull(); }
+  if (MENU_STATES.includes(state)) { const [gx, gy] = toGame(e); audio(); uiTap(gx, gy); return; }
   press();
+}
+// screen point -> game pixel, also when the whole stage is turned for a phone held upright
+function toGame(e) {
+  const r = cv.getBoundingClientRect();
+  if (!rotated) return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H];
+  // stage turned 90 degrees clockwise: screen down = game right, screen left = game down
+  return [(e.clientY - r.top) / r.height * W, (r.right - e.clientX) / r.width * H];
 }
 document.addEventListener('pointerdown', onDown, { passive: false });
 document.addEventListener('pointerup', release);
@@ -1290,12 +1368,765 @@ function showEnd(on) {
   document.getElementById('shareBtn').classList.toggle('hidden', !window.EmilyShare);
 }
 document.getElementById('againBtn').addEventListener('click', () => { audio(); start(); });
+document.getElementById('menuBtn').addEventListener('click', () => { audio(); goTitle(); });
 document.getElementById('shareBtn').addEventListener('click', () => window.EmilyShare && EmilyShare.open());
 clearBtn.addEventListener('click', () => {   // asks once more before wiping
   if (!clearBtn.dataset.sure) { clearBtn.dataset.sure = '1'; clearBtn.textContent = 'TAP AGAIN TO CLEAR'; return; }
   clearRecords(); if (G.result) G.result = { rank: -1, newBest: false };
   clearBtn.textContent = 'CLEARED'; clearBtn.dataset.sure = '';
 });
+
+// =====================================================================
+// AUSTRALIA TOUR - 8 capital cities, one level each. Collect the city's
+// 3 animals and reach the flag to clear it, then fly to the next city.
+// Difficulty follows the STAGE number (1st stop easiest, 8th hardest),
+// whatever city the tour starts from.
+// =====================================================================
+// one row per stage: length (m), start and end speed (px/s), obstacle gap multiplier, chance of two obstacles side by side
+const STAGES = [
+  { len: 400, speed0: 95,  speed1: 115, gap: 1.30, pair: 0.03 },
+  { len: 470, speed0: 100, speed1: 125, gap: 1.22, pair: 0.05 },
+  { len: 540, speed0: 105, speed1: 135, gap: 1.15, pair: 0.08 },
+  { len: 610, speed0: 110, speed1: 145, gap: 1.08, pair: 0.10 },
+  { len: 680, speed0: 115, speed1: 155, gap: 1.02, pair: 0.12 },
+  { len: 750, speed0: 120, speed1: 162, gap: 0.97, pair: 0.15 },
+  { len: 820, speed0: 125, speed1: 170, gap: 0.93, pair: 0.17 },
+  { len: 900, speed0: 130, speed1: 180, gap: 0.90, pair: 0.20 },
+];
+const TOUR_HEARTS = 3, HURT_TIME = 1.2;          // hearts per level; blink time after a bump (can't be hurt again)
+
+// ---------- the 24 city animals ----------
+Object.assign(PAL, {
+  '0': '#26262b', '#': '#c0c0c8', '1': '#7a7a84', '2': '#e07a9a', '3': '#c8402a', '4': '#5a5a64',
+  '5': '#3a5a9a', '6': '#8a5a3a', '7': '#d8b070', '8': '#6a8a3a', '9': '#465e26', '+': '#e8c040', '@': '#ff7a6a',
+});
+const ASPR = {
+  gangGang: sprite(['.......3..3..', '......33333..', '......333033.', '.....43333##.', '....444433#..', '...4#4#4444..',
+    '..4#4#4#444..', '.4#4#4#4#44..', '4#4#4#4#44...', '.444444444...', '....0..0.....', '...00.00.....']),
+  greyRoo: recolour(SPR.roo1, { f: '#9a8f86', F: '#6a625c' }),
+  bogong: sprite(['...0.....0...', '....0...0....', '.666.000.666.', '6777600067776', '6767600067676', '6777600067776',
+    '.667.000.766.', '..66..0..66..', '......0......']),
+  platypus: sprite(['....66666666....', '..666666666k6...', '666666666666444.', '6666777777664444', '.66.6777776.6...', '..k......k......']),
+  kookaburra: SPR.kooka,
+  ibis: sprite(['......00....', '.....0000...', '.....000W0..', '.....00..0..', '.....w0...0.', '.....w.....0', '....ww......',
+    '...wwww.....', '.wwwwwww....', 'wwwwWwwww...', 'w0wwWwwww...', '00.wwwwww...', '....wwww....', '.....0.0....', '.....0.0....', '....00.00...']),
+  koala: SPR.koala,
+  brolga: sprite(['......##....', '......#3#...', '......#3k##.', '......##....', '......#.....', '......#.....', '.....##.....',
+    '....###.....', '..######....', '.#######1...', '########1...', '.######1....', '..#####.....', '....0.0.....', '....0.0.....',
+    '....0.0.....', '....0.0.....', '...00.00....']),
+  brushTurkey: sprite(['.........33...', '........333k..', '........3333..', '........+3....', '..0.....00....', '.00....000....',
+    '000..00000....', '00000000000...', '.0000000000...', '..00000000....', '....6..6......', '...66.66......']),
+  croc: sprite(['..........9.9.9.......', '.....99999999999999k9.', '9999988888888888888889', '..999888888888888+8+8+',
+    '....9999999999999999..', '.....9..9.....9..9....']),
+  frilledLizard: sprite(['.......LLL....', '......LLLLL...', '.....LL66kLL..', '.....LL6666LL.', '......LLLLL...', '.......666....',
+    '......6666....', '.....666.6....', '....666.......', '...6.6........', '..6..6........', '.6..66........']),
+  eagle: sprite(['00................00', '.000.....66.....000.', '..0000..6+66..0000..', '...00000666600000...', '.....000666600......',
+    '........6666........', '.........66.........', '........0000........', '.......00..00.......']),
+  quokka: sprite(['.....66.6.', '....66666.', '....66k66.', '....66667k', '.6666667..', '66666666..', '6666667...', '.666667...', '..6.66....', '..6..66...']),
+  numbat: sprite(['66..............', '666...rrrrrrr...', '.66.rrwrwrwrrr..', '..6rrwrwrwrrrkr.', '...rrrrrrrrrrrrk', '....rrrrrrrr....',
+    '....r.r...r.r...', '...rr.rr.rr.rr..']),
+  blackSwan: sprite(['..........00..', '.........0W0qq', '.........00...', '.........0....', '........00....', '........0.....', '.0......0.....',
+    '000..0000.....', '00000000000...', '.0000000000...', '..00000000....']),
+  wombat: SPR.wombat,
+  magpie: sprite(['........00..', '.......0000#', '.....ww000..', '...0www000..', '000000ww00..', '00000wwww0..', '.....0000...', '......0.0...', '.....00.00..']),
+  seaLion: sprite(['...........66...', '..........666k..', '..........66666.', '.........666....', '........6666....', '....66666666....',
+    '.6666666666666..', '66666666666666..', '6.66.......666..']),
+  penguin: sprite(['..555...', '.55555..', '.5555k#.', '.555ww..', '5555www.', '5555www.', '5555www.', '.555ww..', '.555ww..', '..+..+..', '.++.++..']),
+  possum: SPR.possum,
+  flyingFox: sprite(['0............0', '00....LL....00', '000..6LL6..000', '00000066000000', '.0000.66.0000.', '..0.0.66.0.0..', '......00......']),
+  devil: sprite(['.........2..2.', '........00000.', '........00W00.', '.00000000000002', '00000000ww000.', '00000000ww00..', '.0000000000...', '.00.00..00.00.', '.00.00..00.00.']),
+  pademelon: recolour(SPR.roo1, { f: '#8a5a3a', F: '#5a3a22' }),
+  echidna: SPR.echidna,
+};
+// black shape of a sprite (an animal not found yet)
+function silhouette(spr, col = '#1b1b20') {
+  const [c, x] = makeCanvas(spr.width, spr.height); x.drawImage(spr, 0, 0);
+  x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, spr.width, spr.height); return c;
+}
+const SIL = new Map();
+const silOf = (spr, col = '#3a3a3a') => { const k = col; let m = SIL.get(spr); if (!m) SIL.set(spr, m = {}); return m[k] || (m[k] = silhouette(spr, col)); };
+
+// where an animal waits: 'ground' (run into it), 'tree' (one jump), 'sky' (double jump)
+const A = (k, name, short, place) => ({ k, name, short, place });
+const CITIES = [
+  { id: 'canberra', name: 'CANBERRA', state: 'ACT', ll: [149.1, -35.3],
+    animals: [A('gangGang', 'GANG-GANG COCKATOO', 'GANG-GANG', 'tree'), A('greyRoo', 'EASTERN GREY KANGAROO', 'KANGAROO', 'ground'), A('bogong', 'BOGONG MOTH', 'BOGONG MOTH', 'sky')],
+    fact: 'BOGONG MOTHS FLY TO THE ALPS EVERY SPRING', sky: ['#86b8e8', '#e6f2ff'], hills: ['#a8c8b0', '#bcd8c0', '#7ab06a', '#8cc47c'],
+    ground: { main: 'grass', alt: 'grass', creek: 0.12 }, obst: ['hedgeBox', 'roundabout'], props: { gumE: 4, lamp: 3, wattle: 3, fern: 2, roosign: 2, parksign: 1 } },
+  { id: 'sydney', name: 'SYDNEY', state: 'NSW', ll: [151.2, -33.9],
+    animals: [A('platypus', 'PLATYPUS', 'PLATYPUS', 'ground'), A('kookaburra', 'KOOKABURRA', 'KOOKABURRA', 'tree'), A('ibis', 'IBIS', 'IBIS', 'tree')],
+    fact: 'PLATYPUS ARE MAMMALS THAT LAY EGGS!', sky: ['#4ea0ec', '#c0e4ff'], hills: ['#9cc8a6', '#b3d7b8', '#6aa65e', '#7fbe6f'],
+    ground: { main: 'grass', alt: 'sand', creek: 0.25 }, obst: ['surfboard', 'grill'], props: { palm: 2, gumE: 2, lamp: 2, bbq: 2, fern: 2, paw: 2, swings: 1 } },
+  { id: 'brisbane', name: 'BRISBANE', state: 'QLD', ll: [153.0, -27.5],
+    animals: [A('koala', 'KOALA', 'KOALA', 'tree'), A('brolga', 'BROLGA', 'BROLGA', 'sky'), A('brushTurkey', 'BRUSH TURKEY', 'BUSH TURKEY', 'ground')],
+    fact: 'KOALAS SLEEP UP TO 20 HOURS A DAY', sky: ['#58a4dc', '#d8f0e4'], hills: ['#94c49a', '#a8d4ac', '#5a9e52', '#6cb262'],
+    ground: { main: 'grass', alt: 'grass', creek: 0.2 }, obst: ['mulch', 'hedgeBox'], props: { palm: 4, jacaranda: 4, fern: 2, bbq: 1, slide: 1 } },
+  { id: 'darwin', name: 'DARWIN', state: 'NT', ll: [130.8, -12.5],
+    animals: [A('croc', 'SALTWATER CROCODILE', 'CROCODILE', 'ground'), A('frilledLizard', 'FRILL-NECKED LIZARD', 'FRILLNECK', 'ground'), A('eagle', 'WEDGE-TAILED EAGLE', 'WEDGE-TAIL', 'sky')],
+    fact: 'SALTIES CAN GROW OVER 6 METRES LONG!', sky: ['#f08a4a', '#ffd88a'], hills: ['#c89a6a', '#d8ac7a', '#8a8a3a', '#9c9c48'],
+    ground: { main: 'red', alt: 'grass', creek: 0.3 }, obst: ['termite', 'crocSign'], props: { palm: 6, fern: 2, wattle: 1 } },
+  { id: 'perth', name: 'PERTH', state: 'WA', ll: [115.9, -32.0],
+    animals: [A('quokka', 'QUOKKA', 'QUOKKA', 'ground'), A('numbat', 'NUMBAT', 'NUMBAT', 'ground'), A('blackSwan', 'BLACK SWAN', 'BLACK SWAN', 'sky')],
+    fact: 'QUOKKAS LIVE ON ROTTNEST ISLAND', sky: ['#3c9cf0', '#d4eeff'], hills: ['#d8d0a8', '#e8e0b8', '#9cb870', '#b0c880'],
+    ground: { main: 'sand', alt: 'grass', creek: 0.05 }, obst: ['log', 'surfboard'], props: { paw: 5, palm: 2, wattle: 2, gumE: 2 } },
+  { id: 'adelaide', name: 'ADELAIDE', state: 'SA', ll: [138.6, -34.9],
+    animals: [A('wombat', 'HAIRY-NOSED WOMBAT', 'WOMBAT', 'ground'), A('magpie', 'MAGPIE', 'MAGPIE', 'sky'), A('seaLion', 'SEA LION', 'SEA LION', 'ground')],
+    fact: 'MAGPIES SWOOP TO GUARD THEIR NESTS', sky: ['#6aa8e8', '#f0e6cc'], hills: ['#b8c098', '#c8d0a8', '#7a9a4a', '#8cac58'],
+    ground: { main: 'grass', alt: 'red', creek: 0.1 }, obst: ['barrel', 'grill'], props: { vines: 6, gumE: 2, lamp: 2, parksign: 1 } },
+  { id: 'melbourne', name: 'MELBOURNE', state: 'VIC', ll: [145.0, -37.8],
+    animals: [A('penguin', 'LITTLE PENGUIN', 'PENGUIN', 'ground'), A('possum', "LEADBEATER'S POSSUM", 'POSSUM', 'tree'), A('flyingFox', 'FLYING FOX', 'FLYING FOX', 'sky')],
+    fact: "THE WORLD'S SMALLEST PENGUIN!", sky: ['#8ca8c4', '#dce2ea'], hills: ['#a0b4b0', '#b4c4c0', '#5e9a58', '#70ac68'],
+    ground: { main: 'grass', alt: 'grass', creek: 0.15 }, obst: ['coffee', 'footy'], props: { lamp: 4, gumE: 3, fern: 2, climb: 1, swings: 1 } },
+  { id: 'hobart', name: 'HOBART', state: 'TAS', ll: [147.3, -42.9],
+    animals: [A('devil', 'TASMANIAN DEVIL', 'TAS DEVIL', 'ground'), A('pademelon', 'PADEMELON', 'PADEMELON', 'ground'), A('echidna', 'ECHIDNA', 'ECHIDNA', 'ground')],
+    fact: 'DEVILS HAVE A SUPER STRONG BITE!', sky: ['#6a8ab8', '#ccd8ea'], hills: ['#8a9ab8', '#c8d0e0', '#4a7a4a', '#5a8c56'],
+    ground: { main: 'grass', alt: 'grass', creek: 0.15 }, obst: ['rock', 'log'], props: { gumE: 5, fern: 4, wattle: 1 } },
+];
+const CITY = Object.fromEntries(CITIES.map(c => [c.id, c]));
+
+// ---------- city landmark icons, 44 x 28 ----------
+const ICON_DRAW = {
+  canberra(P, X, Y) { // Parliament House under its grass hill, four-legged flag mast
+    P('#9fd0f0', X, Y, 44, 28);
+    P('g', X + 4, Y + 17, 36, 3); P('l', X + 8, Y + 16, 28, 1);
+    P('w', X + 2, Y + 20, 40, 5); P('W', X + 2, Y + 24, 40, 1);
+    for (let i = 0; i < 9; i++) P('S', X + 5 + i * 4, Y + 21, 1, 3);
+    P('m', X + 18, Y + 4, 1, 13); P('m', X + 25, Y + 4, 1, 13); P('m', X + 19, Y + 8, 6, 1); P('m', X + 21, Y + 1, 2, 16);
+    P('J', X + 23, Y + 1, 6, 4); P('w', X + 24, Y + 2, 1, 1); P('w', X + 27, Y + 3, 1, 1); P('q', X + 23, Y + 1, 2, 1);
+    P('x', X, Y + 25, 44, 3);
+  },
+  sydney(P, X, Y) { // Opera House sails in front of the Harbour Bridge arch
+    P('#9fd0f0', X, Y, 44, 28);
+    for (let i = 0; i < 11; i++) { const a = Math.round(Math.sin(i / 10 * Math.PI) * 9); P('S', X + 2 + i * 4, Y + 14 - a, 4, 1); }
+    P('S', X + 2, Y + 14, 1, 6); P('S', X + 42, Y + 14, 1, 6); P('S', X + 2, Y + 14, 41, 1);
+    const sail = (x0, h) => { for (let r = 0; r <= h; r++) { const w = Math.round(r * 0.8) + 1, y = Y + 21 - h + r;
+      P('w', X + x0 - w, y, w, 1); if (r % 3 === 2) P('W', X + x0 - w, y, w, 1); P('W', X + x0 - 1, y, 1, 1); } };
+    sail(14, 12); sail(22, 14); sail(29, 10); sail(35, 8);
+    P('b', X + 6, Y + 21, 30, 2);
+    P('x', X, Y + 23, 44, 5); P('z', X + 5, Y + 25, 4, 1); P('z', X + 30, Y + 26, 5, 1);
+  },
+  brisbane(P, X, Y) { // Story Bridge over the brown river, palm on the bank
+    P('#9fd0f0', X, Y, 44, 28);
+    for (let i = 0; i <= 10; i++) { P('S', X + 4 + i, Y + 18 - i, 1, 1); P('S', X + 24 - i, Y + 18 - i, 1, 1); P('S', X + 20 + i, Y + 18 - i, 1, 1); P('S', X + 40 - i, Y + 18 - i, 1, 1); }
+    P('S', X + 14, Y + 8, 1, 10); P('S', X + 30, Y + 8, 1, 10); P('k', X + 2, Y + 18, 40, 2);
+    for (let i = 6; i < 40; i += 4) P('S', X + i, Y + 14, 1, 4);
+    P('#8a6a3a', X, Y + 21, 44, 7); P('#a9844a', X + 6, Y + 23, 6, 1); P('#a9844a', X + 28, Y + 25, 6, 1);
+    P('B', X + 2, Y + 12, 1, 9); P('g', X, Y + 11, 5, 1); P('G', X, Y + 12, 1, 1); P('G', X + 4, Y + 12, 1, 1);
+  },
+  darwin(P, X, Y) { // sunset over the sea, palm tree, a crocodile in the water
+    for (let r = 0; r < 18; r++) P(r < 6 ? '#ff9a3c' : r < 12 ? '#ffb85c' : '#ffd88a', X, Y + r, 44, 1);
+    P('#ffe066', X + 26, Y + 12, 8, 6); P('#fff3a0', X + 28, Y + 13, 4, 4);
+    P('#1f5fa8', X, Y + 18, 44, 10); P('#ffb85c', X + 24, Y + 19, 12, 1);
+    P('B', X + 9, Y + 6, 2, 16); P('B', X + 8, Y + 14, 1, 8);
+    P('G', X + 3, Y + 5, 7, 1); P('G', X + 11, Y + 5, 7, 1); P('G', X + 2, Y + 6, 2, 2); P('G', X + 17, Y + 6, 2, 2); P('g', X + 6, Y + 3, 9, 2); P('G', X + 9, Y + 2, 2, 1);
+    P('r', X, Y + 22, 14, 6);
+    P('#4f6b2a', X + 22, Y + 23, 12, 2); P('#4f6b2a', X + 22, Y + 22, 2, 1); P('#4f6b2a', X + 27, Y + 22, 2, 1); P('o', X + 23, Y + 22, 1, 1); P('#4f6b2a', X + 34, Y + 24, 4, 1);
+  },
+  perth(P, X, Y) { // Bell Tower glass spire on the Swan River, a black swan
+    P('#9fd0f0', X, Y, 44, 28);
+    P('z', X + 8, Y + 4, 6, 16); P('j', X + 8, Y + 4, 1, 16); P('j', X + 13, Y + 4, 1, 16); P('z', X + 9, Y + 1, 4, 3); P('j', X + 10, Y, 2, 1);
+    P('b', X + 6, Y + 18, 10, 3); P('w', X + 18, Y + 14, 22, 6); P('W', X + 18, Y + 19, 22, 1); for (let i = 0; i < 5; i++) P('z', X + 20 + i * 4, Y + 15, 2, 3);
+    P('x', X, Y + 21, 44, 7); P('z', X + 4, Y + 24, 5, 1);
+    P('k', X + 26, Y + 22, 9, 3); P('k', X + 33, Y + 17, 2, 6); P('k', X + 33, Y + 16, 3, 2); P('q', X + 36, Y + 17, 2, 1); P('S', X + 28, Y + 22, 4, 1);
+  },
+  adelaide(P, X, Y) { // St Peter's Cathedral: sandstone with two dark spires, vines in front
+    P('#9fd0f0', X, Y, 44, 28);
+    P('#d8c08a', X + 12, Y + 10, 20, 12); P('#b8a06a', X + 12, Y + 21, 20, 1);
+    for (const sx of [12, 27]) { P('#d8c08a', X + sx, Y + 6, 5, 6); for (let r = 0; r < 6; r++) P('S', X + sx + Math.floor(r / 2), Y + r, 5 - Math.floor(r / 2) * 2, 1); }
+    P('S', X + 20, Y + 6, 4, 1); P('S', X + 19, Y + 7, 6, 3);
+    P('#5a7abf', X + 19, Y + 12, 6, 6); P('#d23a2a', X + 21, Y + 13, 2, 4); P('k', X + 14, Y + 14, 2, 4); P('k', X + 28, Y + 14, 2, 4);
+    P('G', X, Y + 22, 44, 6); for (let i = 0; i < 44; i += 5) P('#7a3a8a', X + i + 1, Y + 23 + (i % 2), 2, 2);
+  },
+  melbourne(P, X, Y) { // Flinders Street Station: ochre front, green dome, row of clocks
+    P('#9fd0f0', X, Y, 44, 28);
+    P('#e0a040', X + 2, Y + 12, 40, 12); P('#c08030', X + 2, Y + 23, 40, 1);
+    P('#3f8f5a', X + 16, Y + 5, 12, 7); P('#3f8f5a', X + 18, Y + 3, 8, 2); P('#2f6f44', X + 21, Y + 1, 2, 2); P('#e0a040', X + 15, Y + 11, 14, 2);
+    for (let i = 0; i < 6; i++) { P('w', X + 4 + i * 6, Y + 14, 4, 4); P('k', X + 5 + i * 6, Y + 15, 1, 2); P('k', X + 6 + i * 6, Y + 16, 1, 1); }
+    P('#7a4a20', X + 18, Y + 18, 8, 6); P('#e0a040', X + 2, Y + 10, 4, 2); P('#e0a040', X + 38, Y + 10, 4, 2);
+    P('S', X, Y + 24, 44, 4); P('#b8b8b8', X, Y + 25, 44, 1);
+  },
+  hobart(P, X, Y) { // kunanyi / Mt Wellington with snow, harbour with a yacht
+    P('#9fd0f0', X, Y, 44, 28);
+    for (let r = 0; r < 16; r++) { const w = 8 + r * 2; P(r < 4 ? 'w' : r < 6 ? '#c8c8d8' : '#6a6a8a', X + 22 - w / 2, Y + 3 + r, w, 1); }
+    P('#4a6a4a', X, Y + 17, 44, 3);
+    P('x', X, Y + 20, 44, 8); P('z', X + 4, Y + 23, 4, 1);
+    P('w', X + 30, Y + 10, 1, 9); P('w', X + 31, Y + 11, 4, 7); P('W', X + 26, Y + 12, 4, 6); P('q', X + 26, Y + 19, 10, 2);
+    P('b', X + 6, Y + 18, 12, 2);
+  },
+};
+// each icon made once; FAR is the same picture without its sky, for the distant city skyline
+const ICON = {}, ICON_FAR = {};
+for (const id in ICON_DRAW) {
+  const [c, x] = makeCanvas(44, 28); ICON_DRAW[id]((col, X, Y, w = 1, h = 1) => px(x, col, X, Y, w, h), 0, 0); ICON[id] = c;
+  const [f, fx] = makeCanvas(44, 28); fx.drawImage(c, 0, 0); const d = fx.getImageData(0, 0, 44, 28);
+  for (let i = 0; i < d.data.length; i += 4) if (d.data[i] === 0x9f && d.data[i + 1] === 0xd0 && d.data[i + 2] === 0xf0) d.data[i + 3] = 0;
+  fx.putImageData(d, 0, 0); ICON_FAR[id] = f;
+}
+
+// ---------- city obstacles (the bench and wheelie bins turn up everywhere) ----------
+SPR.hedgeBox = sprite(['GGGGGGGGGGGG', 'GglgggglgggG', 'GgggggggglgG', 'GgGgglgggggG', 'GggggggGgggG', 'GglggggggggG',
+  'GgggggglgggG', 'GgGggggggggG', 'GGGGGGGGGGGG', '....BBB.....', '....BBB.....']);
+SPR.roundabout = sprite(['...kkkkk...', '..kjjjjjk..', '.kjwwwjjjk.', 'kjwjjjwjjjk', 'kjjjjjwjjjk', 'kjjjjjjwjjk', 'kjjwjjjjjjk',
+  'kjjjwwwjjjk', '.kjjjjjjjk.', '..kjjjjjk..', '...kkkkk...', '....SS.....', '....SS.....', '....SS.....', '....SS.....', '...SSSS....']);
+SPR.surfboard = sprite(['..oo..', '.oooo.', '.oqqo.', 'ooqqoo', 'ooqqoo', 'oooooo', 'oooooo', 'oowwoo', 'oooooo', 'oooooo',
+  'oooooo', 'oooooo', '.oooo.', '.aaaa.', 'aaaaaa', 'aaaaaa']);
+SPR.grill = sprite(['ssssssssssss', 'sSSSSSSSSSSs', 'skkkkkkkkkks', 'sqkqkqkqkqks', 'ssssssssssss', '.S........S.', '.S........S.', '.S........S.',
+  '.S........S.', 'SS........SS']);
+SPR.mulch = sprite(['.....bBb.......', '...bbBbbBb.....', '..bBbbbBbbb....', '.bbbBbbbbBbbb..', 'bbBbbbBbbbbBbb.', 'bBbbbbbbBbbbbbb', 'BBBBBBBBBBBBBBB']);
+SPR.termite = sprite(['....rr....', '...rRrr...', '...rrrR...', '..rRrrr...', '..rrrRrr..', '..rrrrrR..', '.rRrrrrr..', '.rrrRrrrr.',
+  '.rrrrrrRr.', 'rRrrrrrrr.', 'rrrrRrrrrr', 'rrrrrrrRrr', 'rRrrrrrrrr', 'rrrrrRrrrR', 'RRRRRRRRRR']);
+SPR.crocSign = sprite(['kkkkkkkkkkkk', 'kooooooooook', 'kokkkkkkkkok', 'kooooooooook', 'kokkokkokkok', 'kooooooooook', 'kkkkkkkkkkkk',
+  '....SS......', '....SS......', '....SS......', '....SS......', '....SS......', '...SSSS.....']);
+SPR.log = sprite(['..bbbbbbbbbbbb..', '.bBbbbbBbbbbbbb.', 'bTtTbbbbbbBbbTtT', 'tTDTtbbBbbbbbtTD', 'tDDTtbbbbbbBbtDD', 'bTtTbBbbbbbbbTtT', '.bbbbbbbBbbbbbb.', '..BBBBBBBBBBBB..']);
+SPR.barrel = sprite(['..bbbbbbbb..', '.bBbbbbbbBb.', 'sssssssssssss', 'bbbBbbbbBbbb', 'bbbBbbbbBbbb', 'sssssssssssss', 'bbbBbbbbBbbb',
+  'bbbBbbbbBbbb', 'sssssssssssss', '.bBbbbbbbBb.', '..bbbbbbbb..']);
+SPR.coffee = sprite(['qqqqqqqqqqqqqq', 'qwqwqwqwqwqwqq', 'kkkkkkkkkkkkkk', 'bbbbbbbbbbbbbb', 'bwwbbbbbbsbbbb', 'bwwbbbbbbsbbbb', 'bbbbbbbbbbbbbb',
+  'BBBBBBBBBBBBBB', 'bbbbbbbbbbbbbb', 'bbbbbbbbbbbbbb', 'BBBBBBBBBBBBBB', '.kk.......kk..', '.kk.......kk..']);
+SPR.footy = sprite(['...qqqq...', '.qqqwqqqq.', 'qqqwqwqqqq', 'qqqqwqwqqq', '.qqqqwqqq.', '...qqqq...']);
+SPR.rock = sprite(['....iiii....', '..iiIiiiii..', '.iiiiiiIiii.', 'iiIiiiiiiiIi', 'iiiiiIiiiiii', 'IiiiiiiiiIii', 'IIIIIIIIIIII']);
+const CITY_OBST = {
+  hedgeBox: [0, 1, 0, 0], roundabout: [2, 0, 3, 0], surfboard: [0, 1, 0, 0], grill: [0, 1, 0, 0], mulch: [1, 2, 1, 0], termite: [1, 1, 1, 0],
+  crocSign: [0, 0, 5, 0], log: [0, 1, 0, 0], barrel: [0, 0, 0, 0], coffee: [0, 1, 0, 0], footy: [0, 0, 0, 0], rock: [0, 1, 0, 0],
+};
+function tourObstacles(city) {
+  const list = [
+    { id: 'bench', spr: SPR.bench, inset: [0, 2, 0, 0], weight: 2 },
+    { id: 'bin', spr: SPR.bin, inset: [0, 0, 0, 0], weight: 0.7 }, { id: 'bin', spr: SPR.binBlue, inset: [0, 0, 0, 0], weight: 0.7 },
+    { id: 'bin', spr: SPR.binGreen, inset: [0, 0, 0, 0], weight: 0.7 },
+  ];
+  for (const id of city.obst) list.push({ id, spr: SPR[id], inset: CITY_OBST[id], weight: 3 });
+  return list;
+}
+// sand for beaches and Perth's dunes
+function sandTile(seed, top) {
+  const R = mulberry(seed), [c, x] = makeCanvas(16, 16);
+  for (let yy = 0; yy < 16; yy++) for (let xx = 0; xx < 16; xx++) px(x, R() < 0.25 ? '#d8c088' : R() < 0.5 ? '#e8d8a0' : '#e2cf94', xx, yy);
+  if (top) for (let xx = 0; xx < 16; xx++) px(x, R() < 0.5 ? '#f4e8c0' : '#ecdcaa', xx, 0);
+  if (!top) for (let k = 0; k < 2; k++) px(x, '#c8a870', Math.floor(R() * 14), Math.floor(R() * 14), 2, 1);
+  return c;
+}
+TILES.sand = [31, 32, 33].map(s => sandTile(s, true)); TILES.sanddirt = [34, 35].map(s => sandTile(s, false));
+// extra background things for some cities
+PROPS.gumE = seed => PROPS.gum(seed - (seed % 3) + 2);   // a gum tree with no koala or possum in it
+PROPS.palm = seed => {
+  const R = mulberry(seed), [c, x] = makeCanvas(30, 52);
+  for (let y = 12; y < 52; y++) px(x, y % 4 ? 'b' : 'B', 14 + Math.round(Math.sin(y / 9) * 2), y, 3, 1);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [-1, 1], [1, 1], [0, -1]]) for (let i = 0; i < 12; i++)
+    px(x, i % 3 ? 'g' : 'G', 15 + dx * i, 12 + dy * Math.floor(i * i / 14) - (dy < 0 ? i : 0), 2, 2);
+  if (R() < 0.6) { px(x, 'B', 13, 14, 3, 3); px(x, 'B', 17, 15, 3, 3); }
+  return c;
+};
+PROPS.jacaranda = seed => {
+  const R = mulberry(seed), [c, x] = makeCanvas(40, 44);
+  px(x, 'B', 19, 18, 3, 26); px(x, 'B', 14, 22, 5, 1); px(x, 'B', 22, 20, 6, 1);
+  for (let yy = -10; yy <= 10; yy += 2) for (let xx = -18; xx <= 18; xx += 2)
+    if ((xx * xx) / 324 + (yy * yy) / 100 < 1 && R() < 0.7) px(x, R() < 0.5 ? '#9a7ad8' : R() < 0.5 ? '#b89ae8' : '#7a5ab8', 20 + xx, 13 + yy, 2, 2);
+  return c;
+};
+PROPS.vines = seed => {
+  const R = mulberry(seed), [c, x] = makeCanvas(48, 16);
+  for (let r = 0; r < 3; r++) { px(x, 'B', r * 16 + 7, 4, 1, 12); for (let i = 0; i < 6; i++) px(x, R() < 0.6 ? 'g' : 'G', r * 16 + 2 + i * 2, 3 + (i % 2), 2, 3);
+    px(x, '#7a3a8a', r * 16 + 5, 7, 2, 2); px(x, '#7a3a8a', r * 16 + 9, 8, 2, 2); }
+  return c;
+};
+// far layer for each city: soft hills with the city's landmark on them, repeats as you run
+const CITY_FAR = {};
+function cityFar(city) {
+  if (CITY_FAR[city.id]) return CITY_FAR[city.id];
+  const w = 520, [c, x] = makeCanvas(w, 70);
+  x.drawImage(makeHills(city.id.length * 7 + 3, w, 30, 12, city.hills[0], city.hills[1]), 0, 0);
+  x.imageSmoothingEnabled = false;
+  x.drawImage(ICON_FAR[city.id], 150, 70 - 56 - 14, 88, 56);         // the landmark, big and far away
+  x.drawImage(makeHills(city.id.length * 11 + 5, w, 14, 6, city.hills[2], city.hills[3]), 0, 0);
+  return CITY_FAR[city.id] = c;
+}
+
+// =====================================================================
+// TOUR SAVE: start city, how many stages are done, stars and best score per city
+// =====================================================================
+const TOUR_KEY = 'parkour_tour', TOUR_SEEN_KEY = 'parkour_tour_animals';
+let tourSave = loadJSON(TOUR_KEY, null);
+if (!tourSave || typeof tourSave !== 'object' || !(tourSave.start >= 0 && tourSave.start < 8)) tourSave = { start: 1, cleared: 0, stars: {}, best: {} };
+tourSave.cleared = Math.max(0, Math.min(8, tourSave.cleared | 0)); tourSave.stars = tourSave.stars || {}; tourSave.best = tourSave.best || {};
+let tourSeen = loadJSON(TOUR_SEEN_KEY, []); if (!Array.isArray(tourSeen)) tourSeen = [];
+const saveTour = () => saveJSON(TOUR_KEY, tourSave);
+const cityIndex = id => CITIES.findIndex(c => c.id === id);
+const stageOf = id => (cityIndex(id) - tourSave.start + 8) % 8 + 1;          // 1..8 along the tour
+const unlocked = id => tourSave.cleared >= 8 || stageOf(id) <= tourSave.cleared + 1;
+const cityAtStage = s => CITIES[(tourSave.start + s - 1) % 8];
+const totalStars = () => CITIES.reduce((n, c) => n + (tourSave.stars[c.id] || 0), 0);
+
+// =====================================================================
+// MENU TAPS: screens register their buttons each frame, a tap checks them
+// =====================================================================
+let HITS = [];
+const hit = (x, y, w, h, fn) => HITS.push({ x, y, w, h, fn });
+function uiTap(gx, gy) { for (let i = HITS.length - 1; i >= 0; i--) { const b = HITS[i]; if (gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.h) { audio(); b.fn(); return true; } } return false; }
+const MENU_STATES = ['title', 'map', 'flight', 'clear', 'fail', 'complete'];
+// Minecraft button drawn on the canvas
+function mcButton(x, y, w, h, label, green, fn) {
+  x = Math.round(x); y = Math.round(y);
+  px(ctx, '#1b1b20', x - 1, y - 1, w + 2, h + 2); px(ctx, green ? '#4c9a2a' : '#8b8b8b', x, y, w, h);
+  px(ctx, green ? '#7cc24a' : '#b5b5b5', x, y, w, 2); px(ctx, green ? '#2f6b1a' : '#5a5a5a', x, y + h - 2, w, 2);
+  drawText(ctx, label, x + w / 2, y + Math.round(h / 2) - 3, '#ffffff', 1, 'center');
+  if (fn) hit(x - 2, y - 2, w + 4, h + 4, fn);
+}
+function slot(x, y, w, h, sel) {
+  px(ctx, sel ? '#f2c230' : '#1b1b20', x - 2, y - 2, w + 4, h + 4);
+  px(ctx, '#8b8b8b', x, y, w, h); px(ctx, '#373737', x, y, w, 1); px(ctx, '#373737', x, y, 1, h); px(ctx, '#ffffff', x, y + h - 1, w, 1); px(ctx, '#ffffff', x + w - 1, y, 1, h);
+  if (sel) { px(ctx, '#fff3a0', x - 2, y - 2, w + 4, 1); px(ctx, '#c08a12', x - 2, y + h + 1, w + 4, 1); }
+}
+function starRow(X, Y, n, of = 3) { for (let i = 0; i < of; i++) { const c = i < n ? '#f2c230' : '#5a5a5a', x = X + i * 7;
+  px(ctx, c, x + 2, Y, 1, 1); px(ctx, c, x + 1, Y + 1, 3, 1); px(ctx, c, x, Y + 2, 5, 1); px(ctx, c, x + 1, Y + 3, 3, 1); px(ctx, c, x, Y + 4, 2, 1); px(ctx, c, x + 3, Y + 4, 2, 1); } }
+function bigStar(X, Y, on) { const c = on ? '#f2c230' : '#5a5a5a', d = on ? '#c08a12' : '#3a3a3a';
+  const rows = ['....kk....', '...kcck...', '...kcck...', 'kkkkccdkkk', 'kccccccddk', '.kccccddk.', '..kcccddk.', '..kccdkddk', '.kcdk.kddk', '.kkk...kkk'];
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') px(ctx, ch === 'k' ? '#1b1b20' : ch === 'c' ? c : d, X + x * 2, Y + y * 2, 2, 2); })); }
+function heart(X, Y, full) { const c = full ? '#d23a2a' : '#4a4a4a', h = full ? '#ff8080' : '#6a6a6a', P = (col, x, y, w = 1, hh = 1) => px(ctx, col, X + x, Y + y, w, hh);
+  P('#1b1b20', 0, 1, 9, 4); P('#1b1b20', 1, 0, 3, 7); P('#1b1b20', 5, 0, 3, 7); P('#1b1b20', 2, 5, 5, 3); P('#1b1b20', 4, 8, 1, 1);
+  P(c, 1, 1, 3, 4); P(c, 5, 1, 3, 4); P(c, 2, 4, 5, 2); P(c, 3, 6, 3, 1); P(c, 4, 7, 1, 1); P(h, 2, 2, 1, 1); }
+// gold sparkle ring that marks an animal to collect (things to jump have black outlines instead)
+function glow(X, Y, w, h, t) {
+  ctx.globalAlpha = 0.45 + Math.sin(t * 6) * 0.15; px(ctx, '#fff3a0', X - 2, Y - 2, w + 4, h + 4); ctx.globalAlpha = 1;
+  const k = Math.floor(t * 4) % 4;
+  [[X - 4, Y + 2], [X + w + 2, Y - 3], [X + w / 2, Y - 6], [X - 2, Y + h - 2]].forEach(([sx, sy], i) => { if (i === k) return;
+    px(ctx, '#ffffff', Math.round(sx), Math.round(sy) - 1, 1, 3); px(ctx, '#ffffff', Math.round(sx) - 1, Math.round(sy), 3, 1); });
+}
+function wrapWords(s, max) { const out = []; let line = '';
+  for (const w of s.split(' ')) { if ((line + ' ' + w).trim().length > max) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); }
+  if (line) out.push(line); return out; }
+
+// =====================================================================
+// AUSTRALIA MAP (block pixels): the level map and the little map in the flight
+// =====================================================================
+const MAINLAND = [[113.5,-22],[114,-26],[115,-30],[115,-33.5],[116.5,-35],[118,-35],[121,-33.8],[124,-33],[126.5,-32.2],[129,-31.6],
+  [131,-31.5],[133,-32.1],[135,-34.8],[136.5,-33.2],[137.8,-33],[137.6,-35.3],[139.5,-35.9],[140.5,-38],[142,-38.4],[144,-38.2],
+  [145,-38.6],[146.3,-39.1],[148,-37.8],[149.9,-37.5],[150.1,-36.3],[150.2,-35.5],[150.6,-34.9],[150.9,-34.4],[151.25,-33.95],[151.3,-33.6],
+  [151.55,-33.1],[152.2,-32.7],[152.55,-32.2],[152.8,-31.7],[153.05,-30.9],[153.05,-30.3],[153.35,-29.4],[153.6,-28.6],[153.45,-28.1],
+  [153.25,-27.6],[153.1,-27.2],[153.15,-26.6],[153.1,-25.5],[151,-23.5],
+  [149.5,-22.3],[146.5,-19],[145.5,-16],[145.2,-14.8],[143.6,-14],[143,-11],[142.5,-10.7],[141.6,-12.5],[141.5,-15],[140.8,-17.5],
+  [139.5,-17.5],[137.5,-16],[135.5,-15],[136.8,-12.3],[136,-12],[133,-11.5],[131,-12.2],[130,-13],[129.5,-14.9],[128,-15],[126.5,-14],
+  [125,-14.6],[123.5,-16.5],[122.2,-18],[121,-19.5],[119,-20],[116.7,-20.6],[114.5,-21.8]];
+const TASSIE = [[144.6,-40.7],[148.3,-40.9],[148.2,-42.2],[147.8,-43.2],[146.8,-43.6],[145.5,-42.5],[144.8,-41.5]];
+const ISLANDS = [[[153.42,-27.3],[153.55,-27.4],[153.5,-27.75],[153.42,-27.7]], [[153.35,-26.95],[153.45,-27.0],[153.42,-27.25],[153.36,-27.2]]];
+function inPoly(pt, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+  const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; }
+const isLand = ll => inPoly(ll, MAINLAND) || inPoly(ll, TASSIE) || ISLANDS.some(p => inPoly(ll, p));
+const MAPS = {};
+// whole country, K pixels per degree, 3 px blocks; origin 112E 10S
+function buildMap(K) {
+  const key = K.toFixed(2); if (MAPS[key]) return MAPS[key];
+  const B = 3, w = Math.ceil(44 * K), h = Math.ceil(34.5 * K), [c, x] = makeCanvas(w, h);
+  const cols = Math.ceil(w / B), rows = Math.ceil(h / B), land = [];
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) land[r * cols + q] = isLand([112 + (q * B + 1.5) / K, -10 - (r * B + 1.5) / K]);
+  const dist = land.map(l => l ? 99 : 0);
+  for (let pass = 0; pass < 8; pass++) for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const i = r * cols + q; if (!land[i]) continue;
+    for (const [dr, dq] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { const rr = r + dr, qq = q + dq; const d = (rr < 0 || rr >= rows || qq < 0 || qq >= cols) ? 0 : dist[rr * cols + qq]; dist[i] = Math.min(dist[i], d + 1); }
+  }
+  x.fillStyle = '#2f6fc8'; x.fillRect(0, 0, w, h);
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const i = r * cols + q; if (!land[i]) continue;
+    const X = q * B, Y = r * B, lat = -10 - Y / K, lon = 112 + X / K, chk = (r + q) & 1;
+    let col = chk ? '#5fa83a' : '#57a035';
+    if (dist[i] > 3 && lat < -17 && lat > -33 && lon < 146) col = chk ? '#c0612f' : '#b5572a';
+    else if (dist[i] > 2 && lat < -20 && lat > -34) col = chk ? '#a8a04a' : '#9c9442';
+    if (dist[i] === 1) col = '#e8d8a0';
+    px(x, col, X, Y, B, B);
+  }
+  const segs = [[[129, -14.9], [129, -31.7]], [[129, -26], [138, -26]], [[138, -16], [138, -26]], [[138, -26], [141, -26]], [[141, -26], [141, -38]],
+    [[141, -29], [153.4, -28.3]], [[141, -34], [150, -37.5]]];
+  for (const [[a, b], [cc, d]] of segs) for (let t = 0; t <= 1; t += 0.012) {
+    const lon = a + (cc - a) * t, lat = b + (d - b) * t; if (!inPoly([lon, lat], MAINLAND)) continue;
+    if (Math.round(t * 80) % 2) px(x, '#f4efe4', Math.round((lon - 112) * K), Math.round((-10 - lat) * K));
+  }
+  c.K = K; return MAPS[key] = c;
+}
+const mapXY = (m, lon, lat) => [(lon - 112) * m.K, (-10 - lat) * m.K];
+// label offsets around each city dot on the map
+const LABEL = { canberra: [-4, 5, 'right'], sydney: [5, -5, 'left'], brisbane: [-5, -3, 'right'], darwin: [0, -12, 'center'],
+  perth: [0, 6, 'center'], adelaide: [-5, -3, 'right'], melbourne: [0, 6, 'center'], hobart: [5, -1, 'left'] };
+
+// =====================================================================
+// TOUR FLOW
+// =====================================================================
+let titleSel = tourSave.start, mapSel = 0, endInfo = null, flight = null, toast = null;
+function nextCity() { return tourSave.cleared >= 8 ? null : cityAtStage(tourSave.cleared + 1); }
+function goTitle() { state = 'title'; titleSel = tourSave.start; newRun(); showEnd(false); showButtons(); }
+function goMap(id) {
+  const n = nextCity(); mapSel = cityIndex(id || (n ? n.id : CITIES[tourSave.start].id));
+  state = 'map'; showEnd(false); showButtons();
+}
+function startTour(i) {
+  if (i !== tourSave.start) { tourSave.start = i; tourSave.cleared = 0; saveTour(); }   // a new route starts again from stage 1
+  goMap();
+}
+function startLevel(id) {
+  const city = CITY[id]; newRun(city); state = 'play'; showEnd(false); fillTiles(); showButtons();
+}
+// stage setup for one city level
+function setupTour(city) {
+  const stage = stageOf(city.id), st = STAGES[stage - 1], len = st.len * 16;
+  const T = { city, stage, st, len, finishX: len, hearts: TOUR_HEARTS, hurt: 0, lost: 0, got: [false, false, false],
+    coinsMade: 0, spawns: [], animals: [], cards: [], ended: false,
+    back: Object.entries(city.props).map(([type, weight]) => ({ type, weight })) };
+  // each animal shows up 3 times, spread over the level, so a miss is not the end
+  const order = [0, 1, 2, 1, 2, 0, 2, 0, 1];
+  order.forEach((ai, n) => T.spawns.push({ x: Math.round(len * (0.1 + n * 0.1) + rnd(-40, 40)), ai }));
+  return T;
+}
+// where an animal stands: [top y] for its place
+function animalY(place, spr) {
+  if (place === 'ground') return GROUND_Y - spr.height;
+  if (place === 'tree') return GROUND_Y - 46 - Math.round(spr.height / 2);
+  return GROUND_Y - 84 - Math.round(spr.height / 2);
+}
+function spawnTourAnimals() {
+  const T = G.tour;
+  while (T.spawns.length && T.spawns[0].x < G.cam + W + 40) {
+    const s = T.spawns.shift(); if (T.got[s.ai]) continue;
+    const a = T.city.animals[s.ai], spr = ASPR[a.k];
+    T.animals.push({ ai: s.ai, a, spr, x: s.x, y: animalY(a.place, spr), w: spr.width, h: spr.height, t: Math.random() * 6 });
+  }
+}
+// the ground near a waiting animal stays clear of obstacles and creeks
+const nearAnimal = (x, w, pad = 36) => G.tour && (G.tour.spawns.some(s => x < s.x + 24 + pad && x + w > s.x - pad) || G.tour.animals.some(a => !a.gone && x < a.x + a.w + pad && x + w > a.x - pad));
+function collectAnimal(an) {
+  const T = G.tour; an.gone = true; T.got[an.ai] = true;
+  T.animals = T.animals.filter(o => o.ai !== an.ai || o === an);     // later copies of it are not needed any more
+  T.cards.push({ spr: an.spr, x: an.x - G.cam, y: an.y, ai: an.ai, t: 0 });
+  G.pickPts += 200;
+  for (let k = 0; k < 14; k++) particle(an.x - G.cam + an.w / 2, an.y + an.h / 2, rnd(-70, 70), rnd(-90, 10), rnd(0.4, 0.8), pick(['#f2c230', '#fff3a0', '#ffffff']), 2);
+  if (!tourSeen.includes(an.a.k)) { tourSeen.push(an.a.k); saveJSON(TOUR_SEEN_KEY, tourSeen); }
+  banner(an.a.name + '!');
+}
+function tourHurt() {
+  const T = G.tour; if (T.hurt > 0 || state !== 'play') return;
+  T.hearts--; T.lost++; T.hurt = HURT_TIME; G.combo = 0; G.mult = 1;
+  SFX.hit(); G.p.vy = Math.min(G.p.vy, -120); G.p.onGround = false;
+  for (let k = 0; k < 10; k++) particle(PLAYER_X + 4, G.p.y - 12, rnd(-30, 90), rnd(-120, -20), rnd(0.3, 0.6), pick(['#d23a2a', '#ffffff']), 2);
+  if (T.hearts <= 0) endLevel(false, 'OUT OF HEARTS!');
+}
+function endLevel(ok, why) {
+  const T = G.tour; if (T.ended) return; T.ended = true;
+  if (!ok) { state = 'fail'; endInfo = { why, missed: T.city.animals.filter((a, i) => !T.got[i]).map(a => a.short) }; SFX.over(); showButtons(); return; }
+  const gold = T.coinsMade ? G.coins / T.coinsMade : 1, stars = 1 + (T.lost === 0 ? 1 : 0) + (gold >= 0.8 ? 1 : 0), id = T.city.id;
+  const frontier = stageOf(id) === tourSave.cleared + 1;
+  if (frontier) tourSave.cleared++;
+  tourSave.stars[id] = Math.max(tourSave.stars[id] || 0, stars);
+  const newBest = G.score > (tourSave.best[id] || 0); if (newBest) tourSave.best[id] = G.score;
+  saveTour();
+  endInfo = { stars, gold, frontier, newBest, done: frontier && tourSave.cleared >= 8, t: 0 };
+  state = 'clear'; G.needSnap = true; showButtons();
+  [523, 659, 784, 1047, 1319].forEach((f, i) => beep(f, f, 0.12, 0.07, 'square', i * 0.09));
+}
+function afterClear() {
+  const T = G.tour;
+  if (endInfo.done) { state = 'complete'; G.needSnap = true; showButtons(); return; }
+  if (endInfo.frontier) startFlight(T.city, nextCity()); else goMap(T.city.id);
+}
+
+// =====================================================================
+// FLIGHT: a close-up camera follows a big plane over a zoomed-in map
+// =====================================================================
+const FK = 36, FB = 4, FLON = 111, FLAT = -9, FW = 45 * FK, FH = 36 * FK;
+const fw = (lon, lat) => [(lon - FLON) * FK, (FLAT - lat) * FK];
+let WORLD = null;
+const hash2 = (a, b) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const RIVERS = [[[150.4,-33.2],[150.9,-33.45],[151.3,-33.55]], [[150.8,-32.3],[151.4,-32.6],[151.78,-32.9]], [[151.9,-29.6],[152.6,-29.5],[153.3,-29.43]],
+  [[152.4,-27.7],[152.8,-27.5],[153.0,-27.47],[153.2,-27.38]], [[152.3,-31.2],[152.8,-31.3],[152.95,-31.43]],
+  [[147.5,-36.0],[146.9,-36.05],[145.5,-35.9],[144.2,-35.5],[142.2,-34.2],[140.9,-34.0],[139.7,-34.3],[139.4,-35.0],[139.3,-35.5]],  // the Murray
+  [[145.4,-37.7],[145.1,-37.8],[144.95,-37.84]], [[116.1,-31.85],[115.95,-31.95],[115.8,-32.03]], [[146.8,-42.7],[147.1,-42.8],[147.35,-42.95]],
+  [[131.6,-13.6],[131.3,-13.0],[131.1,-12.5]]];
+const TOWNS = [[151.75,-32.93,'NEWCASTLE','right'], [152.9,-31.45,'PORT MACQUARIE','right'], [153.12,-30.3,'COFFS HARBOUR','right'], [153.42,-28.02,'',''],
+  [133.88,-23.7,'ALICE SPRINGS','left'], [132.26,-14.47,'KATHERINE','left'], [121.47,-30.75,'KALGOORLIE','left'], [141.47,-31.95,'BROKEN HILL','left'],
+  [142.16,-34.2,'MILDURA','left'], [137.77,-32.49,'PORT AUGUSTA','left'], [114.6,-28.77,'GERALDTON','left'], [122.24,-17.96,'BROOME','left'],
+  [146.8,-19.26,'TOWNSVILLE','right'], [150.5,-23.38,'ROCKHAMPTON','right'], [147.14,-41.43,'LAUNCESTON','left'], [146.9,-36.08,'ALBURY','left'],
+  [143.85,-37.56,'BALLARAT','left'], [145.77,-16.92,'CAIRNS','right'], [115.35,-33.65,'BUNBURY','left']];
+function buildWorld() {
+  if (WORLD) return WORLD;
+  const [c, x] = makeCanvas(FW, FH), W2 = (col, X, Y, w = 1, h = 1) => px(x, col, X, Y, w, h);
+  const cols = FW / FB, rows = FH / FB, n = cols * rows, land = new Uint8Array(n);
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const j = (hash2(q, r) - 0.5) * 0.07; land[r * cols + q] = isLand([FLON + (q * FB + 2) / FK + j, FLAT - (r * FB + 2) / FK + j]) ? 1 : 0;
+  }
+  // distance from the coast (on land and at sea), found by a flood from every coast block
+  const dist = new Int16Array(n), queue = new Int32Array(n); let qh = 0, qt = 0;
+  for (let i = 0; i < n; i++) { const r = i / cols | 0, q = i % cols;
+    if ((q > 0 && land[i - 1] !== land[i]) || (q < cols - 1 && land[i + 1] !== land[i]) || (r > 0 && land[i - cols] !== land[i]) || (r < rows - 1 && land[i + cols] !== land[i])) { dist[i] = 1; queue[qt++] = i; } }
+  while (qh < qt) { const i = queue[qh++], r = i / cols | 0, q = i % cols;
+    for (const j of [q > 0 ? i - 1 : -1, q < cols - 1 ? i + 1 : -1, r > 0 ? i - cols : -1, r < rows - 1 ? i + cols : -1])
+      if (j >= 0 && !dist[j] && land[j] === land[i]) { dist[j] = dist[i] + 1; queue[qt++] = j; } }
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const i = r * cols + q, X = q * FB, Y = r * FB, h = hash2(q * 7, r * 3), d = dist[i] || 99, lat = FLAT - Y / FK, lon = FLON + X / FK;
+    if (!land[i]) { W2(d <= 2 ? '#3f82d8' : d <= 5 ? '#3474cc' : '#2f6fc8', X, Y, FB, FB); if (h < 0.04) W2('#6fa6ec', X, Y + 1, 3, 1); if (d === 1 && h < 0.5) W2('#cfe6ff', X, Y, 2, 1); continue; }
+    const north = lat > -19, tas = lat < -40, east = lon > 140;
+    let col = (r + q) & 1 ? '#5fa83a' : '#57a035', kind = 'green';
+    if (d === 1) { col = '#e8d8a0'; kind = 'beach'; }
+    else if (tas) { if (d > 5 && h < 0.4) col = '#4f8a3a'; }
+    else if (north) { if (d > 10) { col = h < 0.5 ? '#9ca848' : '#a8b050'; kind = 'savanna'; } if (d > 40) { col = h < 0.5 ? '#c0612f' : '#b5572a'; kind = 'desert'; } }
+    else if (east && d > 6 && d < 16) { col = h < 0.3 ? '#7aa645' : h < 0.6 ? '#6f9a3a' : '#5c8a30'; kind = 'range'; }
+    else if (d >= 7 && d < 34 && (east || lat < -31)) { const f = hash2(q >> 2, (r / 3) | 0); col = f < 0.3 ? '#8aa848' : f < 0.55 ? '#b8ac58' : f < 0.8 ? '#9cb050' : '#c8b860'; kind = 'farm'; }
+    else if (d >= 7 && d < 34) { col = h < 0.5 ? '#c89a5a' : '#bf8f50'; kind = 'dry'; }
+    else if (d >= 34) { col = h < 0.5 ? '#c0612f' : h < 0.8 ? '#b5572a' : '#c86a38'; kind = 'desert'; }
+    W2(col, X, Y, FB, FB);
+    if (kind === 'range' && h > 0.8) { W2('#8fbf5a', X, Y, 2, 1); W2('#3f6a22', X + 2, Y + 3, 2, 1); }
+    if (kind === 'farm' && (q & 3) === 0) W2('#7a8a3a', X, Y, 1, 4);
+    if (kind === 'farm' && h > 0.94) { W2('#f4f4f4', X + 1, Y + 1, 2, 1); W2('#1b1b20', X + 1, Y + 2, 1, 1); }       // sheep
+    if ((kind === 'dry' || kind === 'desert' || kind === 'savanna') && h > 0.9) W2(kind === 'desert' ? '#8a8a3a' : '#4f7a2a', X + 1, Y + 1, 2, 2);  // scrub
+    if ((kind === 'green' || kind === 'range') && h < 0.16) { W2('#2f7a2a', X, Y, 4, 3); W2('#3f9a3a', X, Y, 2, 1); W2('#1f4a28', X + 1, Y + 3, 3, 1); } // gum trees
+  }
+  // Great Barrier Reef, rivers, Lake Eyre, Uluru
+  for (let lat = -11.5; lat > -23.5; lat -= 0.12) { const lon = 143.6 + (-11.5 - lat) * 0.72 + Math.sin(lat * 3) * 0.2, [X, Y] = fw(lon, lat);
+    W2('#5fd0c8', Math.round(X + hash2(lat * 100 | 0, 1) * 10), Math.round(Y), 3, 2); }
+  for (const rv of RIVERS) for (let k = 0; k < rv.length - 1; k++) { const [a, b] = fw(...rv[k]), [cc, d] = fw(...rv[k + 1]);
+    for (let t = 0; t <= 1; t += 0.01) W2('#3d7fe0', Math.round(a + (cc - a) * t + Math.sin(t * 9 + k) * 2), Math.round(b + (d - b) * t), 2, 2); }
+  { const [X, Y] = fw(137.3, -28.4); for (let yy = -16; yy <= 16; yy += 2) for (let xx = -28; xx <= 28; xx += 2)
+      if (xx * xx / 784 + yy * yy / 256 < 1 && hash2(xx + 99, yy + 99) < 0.9) W2(hash2(xx, yy) < 0.3 ? '#c8d8e0' : '#ecece4', X + xx, Y + yy, 2, 2);
+    drawText(x, 'LAKE EYRE', X, Y + 20, '#ffffff', 1, 'center', '#1b1b20'); }
+  { const [X, Y] = fw(131.04, -25.34).map(Math.round); W2('#1b1b20', X - 9, Y - 4, 20, 9); W2('#d0602a', X - 8, Y - 3, 18, 7); W2('#e8884a', X - 6, Y - 3, 12, 2); W2('#a8441e', X - 8, Y + 2, 18, 2);
+    drawText(x, 'ULURU', X + 1, Y + 8, '#ffffff', 1, 'center', '#1b1b20'); }
+  for (const [lon, lat, name, al] of TOWNS) { const [X, Y] = fw(lon, lat).map(Math.round);
+    for (let k = 0; k < 9; k++) { const hx = X - 8 + ((k * 5) % 13), hy = Y - 4 + ((k * 3) % 7); W2('#e4e0d8', hx, hy, 3, 3); W2(k % 3 ? '#c0612f' : '#8e3c1e', hx, hy, 3, 1); }
+    if (name) drawText(x, name, al === 'right' ? X - 14 : X + 14, Y - 2, '#ffffff', 1, al, '#1b1b20'); }
+  { const [hx, hy] = fw(153.95, -30.6).map(Math.round);            // a humpback whale swimming north
+    W2('#2a3a5a', hx, hy, 6, 12); W2('#2a3a5a', hx + 1, hy - 2, 4, 2); W2('#2a3a5a', hx - 2, hy + 12, 10, 2); W2('#6a7a9a', hx + 2, hy + 2, 2, 5);
+    W2('#ffffff', hx + 2, hy - 6, 2, 3); W2('#ffffff', hx, hy - 8, 2, 2); W2('#ffffff', hx + 4, hy - 8, 2, 2); }
+  for (const cty of CITIES) { const [X, Y] = fw(...cty.ll).map(Math.round);
+    for (let k = 0; k < 22; k++) { const bx = X - 14 + ((k * 7) % 26), by = Y - 10 + ((k * 5) % 20); W2('#9a9aa0', bx, by, 4, 4); W2('#c8c8d0', bx, by, 4, 1); W2('#6a6a74', bx + 3, by + 1, 1, 3); } }
+  return WORLD = c;
+}
+// the plane from above, nose up; the runner's bush hat pokes out of the open cockpit
+function makeTopPlane() {
+  const S = 2, [c, x] = makeCanvas(40 * S, 40 * S), P = (col, X, Y, w = 1, h = 1) => px(x, col, (X + 20) * S, (Y + 20) * S, w * S, h * S);
+  const body = (col, g) => { P(col, -16 - g, -2 - g, 33 + 2 * g, 5 + 2 * g); P(col, -6 - g, 11 - g, 13 + 2 * g, 3 + 2 * g); P(col, -3 - g, -14 - g, 7 + 2 * g, 30 + 2 * g); P(col, -2 - g, -16 - g, 5 + 2 * g, 2 + g); };
+  body('#1b1b20', 1); body('#f4f4f4', 0);
+  P('#c8c8c8', -16, 2, 33, 1); P('#c8c8c8', -6, 13, 13, 1); P('#c8c8c8', 2, -14, 1, 30);
+  P('#d23a2a', -16, -2, 2, 5); P('#d23a2a', 15, -2, 2, 5); P('#d23a2a', -1, 10, 3, 6);
+  P('#3c6fd0', -2, -12, 5, 2); P('#8fc2ff', -1, -12, 2, 1);
+  P('#6d4f2a', -3, -9, 7, 5); P('#b8925a', -2, -9, 5, 4); P('#6d4f2a', -1, -8, 3, 2); P('#d6a27a', 3, -7, 2, 2);
+  return c;
+}
+let TOP_PLANE = null, PLANE_SHADOW = null;
+const haversine = (a, b) => { const R = 6371, r = Math.PI / 180, dl = (b[1] - a[1]) * r, dn = (b[0] - a[0]) * r;
+  const s = Math.sin(dl / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s)); };
+function startFlight(from, to) {
+  buildWorld(); if (!TOP_PLANE) { TOP_PLANE = makeTopPlane(); PLANE_SHADOW = silhouette(TOP_PLANE, '#000000'); }
+  const [ax, ay] = fw(...from.ll), [bx, by] = fw(...to.ll), d = Math.hypot(bx - ax, by - ay);
+  flight = { from, to, ax, ay, bx, by, d, t: 0, dur: Math.max(4, Math.min(8, d / 220)), km: Math.round(haversine(from.ll, to.ll) / 10) * 10, hold: 0, frame: 0 };
+  state = 'flight'; showEnd(false); showButtons();
+  [392, 523, 659].forEach((f, i) => beep(f, f * 1.01, 0.15, 0.06, 'triangle', i * 0.12));
+}
+function flightPos(t) { const f = flight, nx = -(f.by - f.ay) / f.d, ny = (f.bx - f.ax) / f.d, bow = Math.sin(t * Math.PI) * f.d * 0.06;
+  return [f.ax + (f.bx - f.ax) * t + nx * bow, f.ay + (f.by - f.ay) * t + ny * bow]; }
+function updateFlight(dt) {
+  const f = flight; f.frame += dt;
+  if (f.t < 1) f.t = Math.min(1, f.t + dt / f.dur); else if ((f.hold += dt) > 1.2) endFlight();
+}
+function endFlight() { if (state !== 'flight') return; goMap(flight.to.id); }
+function drawFlight() {
+  const f = flight, t = f.t, [PX, PY] = flightPos(t), [ax, ay] = flightPos(Math.max(0, t - 0.01)), [bx, by] = flightPos(Math.min(1, t + 0.01));
+  const cx = Math.round(W / 2), cy = 104, camX = Math.round(PX - cx), camY = Math.round(PY - cy);
+  ctx.fillStyle = '#2f6fc8'; ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(WORLD, -camX, -camY);
+  for (const cty of [f.from, f.to]) { const [X, Y] = fw(...cty.ll).map(Math.round), sx = X - camX, sy = Y - camY;
+    if (sx < -60 || sx > W + 120 || sy < -60 || sy > H + 60) continue;
+    const ix = sx - 92, iy = sy - 18;
+    px(ctx, '#1b1b20', ix + 46, sy - 1, sx - ix - 46, 2); px(ctx, '#1b1b20', sx - 3, sy - 3, 7, 7); px(ctx, '#f2c230', sx - 2, sy - 2, 5, 5);
+    px(ctx, '#1b1b20', ix - 2, iy - 2, 48, 32); ctx.drawImage(ICON[cty.id], ix, iy);
+    drawText(ctx, cty.name, ix + 22, iy + 33, '#ffffff', 1, 'center', '#1b1b20'); }
+  // low at take off and landing (shadow close), high in the middle; clouds slide past faster than the land
+  const alt = Math.min(1, t / 0.18, (1 - t) / 0.18), off = Math.round(4 + alt * 22), fr = Math.floor(f.frame * 10);
+  for (let k = 0; k < 7; k++) { const qx = ((k * 157 - camX * 1.35) % 560 + 560) % 560 - 100, qy = ((k * 97 - camY * 1.35) % 320 + 320) % 320 - 70, cl = CLOUDS[k % 5];
+    ctx.globalAlpha = 0.18; ctx.drawImage(silOf(cl, '#000000'), qx + 18, qy + 26); ctx.globalAlpha = alt > 0.5 ? 0.92 : 0.6; ctx.drawImage(cl, qx, qy); ctx.globalAlpha = 1; }
+  const ang = Math.atan2(bx - ax, -(by - ay)) || 0;
+  ctx.save(); ctx.globalAlpha = 0.28; ctx.translate(cx + off, cy + off); ctx.rotate(ang); ctx.drawImage(PLANE_SHADOW, -40, -40); ctx.restore();
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); ctx.drawImage(TOP_PLANE, -40, -40);
+  const an = f.from.animals.map(a => ASPR[a.k]);                    // the city's three animals ride on the wings
+  ctx.drawImage(an[0], -30, -10 - an[0].height + 8); ctx.drawImage(an[1], 12, -10 - an[1].height + 4); ctx.drawImage(an[2], 22, -12 - an[2].height + 2);
+  if (alt > 0.5) for (const s of [-1, 1]) px(ctx, '#ffffff', s * 31 - 1, 8 + (fr % 3) * 3, 1, 8);
+  ctx.restore();
+  // top box: route and distance; little map bottom left
+  const bw = Math.min(172, W - 108), bxp = Math.round(W / 2 - bw / 2);
+  px(ctx, '#1b1b20', bxp - 1, 3, bw + 2, 26); ctx.globalAlpha = 0.85; px(ctx, '#c6c6c6', bxp, 4, bw, 24); ctx.globalAlpha = 1;
+  drawText(ctx, f.from.name + ' > ' + f.to.name, W / 2, 7, '#1b1b20', 1, 'center', null);
+  const msg = t < 0.15 ? 'TAKING OFF!' : t >= 1 ? 'WELCOME TO ' + f.to.name + '!' : t > 0.8 ? 'LANDING SOON' : Math.round(f.km * (1 - t) / 10) * 10 + ' KM TO GO';
+  drawText(ctx, msg, W / 2, 17, '#2f7a3a', 1, 'center', null);
+  const mm = buildMap(1.5), mx = W - mm.width - 4, my = H - mm.height - 4;
+  px(ctx, '#1b1b20', mx - 1, my - 1, mm.width + 2, mm.height + 2); ctx.drawImage(mm, mx, my);
+  const [m1x, m1y] = mapXY(mm, ...f.from.ll), [m2x, m2y] = mapXY(mm, ...f.to.ll);
+  for (let s = 0; s <= 1; s += 0.06) px(ctx, '#f2c230', Math.round(mx + m1x + (m2x - m1x) * s), Math.round(my + m1y + (m2y - m1y) * s));
+  const mp = [m1x + (m2x - m1x) * t, m1y + (m2y - m1y) * t];
+  px(ctx, fr % 2 ? '#d23a2a' : '#ffffff', Math.round(mx + mp[0]) - 1, Math.round(my + mp[1]) - 1, 3, 3);
+  drawText(ctx, isTouch ? 'TAP TO SKIP' : 'SPACE TO SKIP', 6, H - 12, '#ffffff', 1, 'left', '#1b1b20');
+  hit(0, 0, W, H, endFlight);
+}
+
+// =====================================================================
+// SCREENS
+// =====================================================================
+function drawTitle() {
+  // hazed park behind (the park keeps scrolling), title, 4 x 2 city tiles, route and buttons
+  ctx.globalAlpha = 0.3; px(ctx, '#d8eeff', 0, 0, W, H); ctx.globalAlpha = 1;
+  const big = W >= 280;
+  drawText(ctx, 'OZZIE PARKOUR', W / 2, 5, '#f2c230', big ? 2 : 1, 'center', '#4a2f1c');
+  drawText(ctx, 'AUSTRALIA TOUR', W / 2, big ? 22 : 16, '#ffffff', 1, 'center');
+  drawText(ctx, tourSave.cleared ? 'TAP A CITY TO START A NEW TOUR' : 'CHOOSE YOUR FIRST CITY', W / 2, 33, '#1b1b20', 1, 'center', null);
+  const gap = W >= 300 ? 8 : 6, tw = Math.min(58, Math.floor((W - 16 - 3 * gap) / 4)), th = 42, x0 = Math.round(W / 2 - (4 * tw + 3 * gap) / 2), y0 = 45;
+  CITIES.forEach((c, i) => {
+    const col = i % 4, row = i >> 2, sel = i === titleSel, x = x0 + col * (tw + gap), y = y0 + row * (th + 8) - (sel ? 2 : 0);
+    slot(x, y, tw, th, sel);
+    const ix = x + Math.round((tw - 44) / 2); ctx.drawImage(ICON[c.id], ix, y + 3); px(ctx, '#1b1b20', ix, y + 31, 44, 1);
+    drawText(ctx, c.name, x + tw / 2, y + 33, sel ? '#fff3a0' : '#ffffff', 1, 'center');
+    const s = tourSave.stars[c.id] || 0;
+    if (s) { px(ctx, '#1b1b20', x + tw - 24, y + 2, 23, 8); starRow(x + tw - 23, y + 3, s); }
+    hit(x - 3, y - 3, tw + 6, th + 6, () => { titleSel = i; SFX.coin(); });
+  });
+  const order = CITIES.map(c => c.name), route = order.slice(titleSel).concat(order.slice(0, titleSel));
+  drawText(ctx, 'ROUTE: ' + route.slice(0, W >= 300 ? 4 : 3).join(' > ') + ' > ...', W / 2, 144, '#1b1b20', 1, 'center', null);
+  const cont = tourSave.cleared > 0 && titleSel === tourSave.start, label = cont ? (tourSave.cleared >= 8 ? 'TOUR MAP' : 'CONTINUE') : 'START TOUR';
+  mcButton(W / 2 - 70, 156, 80, 16, label, true, () => startTour(titleSel));
+  mcButton(W / 2 + 18, 156, 52, 16, 'FREE RUN', false, () => start());
+}
+function drawMapScreen() {
+  const cardW = W >= 320 ? 114 : 100, narrow = W < 300, K = Math.min(3.8, (W - cardW - (narrow ? 14 : 56)) / 44, (H - 28) / 34.5), m = buildMap(K);   // room for the labels
+  const mx = 4 + Math.max(0, Math.floor((W - cardW - 12 - m.width) / 2)), my = Math.max(22, Math.floor((H - m.height) / 2) + 6);
+  ctx.fillStyle = '#2f6fc8'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 60; i++) px(ctx, '#4f8fe0', (i * 53) % W, (i * 37) % H, 4, 1);
+  ctx.drawImage(m, mx, my);
+  drawText(ctx, 'AUSTRALIA TOUR', W / 2, 6, '#f2c230', 1, 'center', '#1b1b20');
+  const blink = Math.floor(performance.now() / 400) % 2, n = nextCity();
+  for (const c of CITIES) {
+    const [X0, Y0] = mapXY(m, ...c.ll), X = Math.round(mx + X0), Y = Math.round(my + Y0), [dx, dy, al] = LABEL[c.id];
+    const done = !!tourSave.stars[c.id] && unlocked(c.id), isNext = n && n.id === c.id, open = unlocked(c.id), sel = cityIndex(c.id) === mapSel;
+    if (sel) { px(ctx, '#ffffff', X - 5, Y - 5, 11, 11); }
+    if (isNext) { const b = blink; px(ctx, '#1b1b20', X - 3 - b, Y - 3 - b, 7 + 2 * b, 7 + 2 * b); px(ctx, '#ffffff', X - 2 - b, Y - 2 - b, 5 + 2 * b, 5 + 2 * b); px(ctx, '#d23a2a', X - 1, Y - 1, 3, 3); }
+    else if (done) { px(ctx, '#1b1b20', X - 3, Y - 3, 7, 7); px(ctx, '#f2c230', X - 2, Y - 2, 5, 5); px(ctx, '#fff3a0', X - 2, Y - 2, 2, 1); }
+    else { px(ctx, '#1b1b20', X - 3, Y - 3, 7, 7); px(ctx, open ? '#ffffff' : '#8b8b8b', X - 2, Y - 2, 5, 5); }
+    if (!narrow) drawText(ctx, c.name, X + dx, Y + dy, open ? '#ffffff' : '#c6c6c6', 1, al, '#1b1b20');   // narrow screens: the card names it
+    hit(X - 10, Y - 10, 20, 20, () => { if (open) { mapSel = cityIndex(c.id); SFX.coin(); } else { toast = { s: 'FINISH ' + cityAtStage(tourSave.cleared + 1).name + ' FIRST!', t: 0 }; SFX.hit(); } });
+  }
+  // card for the chosen city
+  const c = CITIES[mapSel], X = W - cardW - 4, Y = 22, w = cardW, h = 152;
+  panel(X, Y, w, h, 1);
+  drawText(ctx, 'STAGE ' + stageOf(c.id) + ' OF 8', X + w / 2, Y + 5, '#555555', 1, 'center', null);
+  drawText(ctx, c.name, X + w / 2, Y + 15, '#1b1b20', textWidth(c.name, 2) <= w - 6 ? 2 : 1, 'center', null);
+  ctx.drawImage(ICON[c.id], X + Math.round(w / 2 - 22), Y + 31);
+  const s = tourSave.stars[c.id] || 0; if (s) starRow(X + w - 25, Y + 5, s);
+  drawText(ctx, 'FIND 3 ANIMALS:', X + 6, Y + 62, '#1b1b20', 1, 'left', null);
+  c.animals.forEach((a, i) => { const spr = ASPR[a.k], yy = Y + 72 + i * 12, known = tourSeen.includes(a.k), sc = spr.width > 20 ? 0.5 : 1;
+    ctx.drawImage(known ? spr : silOf(spr), X + 6, Math.round(yy + 10 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc));
+    drawText(ctx, known ? a.short : '?????', X + 30, yy + 2, known ? '#1b1b20' : '#555555', 1, 'left', null); });
+  wrapWords(c.fact, Math.floor((w - 6) / 6)).slice(0, 3).forEach((l, i) => drawText(ctx, l, X + w / 2, Y + 110 + i * 8, '#2f7a3a', 1, 'center', null));
+  mcButton(X + w / 2 - 30, Y + h - 16, 60, 13, 'GO!', true, () => startLevel(c.id));
+  mcButton(4, H - 18, 40, 13, 'MENU', false, goTitle);
+  drawText(ctx, 'STARS ' + totalStars() + '/24', 50, H - 14, '#ffffff', 1, 'left', '#1b1b20');
+  if (toast) { toast.t += 1 / 60; if (toast.t > 2) toast = null; else drawText(ctx, toast.s, Math.round((W - cardW) / 2), H - 30, '#fff3a0', 1, 'center', '#1b1b20'); }
+}
+function drawTourHud() {
+  const T = G.tour, bw = 90, bxp = Math.round(W / 2 - bw / 2 + 18);
+  for (let i = 0; i < TOUR_HEARTS; i++) heart(bxp - 36 + i * 11, 6, i < T.hearts);
+  px(ctx, '#1b1b20', bxp - 1, 3, bw + 2, 26); ctx.globalAlpha = 0.85; px(ctx, '#c6c6c6', bxp, 4, bw, 24); ctx.globalAlpha = 1;
+  T.city.animals.forEach((a, i) => { const spr = ASPR[a.k], X = bxp + 4 + i * 29, Y = 6, flying = T.cards.some(c => c.ai === i && c.t < 0.6), got = T.got[i] && !flying;
+    px(ctx, '#8b8b8b', X, Y, 24, 20); px(ctx, '#373737', X, Y, 24, 1); px(ctx, '#ffffff', X, Y + 19, 24, 1);
+    const sc = Math.min(1, 22 / spr.width, 18 / spr.height);
+    ctx.drawImage(got ? spr : silOf(spr), Math.round(X + 12 - spr.width * sc / 2), Math.round(Y + 19 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc));
+    if (got) { px(ctx, '#2f9a2a', X + 17, Y + 1, 6, 6); px(ctx, '#ffffff', X + 18, Y + 4, 1, 1); px(ctx, '#ffffff', X + 19, Y + 5, 1, 1); px(ctx, '#ffffff', X + 20, Y + 3, 1, 2); px(ctx, '#ffffff', X + 21, Y + 2, 1, 1); } });
+  // cards flying up to the bar
+  for (const c of T.cards) { if (c.t >= 0.6) continue; const k = c.t / 0.6, tx = bxp + 4 + c.ai * 29 + 12 - c.spr.width / 2, ty = 8;
+    ctx.drawImage(c.spr, Math.round(c.x + (tx - c.x) * k), Math.round(c.y + (ty - c.y) * k - Math.sin(k * Math.PI) * 20)); }
+  // how far to the flag
+  const pw = Math.min(160, W - 120), px0 = Math.round(W / 2 - pw / 2), py = 33, prog = Math.min(1, (G.cam + PLAYER_X) / T.finishX);
+  px(ctx, '#1b1b20', px0 - 1, py - 1, pw + 2, 5); px(ctx, '#8b8b8b', px0, py, pw, 3); px(ctx, '#4c9a2a', px0, py, Math.round(pw * prog), 3);
+  for (const s of [...T.spawns, ...T.animals.filter(a => !a.gone)]) { if (T.got[s.ai]) continue; px(ctx, '#f2c230', px0 + Math.round(pw * Math.min(1, s.x / T.finishX)), py + 1, 1, 1); }
+  px(ctx, '#b8925a', px0 + Math.round(pw * prog) - 3, py - 4, 7, 2); px(ctx, '#d6a27a', px0 + Math.round(pw * prog) - 2, py - 2, 5, 3);
+  px(ctx, '#1b1b20', px0 + pw + 1, py - 9, 1, 13); px(ctx, '#d23a2a', px0 + pw + 2, py - 9, 6, 4); px(ctx, '#ffffff', px0 + pw + 4, py - 8, 2, 2);
+  drawText(ctx, 'SCORE ' + G.score, W / 2, 41, '#ffffff', 1, 'center');
+  if (G.time < 3.5) {
+    drawText(ctx, T.city.name, W / 2, 56, '#fff3a0', 2, 'center', '#3a2a00');
+    drawText(ctx, 'FIND ALL 3 ANIMALS, THEN REACH THE FLAG!', W / 2, 74, '#ffffff', 1, 'center');
+    drawText(ctx, isTouch ? 'TAP = JUMP   TAP AGAIN = DOUBLE JUMP' : 'SPACE = JUMP   AGAIN = DOUBLE JUMP', W / 2, 84, '#ffffff', 1, 'center');
+  }
+  for (const b of G.banners) if (b.t < 2) drawText(ctx, b.s, W / 2, 60 - Math.min(4, b.t * 20), '#f2c230', 1, 'center', '#3a2a00');
+}
+// finish gate: chequered flag and the city's landmark
+function drawFinish() {
+  const T = G.tour, X = Math.round(T.finishX - G.cam);
+  if (X < -60 || X > W + 60) return;
+  ctx.drawImage(ICON[T.city.id], X + 10, GROUND_Y - 34); px(ctx, '#1b1b20', X + 9, GROUND_Y - 35, 46, 1);
+  px(ctx, '#1b1b20', X - 1, GROUND_Y - 48, 3, 48);
+  for (let r = 0; r < 4; r++) for (let q = 0; q < 6; q++) px(ctx, (r + q) % 2 ? '#1b1b20' : '#ffffff', X + 2 + q * 3, GROUND_Y - 48 + r * 3, 3, 3);
+}
+// tree trunks under tree animals, then every waiting animal with its sparkle
+function drawTourAnimals() {
+  for (const an of G.tour.animals) {
+    if (an.gone) continue;
+    const X = Math.round(an.x - G.cam), bob = an.a.place === 'sky' ? Math.round(Math.sin(an.t * 3) * 3) : 0, Y = an.y + bob;
+    if (X < -40 || X > W + 40) continue;
+    if (an.a.place === 'tree') {
+      const tx = X + Math.round(an.w / 2) - 1;
+      px(ctx, 't', tx, Y + an.h, 3, GROUND_Y - Y - an.h); px(ctx, 'T', tx + 2, Y + an.h, 1, GROUND_Y - Y - an.h);
+      px(ctx, 'T', X - 6, Y + an.h, an.w + 12, 2);
+      for (let k = 0; k < 7; k++) px(ctx, k % 2 ? 'u' : 'U', X - 8 + k * 4, Y + an.h - 2 - (k % 3) * 2, 3, 2);
+    }
+    glow(X, Y, an.w, an.h, an.t);
+    ctx.drawImage(an.spr, X, Y);
+  }
+}
+function drawClear() {
+  ctx.globalAlpha = 0.45; px(ctx, '#000000', 0, 0, W, H); ctx.globalAlpha = 1;
+  const T = G.tour, e = endInfo, w = Math.min(240, W - 8), X = Math.round(W / 2 - w / 2), Y = 8, h = 136;
+  panel(X, Y, w, h, 1);
+  drawText(ctx, T.city.name + ' COMPLETE!', W / 2, Y + 6, '#2f7a3a', W >= 300 && textWidth(T.city.name + ' COMPLETE!', 2) <= w - 8 ? 2 : 1, 'center', '#1b4a1a');
+  for (let i = 0; i < 3; i++) bigStar(W / 2 - 38 + i * 28, Y + 24 - (i === 1 ? 4 : 0), i < e.stars);
+  drawText(ctx, (T.lost ? 'HEARTS LOST ' + T.lost : 'NO HEARTS LOST') + '   GOLD ' + Math.round(e.gold * 100) + '%', W / 2, Y + 48, '#555555', 1, 'center', null);
+  const cw = 70, g = 6, cx0 = Math.round(W / 2 - (3 * cw + 2 * g) / 2);
+  T.city.animals.forEach((a, i) => { const spr = ASPR[a.k], ax = cx0 + i * (cw + g), ay = Y + 60, sc = spr.width * 2 > cw - 4 || spr.height * 2 > 30 ? 1 : 2;
+    px(ctx, '#8b8b8b', ax, ay, cw, 34); px(ctx, '#373737', ax, ay, cw, 1); px(ctx, '#ffffff', ax, ay + 33, cw, 1);
+    ctx.drawImage(spr, Math.round(ax + cw / 2 - spr.width * sc / 2), ay + 31 - spr.height * sc, spr.width * sc, spr.height * sc);
+    drawText(ctx, a.short, ax + cw / 2, ay + 37, '#1b1b20', 1, 'center', null); });
+  wrapWords('DID YOU KNOW? ' + T.city.fact, Math.floor((w - 8) / 6)).slice(0, 2).forEach((l, i) => drawText(ctx, l, W / 2, Y + 108 + i * 9, '#2f5fa8', 1, 'center', null));
+  drawText(ctx, 'SCORE ' + G.score + (e.newBest ? '  NEW BEST!' : ''), W / 2, Y + 126, '#1b1b20', 1, 'center', null);
+  const n = nextCity(), main = e.done ? 'FINISH!' : e.frontier && n ? 'FLY TO ' + n.name : 'MAP';
+  const bws = [textWidth(main) + 12, 50, 50], tot = bws[0] + bws[1] + bws[2] + 12; let bx = Math.round(W / 2 - tot / 2);
+  mcButton(bx, 150, bws[0], 16, main, true, afterClear); bx += bws[0] + 6;
+  mcButton(bx, 150, bws[1], 16, 'REPLAY', false, () => startLevel(T.city.id)); bx += bws[1] + 6;
+  if (window.EmilyShare) mcButton(bx, 150, bws[2], 16, 'SHARE', false, () => EmilyShare.open());
+}
+function drawFail() {
+  ctx.globalAlpha = 0.45; px(ctx, '#000000', 0, 0, W, H); ctx.globalAlpha = 1;
+  const T = G.tour, e = endInfo, w = Math.min(226, W - 8), X = Math.round(W / 2 - w / 2), Y = 28, h = 96;
+  panel(X, Y, w, h, 1);
+  drawText(ctx, e.why, W / 2, Y + 7, '#d23a2a', textWidth(e.why, 2) <= w - 8 ? 2 : 1, 'center', '#5a1a14');
+  if (e.missed.length) {
+    drawText(ctx, 'YOU MISSED:', W / 2, Y + 28, '#555555', 1, 'center', null);
+    const missedA = T.city.animals.filter((a, i) => !T.got[i]), cw = 72, x0 = Math.round(W / 2 - (missedA.length * cw) / 2);
+    missedA.forEach((a, i) => { const spr = ASPR[a.k]; ctx.drawImage(spr, Math.round(x0 + i * cw + cw / 2 - spr.width / 2), Y + 56 - spr.height);
+      drawText(ctx, a.short, x0 + i * cw + cw / 2, Y + 60, '#1b1b20', 1, 'center', null); });
+  }
+  drawText(ctx, 'EVERY ANIMAL SHOWS UP 3 TIMES', W / 2, Y + 76, '#2f7a3a', 1, 'center', null);
+  mcButton(W / 2 - 66, Y + h + 10, 70, 16, 'TRY AGAIN', true, () => startLevel(T.city.id));
+  mcButton(W / 2 + 10, Y + h + 10, 56, 16, 'MAP', false, () => goMap(T.city.id));
+}
+function drawComplete() {
+  ctx.fillStyle = '#1f4a28'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) px(ctx, ['#f2c230', '#d23a2a', '#3c6fd0', '#ffffff'][i % 4], (i * 67 + Math.floor(performance.now() / 30)) % W, (i * 41 + Math.floor(performance.now() / 20)) % H, 2, 2);
+  drawText(ctx, 'AUSTRALIA COMPLETE!', W / 2, W >= 300 ? 6 : 10, '#f2c230', W >= 300 ? 2 : 1, 'center', '#4a2f1c');
+  drawText(ctx, 'ALL 8 CITIES   STARS ' + totalStars() + '/24', W / 2, 24, '#ffffff', 1, 'center');
+  const cw = Math.min(36, Math.floor((W - 8) / 8)), x0 = Math.round(W / 2 - cw * 4);
+  CITIES.forEach((c, i) => c.animals.forEach((a, j) => { const spr = ASPR[a.k], X = x0 + i * cw, Y = 36 + j * 34, sc = Math.min(1, (cw - 4) / spr.width, 26 / spr.height);
+    px(ctx, '#2f6a38', X + 1, Y, cw - 2, 30);
+    ctx.drawImage(spr, Math.round(X + cw / 2 - spr.width * sc / 2), Math.round(Y + 28 - spr.height * sc), Math.round(spr.width * sc), Math.round(spr.height * sc)); }));
+  CITIES.forEach((c, i) => drawText(ctx, c.state, x0 + i * cw + cw / 2, 140, '#c6e6c0', 1, 'center', null));
+  mcButton(W / 2 - 56, 156, 50, 16, 'MAP', true, () => goMap());
+  if (window.EmilyShare) mcButton(W / 2 + 6, 156, 50, 16, 'SHARE', false, () => EmilyShare.open());
+}
+// HTML corner buttons: sound only where it does not sit on a canvas button
+function showButtons() {
+  soundBtn.classList.toggle('hidden', !['title', 'play', 'dead'].includes(state));
+  mapBtn.classList.toggle('hidden', !(state === 'play' && G.tour));       // leave a level for the map
+}
+const mapBtn = document.getElementById('mapBtn');
+mapBtn.addEventListener('click', () => { if (state === 'play' && G.tour) { audio(); goMap(G.tour.city.id); } });
 
 // =====================================================================
 // PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
@@ -1313,7 +2144,7 @@ const HARD_PRESET = { baseSpeed: 120, maxSpeed: 270, speedRampRate: 0.2, minObst
 
 // test hooks
 window.__pp = { get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, press, release, update, draw, CONFIG, die,
-  get seen() { return seen; } };
+  get seen() { return seen; }, startLevel, goMap, goTitle, startFlight, CITIES, CITY, get tourSave() { return tourSave; }, get endInfo() { return endInfo; }, menuKey, uiTap };
 
 newRun(); resize(); requestAnimationFrame(frame);
 </script>
