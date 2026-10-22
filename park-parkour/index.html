@@ -219,7 +219,7 @@ const SPR = {
     '.S............S.',
     '.S............S.']),
   // Aussie wheelie bin: green body, red lid
-  bin: sprite([
+  bin: sprite([      // red lid (rubbish); blue and green lid copies are made below
     'qqqqqqqqq',
     'QQQQQQQQQ',
     '.eeeeeeeE',
@@ -395,6 +395,17 @@ const SPR = {
     '..qqgggg',
     '....gg..']),
 };
+// wheelie bins with a blue lid (recycling) and a lime green lid (garden waste), like real Aussie council bins
+function recolour(spr, map) {
+  const [c, x] = makeCanvas(spr.width, spr.height); x.drawImage(spr, 0, 0);
+  const d = x.getImageData(0, 0, spr.width, spr.height), hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const pairs = Object.entries(map).map(([from, to]) => [hex(PAL[from]), hex(to)]);
+  for (let i = 0; i < d.data.length; i += 4) for (const [f, t] of pairs)
+    if (d.data[i] === f[0] && d.data[i + 1] === f[1] && d.data[i + 2] === f[2]) { d.data[i] = t[0]; d.data[i + 1] = t[1]; d.data[i + 2] = t[2]; }
+  x.putImageData(d, 0, 0); return c;
+}
+SPR.binBlue = recolour(SPR.bin, { q: '#3c6fd0', Q: '#284d96' });
+SPR.binGreen = recolour(SPR.bin, { q: '#8ad13a', Q: '#5a9a1f' });
 // mirrored copies for kangaroos hopping left
 function mirror(c) { const [m, x] = makeCanvas(c.width, c.height); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(c, 0, 0); return m; }
 SPR.roo1L = mirror(SPR.roo1); SPR.roo2L = mirror(SPR.roo2);
@@ -404,7 +415,9 @@ SPR.roo1L = mirror(SPR.roo1); SPR.roo2L = mirror(SPR.roo2);
 // The bench uses its seat height (the backrest is thin), the bush ignores its leafy tips.
 const OBSTACLES = [
   { id: 'bench', spr: SPR.bench, inset: [0, 2, 0, 0], from: 0, weight: 3 },
-  { id: 'bin',   spr: SPR.bin,   inset: [0, 0, 0, 0], from: 0, weight: 3 },
+  { id: 'bin',   spr: SPR.bin,      inset: [0, 0, 0, 0], from: 0, weight: 1 },   // red lid
+  { id: 'bin',   spr: SPR.binBlue,  inset: [0, 0, 0, 0], from: 0, weight: 1 },   // blue lid
+  { id: 'bin',   spr: SPR.binGreen, inset: [0, 0, 0, 0], from: 0, weight: 1 },   // green lid
   { id: 'bush',  spr: SPR.bush,  inset: [0, 1, 0, 0], from: 0, weight: 3 },
   { id: 'table', spr: SPR.table, inset: [0, 0, 0, 0], from: 150, weight: 2 },
   { id: 'hedge', spr: SPR.hedge, inset: [0, 0, 0, 0], from: 300, weight: 1.5 },
