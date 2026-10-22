@@ -2769,31 +2769,23 @@ Object.assign(PORTRAIT, {
     P('#4a4a52', 36, 52, 2, 4); P('#4a4a52', 41, 52, 2, 4);                           // feet
     k.outline(); return k.c;
   },
-  greyRoo() {   // eastern grey sitting up tall on its big feet and tail, one smooth body from nose to tail
-  const k = portraitKit(80, 64), { P, E, L, F } = k, FUR = '#9a9088', DARK = '#837970', PALE = '#d4ccc0';
-  F(DARK, [[29, 48], [32, 57], [6, 63], [3, 61]]);                                   // tail, resting on the ground
-  F(DARK, [[48, 9], [46, 0], [50, 2], [52, 9]]);                                      // far ear
-  F(FUR, [[69, 15], [66, 18], [60, 19], [56, 22], [54, 30], [54, 40], [53, 48], [50, 54], [52, 57], [66, 59], [66, 62], [36, 62], [31, 58],
-    [26, 52], [24, 44], [27, 34], [33, 25], [41, 17], [48, 12], [52, 8], [57, 6], [63, 9], [67, 12]]);   // head, neck, body, leg and foot in one piece
-  E(FUR, 59, 12, 5, 5);                                                              // rounder head and cheek
-  F(FUR, [[52, 10], [52, 0], [56, 3], [56, 9]]); F(PALE, [[53, 8], [53, 3], [55, 5], [55, 8]]);   // near ear
-  E(PALE, 50, 38, 4, 9);                                                              // pale chest and belly
-  E(DARK, 34, 51, 8, 7); E(FUR, 33, 49, 6, 5);                                        // big thigh
-  L(DARK, 40, 61, 64, 61, 1);                                                         // sole of the long foot
-  L(DARK, 55, 27, 60, 33, 2); L(DARK, 60, 33, 59, 37, 2);                             // short front arm
-  P('#1b1b20', 67, 13, 2, 2);                                                         // nose
-  P('#1b1b20', 59, 10, 2, 2); P('#ffffff', 59, 10, 1, 1);                             // eye
-  L(DARK, 61, 17, 65, 17, 1);                                                         // mouth
-  k.outline(); return k.c;
-},
-  bogong() {   // a moth resting on the cave wall, wings open
-    const k = portraitKit(80, 64), { P, E, L, F } = k;
-    F('#7a5a3a', [[40, 22], [8, 14], [12, 34], [40, 38]]); F('#7a5a3a', [[40, 22], [72, 14], [68, 34], [40, 38]]);   // fore wings
-    F('#9a7a52', [[40, 36], [16, 36], [22, 50], [40, 44]]); F('#9a7a52', [[40, 36], [64, 36], [58, 50], [40, 44]]);  // hind wings
-    for (const s of [-1, 1]) { E('#3a2a1e', 40 + s * 18, 26, 4, 3); E('#e8d8b0', 40 + s * 18, 26, 2, 1.5); E('#3a2a1e', 40 + s * 26, 22, 2.5, 2);
-      L('#5e4228', 40 + s * 6, 30, 40 + s * 28, 18, 1); }                                                       // the two spots on each wing
-    E('#4a3424', 40, 32, 3, 12); E('#6a4a30', 40, 22, 4, 3);                           // body and head
-    L('#4a3424', 38, 20, 30, 8, 1); L('#4a3424', 42, 20, 50, 8, 1);                    // feelers
+  greyRoo() {   // eastern grey standing up on its big back feet, small head held high, thick tail on the ground
+    const k = portraitKit(80, 64), { P, E, L, F } = k, FUR = '#9a9088', DARK = '#837970', PALE = '#d4ccc0';
+    F(DARK, [[58, 50], [61, 44], [67, 52], [74, 60], [79, 63], [69, 63], [58, 58]]);            // long thick tail, resting on the ground
+    F(DARK, [[26, 8], [27, 0], [30, 2], [29, 9]]);                                              // far ear
+    F(FUR, [[24, 7], [29, 9], [33, 13], [39, 16], [46, 21], [53, 28], [58, 35], [62, 43], [63, 51], [60, 57], [52, 60], [44, 59],
+      [40, 53], [37, 45], [33, 38], [30, 31], [27, 25], [25, 19], [20, 17], [16, 17]]);           // neck, back, belly and haunch in one piece
+    E(FUR, 21, 12, 5, 4.5);                                                                      // small head
+    F(FUR, [[19, 9], [11, 13], [11, 16], [16, 17], [21, 16]]);                                  // long narrow snout
+    F(FUR, [[21, 9], [20, 0], [24, 1], [25, 9]]); F(PALE, [[21, 7], [21, 2], [23, 3], [23, 7]]);    // near ear
+    E(DARK, 51, 48, 11, 11); E(FUR, 50, 46, 9, 9);                                              // big muscly thigh
+    F(FUR, [[36, 58], [36, 62], [58, 62], [58, 57]]); L(DARK, 37, 62, 57, 62, 1);               // long back foot flat on the ground
+    F(PALE, [[22, 18], [26, 19], [30, 30], [35, 40], [40, 52], [38, 53], [33, 43], [28, 32], [24, 24]]);  // pale throat, chest and belly
+    L(DARK, 29, 25, 26, 33, 2); L(DARK, 26, 33, 23, 35, 2);                                     // front arms held close to the chest
+    L(DARK, 31, 27, 29, 34, 2); L(DARK, 29, 34, 27, 36, 2);
+    P('#1b1b20', 10, 13, 2, 2);                                                                  // nose
+    P('#1b1b20', 19, 10, 2, 2); P('#ffffff', 19, 10, 1, 1);                                      // eye
+    L(DARK, 13, 16, 17, 16, 1);                                                                  // mouth
     k.outline(); return k.c;
   },
   kookaburra() {   // perched, big beak, brown eye stripe, blue on the wing
