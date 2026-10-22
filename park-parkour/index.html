@@ -2769,18 +2769,23 @@ Object.assign(PORTRAIT, {
     P('#4a4a52', 36, 52, 2, 4); P('#4a4a52', 41, 52, 2, 4);                           // feet
     k.outline(); return k.c;
   },
-  greyRoo() {   // eastern grey standing tall, a joey peeking out of the pouch
-    const k = portraitKit(80, 64), { P, E, L, F } = k;
-    for (let i = 0; i < 18; i++) L('#8a8078', 27 - i, 50 + i * 0.6, 27 - i, 50 + i * 0.6, Math.max(2, 5 - (i / 5 | 0)));   // tail
-    E('#9a9088', 34, 50, 10, 7); L('#8a8078', 36, 56, 52, 61, 3);                   // big hind leg and foot
-    E('#9a9088', 36, 36, 11, 16); E('#d0c8bc', 42, 40, 6, 11);                       // body, pale chest
-    E('#a89e96', 46, 40, 4, 3); E('#8a8078', 47, 37, 2.5, 2.5); P('#1b1b20', 48, 36, 1, 1);   // joey in the pouch
-    L('#8a8078', 46, 28, 52, 33, 2);                                                 // little arm
-    E('#a49a92', 48, 16, 6, 5); E('#a49a92', 55, 18, 5, 3); P('#1b1b20', 59, 17, 2, 2);   // head and snout, nose
-    F('#a49a92', [[43, 4], [46, 3], [48, 13], [44, 13]]); F('#d0c8bc', [[44, 6], [45, 5], [46, 11], [45, 11]]);   // ear
-    P('#1b1b20', 50, 14, 2, 2); P('#ffffff', 50, 14, 1, 1);
-    k.outline(); return k.c;
-  },
+  greyRoo() {   // eastern grey sitting up tall on its big feet and tail, one smooth body from nose to tail
+  const k = portraitKit(80, 64), { P, E, L, F } = k, FUR = '#9a9088', DARK = '#837970', PALE = '#d4ccc0';
+  F(DARK, [[29, 48], [32, 57], [6, 63], [3, 61]]);                                   // tail, resting on the ground
+  F(DARK, [[48, 9], [46, 0], [50, 2], [52, 9]]);                                      // far ear
+  F(FUR, [[69, 15], [66, 18], [60, 19], [56, 22], [54, 30], [54, 40], [53, 48], [50, 54], [52, 57], [66, 59], [66, 62], [36, 62], [31, 58],
+    [26, 52], [24, 44], [27, 34], [33, 25], [41, 17], [48, 12], [52, 8], [57, 6], [63, 9], [67, 12]]);   // head, neck, body, leg and foot in one piece
+  E(FUR, 59, 12, 5, 5);                                                              // rounder head and cheek
+  F(FUR, [[52, 10], [52, 0], [56, 3], [56, 9]]); F(PALE, [[53, 8], [53, 3], [55, 5], [55, 8]]);   // near ear
+  E(PALE, 50, 38, 4, 9);                                                              // pale chest and belly
+  E(DARK, 34, 51, 8, 7); E(FUR, 33, 49, 6, 5);                                        // big thigh
+  L(DARK, 40, 61, 64, 61, 1);                                                         // sole of the long foot
+  L(DARK, 55, 27, 60, 33, 2); L(DARK, 60, 33, 59, 37, 2);                             // short front arm
+  P('#1b1b20', 67, 13, 2, 2);                                                         // nose
+  P('#1b1b20', 59, 10, 2, 2); P('#ffffff', 59, 10, 1, 1);                             // eye
+  L(DARK, 61, 17, 65, 17, 1);                                                         // mouth
+  k.outline(); return k.c;
+},
   bogong() {   // a moth resting on the cave wall, wings open
     const k = portraitKit(80, 64), { P, E, L, F } = k;
     F('#7a5a3a', [[40, 22], [8, 14], [12, 34], [40, 38]]); F('#7a5a3a', [[40, 22], [72, 14], [68, 34], [40, 38]]);   // fore wings
