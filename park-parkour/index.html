@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Park Parkour</title>
+<title>Ozzie Parkour</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Park Parkour">
+<meta name="apple-mobile-web-app-title" content="Ozzie Parkour">
 <meta name="theme-color" content="#5fa83a">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <meta name="description" content="A blocky pixel runner through an Aussie park: jump benches, bins and bushes, grab gold blocks and spot kangaroos, koalas and kookaburras.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="PARK PARKOUR">
+<meta property="og:title" content="OZZIE PARKOUR">
 <meta property="og:description" content="A blocky pixel runner through an Aussie park: jump benches, bins and bushes, grab gold blocks and spot kangaroos, koalas and kookaburras.">
 <meta property="og:url" content="https://pedrotung.github.io/EmilyGames/park-parkour/">
 <meta property="og:image" content="https://pedrotung.github.io/EmilyGames/park-parkour/cover.png">
@@ -67,7 +67,7 @@
 </div>
 </div>
 <div id="fsHelp" class="hidden"><div>
-  <b>Play full screen on iPhone:</b><br>tap the Share button in Safari, then <b>Add to Home Screen</b>, and open Park Parkour from your home screen.<br><br>
+  <b>Play full screen on iPhone:</b><br>tap the Share button in Safari, then <b>Add to Home Screen</b>, and open Ozzie Parkour from your home screen.<br><br>
   <b>Android (Chrome):</b> tap the &#8942; menu, then <b>Add to Home screen</b>.<br>
   <b>In an app (WeChat and others):</b> open this page in your phone's browser first.<br>
   <button class="mc" id="fsHelpClose">OK</button></div></div>
@@ -75,7 +75,7 @@
 <script>
 'use strict';
 /* =====================================================================
-   PARK PARKOUR - a blocky pixel runner through an Aussie community park.
+   OZZIE PARKOUR - a blocky pixel runner through an Aussie community park.
    Everything is drawn with canvas code. The canvas is only 180 pixels tall
    and is scaled up with smoothing off, so every pixel is a hard square block.
    ===================================================================== */
@@ -1113,7 +1113,7 @@ function drawHud() {
   const touch = isTouch;
   if (state === 'title') {
     ctx.globalAlpha = 0.35; px(ctx, '#000000', 0, 82, W, 48); ctx.globalAlpha = 1;   // dark band so the help text reads over the park
-    drawText(ctx, 'PARK', W / 2, 22, '#f2c230', 4, 'center', '#4a2f1c');
+    drawText(ctx, 'OZZIE', W / 2, 22, '#f2c230', 4, 'center', '#4a2f1c');
     drawText(ctx, 'PARKOUR', W / 2, 56, '#ffffff', 3, 'center', '#3a3a3a');
     if (Math.floor(performance.now() / 500) % 2) drawText(ctx, touch ? 'TAP THE SCREEN TO START' : 'PRESS SPACE OR CLICK TO START', W / 2, 86, '#ffffff', 1, 'center');
     drawText(ctx, touch ? 'TAP = JUMP   TAP AGAIN = DOUBLE JUMP' : 'SPACE = JUMP   AGAIN = DOUBLE JUMP', W / 2, 98, '#ffffff', 1, 'center');
@@ -1285,7 +1285,7 @@ function showEnd(on) {
   if (on && window.EmilyShare) {
     // a sharp, bigger copy of the screen for the share picture
     const k = 4, [big, bx] = makeCanvas(W * k, H * k); bx.drawImage(cv, 0, 0, W * k, H * k);
-    EmilyShare.snap({ canvas: big, game: 'Park Parkour', text: `I ran ${metres()} m and scored ${G.score} in Park Parkour!`, path: 'park-parkour/' });
+    EmilyShare.snap({ canvas: big, game: 'Ozzie Parkour', text: `I ran ${metres()} m and scored ${G.score} in Ozzie Parkour!`, path: 'park-parkour/' });
   }
   document.getElementById('shareBtn').classList.toggle('hidden', !window.EmilyShare);
 }
