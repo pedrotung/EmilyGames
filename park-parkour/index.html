@@ -2046,7 +2046,7 @@ function drawTitle() {
   const order = CITIES.map(c => c.name), route = order.slice(titleSel).concat(order.slice(0, titleSel));
   drawText(ctx, 'ROUTE: ' + route.slice(0, W >= 300 ? 4 : 3).join(' > ') + ' > ...', W / 2, 144, '#1b1b20', 1, 'center', null);
   const cont = tourSave.cleared > 0 && titleSel === tourSave.start, label = cont ? (tourSave.cleared >= 8 ? 'TOUR MAP' : 'CONTINUE') : 'START TOUR';
-  if (tourSave.cleared >= 8) {   // the whole tour is done: the animal guide opens from here too
+  if (tourSave.cleared >= 8 || CITIES.every(c => tourSave.stars[c.id])) {   // the tour was finished once (even if a new tour started since): the animal guide opens from here too
     mcButton(W / 2 - 93, 156, 70, 16, label, true, () => startTour(titleSel));
     mcButton(W / 2 - 17, 156, 52, 16, 'FREE RUN', false, () => start());
     mcButton(W / 2 + 41, 156, 52, 16, 'ANIMALS', false, () => goGuide('title'));
