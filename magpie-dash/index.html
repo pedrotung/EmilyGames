@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Magpie Dash</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Magpie Dash">
+<meta name="theme-color" content="#5fa83a">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="description" content="A swooping magpie is after you! Swipe through an Aussie park in blocky pixels: jump benches and bins, roll under climbing bars and run over council utes.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MAGPIE DASH">
+<meta property="og:description" content="A swooping magpie is after you! Swipe through an Aussie park in blocky pixels: jump benches and bins, roll under climbing bars and run over council utes.">
+<meta property="og:url" content="https://pedrotung.github.io/EmilyGames/magpie-dash/">
+<meta property="og:image" content="https://pedrotung.github.io/EmilyGames/magpie-dash/cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<script src="../share.js"></script>
+<style>
+  /* MOBILE: touch-action none + user-scalable=no stop scrolling, pinch and double-tap zoom */
+  html, body { margin: 0; height: 100%; background: #2b1d12; overflow: hidden; touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* the canvas is drawn small and blown up with hard pixel edges */
+  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  .mc { position: fixed; z-index: 10; font: bold 14px/1 "Courier New", monospace; color: #fff; text-shadow: 2px 2px 0 #3a3a3a;
+    background: #8b8b8b; border: 3px solid #1b1b20; box-shadow: inset 3px 3px 0 #b5b5b5, inset -3px -3px 0 #5a5a5a;
+    padding: 9px 12px; cursor: pointer; text-decoration: none; letter-spacing: 1px; }
+  .mc:active { background: #7a7a7a; box-shadow: inset 3px 3px 0 #5a5a5a, inset -3px -3px 0 #b5b5b5; }
+  #home { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
+  #fsBtn { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+  #soundBtn { bottom: max(8px, env(safe-area-inset-bottom)); right: max(8px, env(safe-area-inset-right)); font-size: 11px; padding: 7px 8px; }
+  /* while running only the game shows; menu buttons come back on the title, pause and game over screens */
+  body.playing .menu { display: none !important; }
+  .hidden { display: none !important; }
+  #fsHelp { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #fsHelp div { background: #c6c6c6; border: 3px solid #1b1b20; box-shadow: inset 3px 3px 0 #fff, inset -3px -3px 0 #555; padding: 16px; max-width: 420px;
+    font: 16px/1.4 "Courier New", monospace; color: #1b1b20; }
+  #fsHelp button { margin-top: 12px; position: static; }
+  #endBtns { position: fixed; z-index: 10; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 0 8px; }
+  #endBtns .mc { position: static; }
+  #againBtn { background: #4c9a2a; box-shadow: inset 3px 3px 0 #7cc24a, inset -3px -3px 0 #2f6b1a; font-size: 18px; padding: 12px 22px; }
+  #shareBtn { font-size: 18px; padding: 12px 18px; }
+  #clearBtn { font-size: 12px; padding: 8px 10px; align-self: center; }
+  #endBtns.withSound { bottom: max(52px, calc(env(safe-area-inset-bottom) + 44px)); }
+  /* MOBILE: phones held sideways get asked to turn upright (the park is a tall picture) */
+  #rotateHint { position: fixed; z-index: 5; left: 0; right: 0; top: 40%; text-align: center; color: #f2c230; font: bold 15px/1.4 "Courier New", monospace;
+    text-shadow: 2px 2px 0 #000; display: none; padding: 0 16px; pointer-events: none; }
+  @media (orientation: landscape) and (max-height: 500px) { #rotateHint { display: block; } }
+  @media (max-width: 520px), (max-height: 500px) { #fsBtn, #home { font-size: 11px; padding: 7px 8px; } }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+<a id="home" class="mc menu" href="../">&#9664; GAMES</a>
+<button id="soundBtn" class="mc menu">SOUND ON</button>
+<button id="fsBtn" class="mc menu">FULL SCREEN</button>
+<div id="rotateHint" class="menu">Hold your phone upright<br>to see the whole park!</div>
+<div id="endBtns" class="hidden withSound">
+  <button id="againBtn" class="mc">RUN AGAIN</button>
+  <button id="shareBtn" class="mc">SHARE</button>
+  <button id="clearBtn" class="mc">CLEAR RECORDS</button>
+</div>
+<div id="fsHelp" class="hidden"><div>
+  <b>Play full screen on iPhone:</b><br>tap the Share button in Safari, then <b>Add to Home Screen</b>, and open Magpie Dash from your home screen.<br><br>
+  <b>Android (Chrome):</b> tap the &#8942; menu, then <b>Add to Home screen</b>.<br>
+  <b>In an app (WeChat and others):</b> open this page in your phone's browser first.<br>
+  <button class="mc" id="fsHelpClose">OK</button></div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   MAGPIE DASH - a blocky pixel lane runner through an Aussie park,
+   seen from behind the runner, with a swooping magpie on your tail.
+   Everything is drawn with canvas code into a small canvas that is
+   blown up with smoothing off, so every pixel is a hard square block.
+   ===================================================================== */
+// =====================================================================
+// CONFIG - every number you may want to tweak lives here.
+// Distances are in metres (one lane is about one metre wide), times in seconds.
+// [range] is a sensible range, the value is what the game uses now.
+// Presets EASY_PRESET and HARD_PRESET are at the bottom of the file;
+// open the page with ?easy or ?hard to try them, ?debug for hit boxes and FPS.
+// =====================================================================
+const CONFIG = {
+  // --- speed ---
+  baseSpeed: 9,             // m/s [7-11] start speed
+  maxSpeed: 18,             // m/s [14-22] top speed, never goes higher
+  speedRamp: 0.0045,        // m/s gained per metre run [0.002-0.008] (top speed at about 2000 m)
+
+  // --- moving ---
+  laneTime: 0.15,           // s to slide one lane [0.1-0.25]
+  gravity: 32,              // m/s^2 [26-40]
+  jumpVelocity: 10,         // m/s [9-12]  apex = v*v/(2*gravity) = about 1.56 m (clears a bench, a bin and the mulch trailer)
+  fastDrop: 20,             // m/s  swipe down in the air drops you this fast, then you roll
+  rollTime: 0.6,            // s [0.45-0.8] how long a roll lasts
+  standHeight: 1.45,        // m  runner height
+  rollHeight: 0.6,          // m  height while rolling (climbing bars start at 0.8)
+  stepUp: 0.5,              // m  small steps (tray to mulch, mulch to cab roof) you run up without jumping
+  jumpBuffer: 0.12,         // s  a swipe up this long before landing still jumps on landing
+  graceY: 0.06,             // m  you only hit things you are this much inside of (grazing is safe)
+
+  // --- obstacles ---
+  spawnAhead: 46,           // m  how far ahead the park is built (fog hides the far end)
+  firstRow: 28,             // m  first obstacle row
+  rowGapTime: [1.15, 1.7],  // s  of running between obstacle rows at the start [min, max]
+  rowGapTimeHard: [0.7, 1.15], // s  ... at full difficulty
+  minRowGap: 7,             // m  rows are never closer than this
+  hardAt: 2500,             // m  run this far for full difficulty
+  barFrom: 60,              // m  climbing bars appear after this
+  uteFrom: 120,             // m  utes appear after this
+  uteFacingFrom: 260,       // m  utes facing you (dodge only) appear after this
+  twoUtesFrom: 700,         // m  after this, utes can sit in both side lanes at once (middle stays open)
+
+  // --- the magpie ---
+  invulnTime: 1.6,          // s  safe time after a hit
+  magpieForget: 9,          // s  after this long without another hit the magpie drops back
+  hitsToCatch: 2,           // hits in a row (before it forgets) and you are caught
+
+  // --- gold and points ---
+  coinChance: 0.6,          // chance each gap between rows has a line of gold blocks
+  coinSpacing: 1.3,         // m between blocks
+  coinPoints: 10,           // points per gold block (times the multiplier)
+  multEvery: 300,           // m run without a hit to add x1 to the multiplier
+  multMax: 5,
+  magnetFrom: 200,          // m  kangaroo paw flowers (gold magnet) appear after this
+  magnetChance: 0.08,       // chance per row gap
+  magnetTime: 8,            // s
+  magnetReach: 6,           // m  ahead of you that the magnet pulls gold from
+
+  // --- engine ---
+  fixedStep: 1 / 60,        // physics step, the same on 60 Hz and 120 Hz screens
+  maxDelta: 0.05,           // s  biggest frame time (stops running through things after the tab was hidden)
+  DEBUG: false,             // show hit boxes, FPS and speed
+};
+
+// ---------- Colour palette (one letter per colour, used by the pixel sprites) ----------
+const PAL = {
+  k: '#1b1b20', w: '#f4f4f4', W: '#c8c8c8',
+  g: '#5fa83a', G: '#3f7f2a', l: '#86c95a',
+  d: '#8a5a32', D: '#6b4426', r: '#c0612f', R: '#8e3c1e',
+  b: '#b07f45', B: '#6e4e28', s: '#8d8d8d', S: '#5f5f5f', m: '#c2cad2',
+  y: '#f2c230', Y: '#c08a12', Z: '#fff3a0',
+  n: '#d6a27a', N: '#a7765a', h: '#4a2f1c', c: '#2fa3a8', C: '#1f7478', p: '#3e43a8', P: '#2a2d78', v: '#6a4aa8',
+  a: '#b8925a', A: '#6d4f2a',
+  u: '#8fb39a', U: '#5f8569', t: '#e2d8c8', T: '#a99c8a',
+  o: '#f5d33b', O: '#c9a316', q: '#d23a2a', Q: '#8f2219',
+  x: '#3d7fe0', X: '#2a5fb8', z: '#8fc2ff',
+  f: '#a9805a', F: '#7a583a', i: '#a0a0a8', I: '#6c6c74',
+  j: '#3c6fd0', J: '#284d96', e: '#2f7a3a', E: '#1f4a28', L: '#ff9a3c',
+};
+
+// ---------- Small helpers ----------
+const rnd = (a, b) => a + Math.random() * (b - a);
+const irnd = (a, b) => Math.floor(rnd(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false; return [c, x]; }
+// fill one block of pixels
+function px(x, col, X, Y, w = 1, h = 1) { x.fillStyle = PAL[col] || col; x.fillRect(X, Y, w, h); }
+// turn rows of palette letters into a small canvas ('.' = see-through)
+function sprite(rows, flip = false) {
+  const w = Math.max(...rows.map(r => r.length)), [c, x] = makeCanvas(w, rows.length);
+  rows.forEach((r, y) => [...r].forEach((ch, i) => { if (ch !== '.' && PAL[ch]) px(x, ch, flip ? w - 1 - i : i, y); }));
+  return c;
+}
+
+// ---------- 5x7 pixel font (Minecraft-like text) ----------
+const FONT = {
+  A:[14,17,17,31,17,17,17], B:[30,17,17,30,17,17,30], C:[14,17,16,16,16,17,14], D:[30,17,17,17,17,17,30],
+  E:[31,16,16,30,16,16,31], F:[31,16,16,30,16,16,16], G:[14,17,16,23,17,17,15], H:[17,17,17,31,17,17,17],
+  I:[14,4,4,4,4,4,14], J:[7,2,2,2,2,18,12], K:[17,18,20,24,20,18,17], L:[16,16,16,16,16,16,31],
+  M:[17,27,21,21,17,17,17], N:[17,17,25,21,19,17,17], O:[14,17,17,17,17,17,14], P:[30,17,17,30,16,16,16],
+  Q:[14,17,17,17,21,18,13], R:[30,17,17,30,20,18,17], S:[15,16,16,14,1,1,30], T:[31,4,4,4,4,4,4],
+  U:[17,17,17,17,17,17,14], V:[17,17,17,17,17,10,4], W:[17,17,17,21,21,21,10], X:[17,17,10,4,10,17,17],
+  Y:[17,17,17,10,4,4,4], Z:[31,1,2,4,8,16,31],
+  0:[14,17,19,21,25,17,14], 1:[4,12,4,4,4,4,14], 2:[14,17,1,2,4,8,31], 3:[31,2,4,2,1,17,14],
+  4:[2,6,10,18,31,2,2], 5:[31,16,30,1,1,17,14], 6:[6,8,16,30,17,17,14], 7:[31,1,2,4,8,8,8],
+  8:[14,17,17,14,17,17,14], 9:[14,17,17,15,1,2,12], ' ':[0,0,0,0,0,0,0], '!':[4,4,4,4,4,0,4],
+  '?':[14,17,1,2,4,0,4], '.':[0,0,0,0,0,12,12], ':':[0,12,12,0,12,12,0], '-':[0,0,0,31,0,0,0],
+  "'":[4,4,8,0,0,0,0], ',':[0,0,0,0,12,4,8], '/':[1,1,2,4,8,16,16], '*':[0,17,10,4,10,17,0], '=':[0,0,31,0,31,0,0], '+':[0,4,4,31,4,4,0],
+};
+function textWidth(s, scale = 1) { return s.length * 6 * scale - scale; }
+// draw text with a dark drop shadow; align: 'left' | 'center' | 'right'
+function drawText(x, s, X, Y, col = '#fff', scale = 1, align = 'left', shadow = '#3a3a3a') {
+  s = String(s).toUpperCase();
+  if (align === 'center') X -= textWidth(s, scale) / 2; else if (align === 'right') X -= textWidth(s, scale);
+  X = Math.round(X); Y = Math.round(Y);
+  for (const [colour, off] of [[shadow, scale], [col, 0]]) {
+    if (!colour) continue; x.fillStyle = colour;
+    [...s].forEach((ch, i) => { const g = FONT[ch] || FONT['?'];
+      g.forEach((row, ry) => { for (let b = 0; b < 5; b++) if (row & (16 >> b)) x.fillRect(X + off + (i * 6 + b) * scale, Y + off + ry * scale, scale, scale); }); });
+  }
+}
+
+// =====================================================================
+// SPRITES
+// =====================================================================
+const SPR = {
+  // park bench, side view: backrest, seat, metal legs
+  bench: sprite([
+    'bbbbbbbbbbbbbbbb',
+    'BBBBBBBBBBBBBBBB',
+    '.S............S.',
+    'bbbbbbbbbbbbbbbb',
+    'BBBBBBBBBBBBBBBB',
+    '.SS..........SS.',
+    '.S............S.',
+    '.S............S.',
+    '.S............S.']),
+  // Aussie wheelie bin: green body, red lid
+  bin: sprite([
+    'qqqqqqqqq',
+    'QQQQQQQQQ',
+    '.eeeeeeeE',
+    '.eEeeeeeE',
+    '.eEeeeeeE',
+    '.eeeeeeeE',
+    '.eEeeeeeE',
+    '.eEeeeeeE',
+    '.eeeeeeeE',
+    '.EEEEEEE.',
+    '..k...k..',
+    '.kkk.kkk.']),
+  // leafy bush
+  bush: sprite([
+    '....G.G.....',
+    '..GgG.gG.G..',
+    '.GgglgggGgG.',
+    'GgglggglgggG',
+    'GggggGgggggG',
+    'GgGgggggGggG',
+    '.GggGgggggG.',
+    '..GGgggGGG..',
+    '...GGGGGG...']),
+  // tall hedge for later in the run (needs a good jump)
+  hedge: sprite([
+    '...G..G.G...',
+    '.GgGgGgGgG..',
+    'GglgggglggG.',
+    'GgggGgggggGG',
+    'GgGgggglgggG',
+    'GgggggGggggG',
+    'GglggggggGgG',
+    'GgggGggglggG',
+    'GggggggGgggG',
+    'GgGglgggggGG',
+    'GgggggGggggG',
+    'GglgggggglgG',
+    'GgggGgggggGG',
+    'GgggggglgggG',
+    '.GgGggggGgG.',
+    '..GGGGGGGG..']),
+  // picnic table, side view
+  table: sprite([
+    'bbbbbbbbbbbbbbbbbbbb',
+    'BBBBBBBBBBBBBBBBBBBB',
+    '...B............B...',
+    '...B............B...',
+    'bbbbbbbbbbbbbbbbbbbb',
+    'BBBBBBBBBBBBBBBBBBBB',
+    '.B...B........B...B.',
+    '.B...B........B...B.']),
+  // gold block (the thing you collect)
+  coin: sprite([
+    'YYYYYYY',
+    'YZZyyyY',
+    'YZyyyyY',
+    'YyyyyyY',
+    'YyyyyOY',
+    'YyyyOOY',
+    'YYYYYYY']),
+  // kangaroo facing right: sitting / landing, and mid-hop
+  roo1: sprite([
+    '...........F........',
+    '...........fF.......',
+    '...........ffff.....',
+    '...........ffkfff...',
+    '............ffffk...',
+    '...........fff......',
+    '..........ffff......',
+    '.........fffffN.....',
+    '........ffffff.N....',
+    '.......fffffff......',
+    '......ffffffff......',
+    '.....fffffffff......',
+    '....FfffffffffF.....',
+    '...F..ffffffFF......',
+    '..F....fffFF........',
+    '.F......fFF.........',
+    'F.......FFFFFFF.....']),
+  roo2: sprite([
+    '.............F......',
+    '.............fF.....',
+    '.............ffff...',
+    '............fffkff..',
+    '............ffffffk.',
+    '...........ffff.....',
+    '.........ffffff.....',
+    '.......fffffffN.....',
+    '.....fffffffff.N....',
+    '...ffffffffff.......',
+    '.FFffffffffff.......',
+    'F....fffffffF.......',
+    '......fffFFF........',
+    '.......FFF..........',
+    '......FF............',
+    '.....FFFF...........',
+    '....................']),
+  // koala hugging a branch
+  koala: sprite([
+    '.II......II.',
+    'IWiI....IiWI',
+    'IWiiiiiiiiWI',
+    '.IiiiiiiiiI.',
+    '.iikiiiikii.',
+    '.iiiikkiiii.',
+    '.iiiikkiiii.',
+    '..iiiiiiii..',
+    '.IiiiWWiiiI.',
+    'IIi......iII']),
+  // kookaburra perched, facing right
+  kooka: sprite([
+    '..FFFF...',
+    '.FwwFFF..',
+    '.wwkwwSSS',
+    '.wwwwwWW.',
+    'FFwwwwF..',
+    'FjjFwwF..',
+    'FjjFwwF..',
+    '.FF.ww...',
+    'F...k.k..']),
+  // echidna (moves slowly, jump it), facing left
+  echidna: sprite([
+    '.....k.W.k....',
+    '....kWkWkWk.k.',
+    '...WkWkWkWkWk.',
+    '..FkWkWkWkWkWk',
+    'NNFFkWkWkWkWkW',
+    '...FFFFFFFFFF.',
+    '...k.k...k.k..']),
+  // wombat (trundles along, jump it), facing left
+  wombat: sprite([
+    '.FF...........',
+    'FTFFFFFFFF....',
+    'FkTTTTTTTTTF..',
+    'FTTTTTTTTTTTF.',
+    'kTTTTTTTTTTTTF',
+    '.FTTTTTTTTTTTF',
+    '.FFTTTTTTTTFFF',
+    '..FF.FF..FF.FF',
+    '..kk.kk..kk.kk']),
+  // possum on a branch, tail curled
+  possum: sprite([
+    'I.....I...',
+    'iI...Ii...',
+    'iiiiiii...',
+    'ikiiiki...',
+    'iiiqiii...',
+    '.iiiii....',
+    '..iiiiiIII',
+    '...iiii..I',
+    '.........I']),
+  // kangaroo paw flower you can collect
+  flower: sprite([
+    'q.....q',
+    'qq.q.qq',
+    '.qqQqq.',
+    '..QqQ..',
+    '...G...',
+    '..GG...',
+    '...G...',
+    '...GG..']),
+  // rainbow lorikeet flying left, wings up / wings down
+  lori1: sprite([
+    '....gg..',
+    '..jjgg..',
+    'LjjqLggg',
+    '..qqggg.',
+    '........']),
+  lori2: sprite([
+    '........',
+    '..jj....',
+    'LjjqLggg',
+    '..qqgggg',
+    '....gg..']),
+};
+// mirrored copies for kangaroos hopping left
+function mirror(c) { const [m, x] = makeCanvas(c.width, c.height); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(c, 0, 0); return m; }
+SPR.roo1L = mirror(SPR.roo1); SPR.roo2L = mirror(SPR.roo2);
+
+// =====================================================================
+// GROUND TILES (16x16 blocks, made once with a few random variations)
+// =====================================================================
+function grassTile(seed, red) {
+  const R = mulberry(seed), [c, x] = makeCanvas(16, 16);
+  const dirt = red ? ['r', 'R', 'r', 'r'] : ['d', 'D', 'd', 'd'];
+  for (let yy = 0; yy < 16; yy++) for (let xx = 0; xx < 16; xx++) px(x, dirt[Math.floor(R() * 4)], xx, yy);
+  // grass top: full on normal tiles, patchy on the red-dirt tiles
+  for (let xx = 0; xx < 16; xx++) {
+    if (red && R() < 0.55) { px(x, R() < 0.5 ? 'g' : 'G', xx, 0); continue; }
+    const depth = 3 + (R() < 0.5 ? 1 : 0) + (R() < 0.2 ? 1 : 0);
+    for (let yy = 0; yy < depth; yy++) px(x, yy === 0 ? (R() < 0.3 ? 'l' : 'g') : (R() < 0.5 ? 'g' : 'G'), xx, yy);
+  }
+  return c;
+}
+function dirtTile(seed, red) {
+  const R = mulberry(seed), [c, x] = makeCanvas(16, 16);
+  for (let yy = 0; yy < 16; yy++) for (let xx = 0; xx < 16; xx++) px(x, red ? (R() < 0.3 ? 'R' : 'r') : (R() < 0.3 ? 'D' : 'd'), xx, yy);
+  if (!red) for (let k = 0; k < 2; k++) px(x, 's', Math.floor(R() * 14), Math.floor(R() * 14), 2, 2); // little stones
+  return c;
+}
+const TILES = {
+  grass: [1, 2, 3].map(s => grassTile(s, false)), red: [4, 5, 6].map(s => grassTile(s, true)),
+  dirt: [7, 8, 9].map(s => dirtTile(s, false)), reddirt: [10, 11].map(s => dirtTile(s, true)),
+};
+
+// =====================================================================
+// BACKGROUND PARK THINGS (drawn once each into small canvases)
+// =====================================================================
+const PROPS = {
+  // eucalyptus: thin pale trunk, sparse grey-green leaves, sometimes a koala
+  gum(seed) {
+    const R = mulberry(seed), w = 44, h = 80, [c, x] = makeCanvas(w, h), tx = 20;
+    for (let y = 18; y < h; y++) px(x, R() < 0.2 ? 'T' : 't', tx, y, 3, 1);
+    px(x, 'T', tx + 2, 18, 1, h - 18);
+    const branches = [[tx, 34, -1, 12], [tx + 2, 28, 1, 12], [tx, 22, -1, 8], [tx + 2, 40, 1, 9]];
+    for (const [bx, by, dir, len] of branches) for (let i = 0; i < len; i++) px(x, 'T', bx + dir * i, by - Math.floor(i / 2), 2, 1);
+    const blobs = [[8, 14], [32, 12], [20, 6], [12, 26], [34, 26]];
+    for (const [cx, cy] of blobs) for (let yy = -6; yy <= 6; yy += 2) for (let xx = -9; xx <= 9; xx += 2)
+      if ((xx * xx) / 81 + (yy * yy) / 36 < 1 && R() < 0.55) px(x, R() < 0.5 ? 'u' : 'U', cx + xx, cy + yy, 2, 2);
+    const a = R(); c.animal = null;
+    if (a < 0.4) { x.drawImage(SPR.koala, tx - 5, 36); c.animal = 'koala'; }          // koala hugging the trunk
+    else if (a < 0.6) { x.drawImage(SPR.possum, tx + 3, 23); c.animal = 'possum'; }   // possum on a branch
+    return c;
+  },
+  // golden wattle: small tree with yellow fluffy balls
+  wattle(seed) {
+    const R = mulberry(seed), [c, x] = makeCanvas(30, 38);
+    px(x, 'B', 14, 18, 2, 20); px(x, 'B', 10, 22, 4, 1); px(x, 'B', 16, 20, 4, 1);
+    for (let yy = -9; yy <= 9; yy += 2) for (let xx = -13; xx <= 13; xx += 2)
+      if ((xx * xx) / 169 + (yy * yy) / 81 < 1 && R() < 0.75) px(x, R() < 0.4 ? 'o' : R() < 0.6 ? 'O' : 'G', 15 + xx, 12 + yy, 2, 2);
+    return c;
+  },
+  // children's climbing frame: coloured posts, ladder bars and a rope net
+  climb() {
+    const [c, x] = makeCanvas(46, 40);
+    px(x, 'q', 4, 4, 18, 2); px(x, 'Q', 4, 6, 18, 1);               // top bar
+    for (const X of [4, 20]) px(x, 'j', X, 4, 2, 36);                // posts
+    for (let y = 10; y < 38; y += 6) px(x, 'o', 6, y, 14, 2);        // rungs
+    px(x, 'j', 30, 14, 2, 26); px(x, 'j', 42, 14, 2, 26);            // little tower
+    px(x, 'b', 28, 22, 18, 3); px(x, 'B', 28, 25, 18, 1);            // tower deck
+    for (let i = 0; i < 6; i++) px(x, 'q', 28 + i * 3, 8 + (i < 3 ? 6 - i * 2 : (i - 3) * 2), 3, 2); // pointy roof
+    for (let y = 26; y < 40; y += 3) for (let X = 22; X < 30; X += 3) px(x, 'B', X, y, 1, 1); // rope net
+    for (let i = 0; i < 8; i++) px(x, 'B', 22 + i, 26 + i * 2, 1, 2);
+    return c;
+  },
+  // public BBQ shelter with a roof, a hot plate and a picnic table
+  bbq() {
+    const [c, x] = makeCanvas(64, 44);
+    for (let i = 0; i < 6; i++) px(x, i % 2 ? 'Q' : 'q', 6 - i, 4 + i * 2, 52 + i * 2, 2); // stepped roof
+    px(x, 'k', 0, 16, 64, 1);
+    for (const X of [4, 56]) px(x, 'b', X, 17, 3, 27);                                      // posts
+    px(x, 's', 12, 30, 22, 14); px(x, 'S', 12, 30, 22, 2); px(x, 'm', 13, 28, 20, 2);       // stone BBQ, steel plate
+    px(x, 'S', 15, 34, 4, 4); px(x, 'S', 27, 34, 4, 4); px(x, 'q', 22, 35, 2, 2);           // knobs, red button
+    px(x, 'W', 18, 24, 1, 3); px(x, 'W', 24, 22, 1, 4); px(x, 'W', 21, 25, 1, 2);           // smoke
+    px(x, 'b', 38, 32, 16, 2); px(x, 'B', 40, 34, 2, 10); px(x, 'B', 50, 34, 2, 10);        // table
+    px(x, 'b', 36, 38, 20, 2);                                                              // bench seat
+    return c;
+  },
+  // slide with ladder and a yellow chute
+  slide() {
+    const [c, x] = makeCanvas(48, 40);
+    for (const X of [4, 10]) px(x, 'm', X, 6, 2, 34);
+    for (let y = 10; y < 40; y += 5) px(x, 'S', 6, y, 4, 1);         // ladder rungs
+    px(x, 'j', 3, 6, 10, 3); px(x, 'J', 3, 9, 10, 1);                // platform
+    for (let i = 0; i < 16; i++) { px(x, 'o', 12 + i * 2, 7 + i * 2, 3, 3); px(x, 'O', 12 + i * 2, 10 + i * 2, 3, 1); }
+    px(x, 'o', 42, 37, 6, 2);
+    return c;
+  },
+  // swing set: red A frame, chains and two seats
+  swings() {
+    const [c, x] = makeCanvas(40, 34);
+    px(x, 'q', 2, 2, 36, 2);
+    for (let i = 0; i < 16; i++) { px(x, 'Q', 4 - Math.floor(i / 4), 4 + i * 2, 2, 2); px(x, 'Q', 34 + Math.floor(i / 4), 4 + i * 2, 2, 2); }
+    for (const X of [12, 26]) { for (let y = 4; y < 24; y += 2) px(x, 'S', X, y, 1, 1), px(x, 'S', X + 5, y, 1, 1); px(x, 'k', X - 1, 24, 8, 2); }
+    return c;
+  },
+  // street lamp
+  lamp() {
+    const [c, x] = makeCanvas(12, 46);
+    px(x, 'S', 5, 8, 2, 38); px(x, 'S', 3, 43, 6, 3);
+    px(x, 'k', 1, 2, 10, 2); px(x, 'o', 2, 4, 8, 3); px(x, 'S', 1, 7, 10, 1);
+    return c;
+  },
+  // yellow diamond "kangaroos ahead" road sign
+  roosign() {
+    const [c, x] = makeCanvas(18, 34);
+    px(x, 'S', 8, 14, 2, 20);
+    for (let i = 0; i <= 8; i++) { px(x, 'k', 9 - i, i, i * 2, 1); px(x, 'k', 9 - i, 16 - i, i * 2, 1); }
+    for (let i = 1; i <= 7; i++) { px(x, 'o', 10 - i, i, i * 2 - 2, 1); px(x, 'o', 10 - i, 16 - i, i * 2 - 2, 1); }
+    // tiny kangaroo on the sign
+    px(x, 'k', 10, 4, 1, 2); px(x, 'k', 9, 6, 3, 1); px(x, 'k', 8, 7, 3, 3); px(x, 'k', 6, 9, 3, 2); px(x, 'k', 4, 11, 3, 1); px(x, 'k', 8, 10, 4, 1);
+    return c;
+  },
+  // green park name sign
+  parksign() {
+    const [c, x] = makeCanvas(34, 24);
+    px(x, 'B', 4, 12, 2, 12); px(x, 'B', 28, 12, 2, 12);
+    px(x, 'E', 0, 0, 34, 14); px(x, 'e', 1, 1, 32, 12);
+    drawText(x, 'PARK', 17, 4, '#f4f4f4', 1, 'center', null);
+    return c;
+  },
+  // kangaroo paw flowers: red tubes on green stalks
+  paw(seed) {
+    const R = mulberry(seed), [c, x] = makeCanvas(16, 16);
+    for (let i = 0; i < 5; i++) { const X = 2 + i * 3, top = 2 + Math.floor(R() * 5);
+      px(x, 'G', X, top + 3, 1, 16 - top - 3); px(x, 'q', X, top, 2, 3); px(x, 'Q', X + 1, top + 2, 1, 1); }
+    for (let X = 0; X < 16; X += 2) px(x, R() < 0.5 ? 'g' : 'G', X, 13, 2, 3);
+    return c;
+  },
+  // fern bush
+  fern(seed) {
+    const R = mulberry(seed), [c, x] = makeCanvas(20, 12);
+    for (let f = 0; f < 6; f++) { const dir = f < 3 ? -1 : 1, len = 5 + Math.floor(R() * 4);
+      for (let i = 0; i < len; i++) px(x, f % 2 ? 'G' : 'g', 10 + dir * i, 11 - Math.floor(i * (0.6 + f * 0.25) / 1.5), 2, 1); }
+    return c;
+  },
+};
+// =====================================================================
+// SKY: clouds and far hills (made once)
+// =====================================================================
+function makeCloud(seed) {
+  const R = mulberry(seed), cols = 4 + Math.floor(R() * 5), cells = [];
+  for (let i = 0; i < cols; i++) for (let j = 0; j < 2; j++) if (j === 0 || R() < 0.6) cells.push([i, j]);
+  for (let i = 1; i < cols - 1; i++) if (R() < 0.5) cells.push([i, -1]);
+  const [c, x] = makeCanvas(cols * 8, 24);
+  for (const [i, j] of cells) { px(x, '#ffffff', i * 8, (j + 1) * 6, 8, 6); px(x, '#e3edf7', i * 8, (j + 1) * 6 + 5, 8, 1); }
+  return c;
+}
+const CLOUDS = [1, 2, 3, 4, 5].map(makeCloud);
+// a long strip of blocky hills that repeats
+function makeHills(seed, w, base, amp, col, top) {
+  const R = mulberry(seed), [c, x] = makeCanvas(w, 70); let hgt = base;
+  for (let X = 0; X < w; X += 4) {
+    hgt += (R() - 0.5) * 6; hgt = Math.max(base - amp, Math.min(base + amp, hgt));
+    const blend = X > w - 80 ? (X - (w - 80)) / 80 : 0, hh = Math.round((hgt * (1 - blend) + base * blend) / 4) * 4; // ends match so it tiles
+    px(x, col, X, 70 - hh, 4, hh); px(x, top, X, 70 - hh, 4, 2);
+  }
+  return c;
+}
+const HILLS_FAR = makeHills(21, 640, 34, 16, '#9cc8a6', '#b3d7b8');
+const HILLS_NEAR = makeHills(22, 480, 20, 10, '#6aa65e', '#7fbe6f');
+
+// =====================================================================
+// THE 3D VIEW: a camera behind the runner. World x = across (lanes at -1, 0, 1),
+// y = up, z = forward. Everything is projected into the small canvas by hand.
+// =====================================================================
+let W = 216, H = 384, HY = 140, FOC = 230;       // canvas size, horizon row, focal length (set by resize)
+let CAMX = 0, CAMY = 2.3, CAMZ = 0;               // camera; CAMZ is world z, things are drawn at z - CAMZ
+const RUNNER_Z = 3;                               // the runner is always this far in front of the camera
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+let mx = ctx;                                     // the context the 3D helpers draw into
+const proj = (x, y, z) => [W / 2 + (x - CAMX) * FOC / z, HY + (CAMY - y) * FOC / z];
+const FOG = [196, 230, 255];
+const fogT = z => Math.max(0, Math.min(0.75, (z - 16) / 26));
+const hexCache = {};
+function hex(c) { c = PAL[c] || c; return hexCache[c] || (hexCache[c] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))); }
+function fogged(c, z) { const t = fogT(z), a = hex(c);
+  return t ? `rgb(${Math.round(a[0] + (FOG[0] - a[0]) * t)},${Math.round(a[1] + (FOG[1] - a[1]) * t)},${Math.round(a[2] + (FOG[2] - a[2]) * t)})` : (PAL[c] || c); }
+// hard-edged convex polygon fill (no smoothing)
+function fillPoly(pts, col) {
+  mx.fillStyle = col;
+  let y0 = 1e9, y1 = -1e9; for (const p of pts) { if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
+  y0 = Math.max(0, Math.floor(y0)); y1 = Math.min(H, Math.ceil(y1));
+  for (let y = y0; y < y1; y++) {
+    const yy = y + 0.5; let lo = 1e9, hi = -1e9;
+    for (let i = 0; i < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+      if ((ay <= yy && by > yy) || (by <= yy && ay > yy)) { const x = ax + (yy - ay) / (by - ay) * (bx - ax); if (x < lo) lo = x; if (x > hi) hi = x; } }
+    if (hi > lo) { const a = Math.max(-1, Math.round(lo)), b = Math.min(W + 1, Math.round(hi)); if (b > a) mx.fillRect(a, y, b - a, 1); }
+  }
+}
+// a block from (x0,y0,z0) to (x1,y1,z1), z relative to the camera: front face (optionally textured), top, and the side you can see
+const NEAR = 0.35;
+function box(x0, x1, y0, y1, z0, z1, c, tex) {
+  if (z1 <= NEAR) return;
+  const cut = z0 < NEAR; if (cut) z0 = NEAR;
+  if (x1 < CAMX) fillPoly([proj(x1, y0, z0), proj(x1, y1, z0), proj(x1, y1, z1), proj(x1, y0, z1)], fogged(c.side, z0));
+  if (x0 > CAMX) fillPoly([proj(x0, y0, z0), proj(x0, y1, z0), proj(x0, y1, z1), proj(x0, y0, z1)], fogged(c.side, z0));
+  if (y1 < CAMY) fillPoly([proj(x0, y1, z0), proj(x1, y1, z0), proj(x1, y1, z1), proj(x0, y1, z1)], fogged(c.top, z0));
+  else if (y0 > CAMY) fillPoly([proj(x0, y0, z0), proj(x1, y0, z0), proj(x1, y0, z1), proj(x0, y0, z1)], fogged(c.side, z0));
+  const [ax, ay] = proj(x0, y1, z0), [bx, by] = proj(x1, y0, z0);
+  const rx = Math.round(ax), ry = Math.round(ay), rw = Math.round(bx) - rx, rh = Math.round(by) - ry;
+  if (rw <= 0 || rh <= 0) return;
+  if (tex && !cut) { mx.drawImage(tex, rx, ry, rw, rh); const t = fogT(z0); if (t) { mx.globalAlpha = t; mx.fillStyle = 'rgb(196,230,255)'; mx.fillRect(rx, ry, rw, rh); mx.globalAlpha = 1; } }
+  else { mx.fillStyle = fogged(c.front, z0); mx.fillRect(rx, ry, rw, rh); }
+}
+// fogged copies of flat pictures, made once per fog step
+const FOGGED = new Map();
+function fogImg(img, z) {
+  const lv = Math.round(fogT(z) / 0.75 * 6); if (!lv) return img;
+  let arr = FOGGED.get(img); if (!arr) FOGGED.set(img, arr = []);
+  if (!arr[lv]) { const [c, x] = makeCanvas(img.width, img.height); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-atop';
+    x.globalAlpha = lv / 6 * 0.75; x.fillStyle = 'rgb(196,230,255)'; x.fillRect(0, 0, img.width, img.height); arr[lv] = c; }
+  return arr[lv];
+}
+// a flat picture standing up (trees, signs, animals). 1 sprite pixel = 1/24 m
+function bill(img, x, z, y = 0, k = 1) {
+  if (z < 0.8) return;
+  const s = FOC / z / 24 * k, w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+  const [sx, sy] = proj(x, y, z);
+  if (sx + w / 2 < -2 || sx - w / 2 > W + 2) return;
+  mx.drawImage(fogImg(img, z), Math.round(sx - w / 2), Math.round(sy - h), w, h);
+}
+function tex(w, h, fn) { const [c, x] = makeCanvas(w, h); fn(x); return c; }
+const hash = (a, b) => ((Math.imul(a, 73856093) ^ Math.imul(b, 19349663)) >>> 0) % 997;
+
+// ---------- block textures ----------
+const TEX = {
+  ute: tex(16, 16, x => { px(x, 'w', 0, 0, 16, 16); px(x, 'k', 2, 1, 12, 6); px(x, 'z', 3, 2, 10, 4); px(x, 'w', 3, 2, 3, 1);
+    px(x, 'L', 0, 8, 16, 2); px(x, 'S', 3, 11, 10, 3); px(x, 'k', 4, 12, 8, 1); px(x, 'o', 0, 11, 3, 2); px(x, 'o', 13, 11, 3, 2); px(x, 'S', 0, 14, 16, 2); }),
+  cabBack: tex(16, 16, x => { px(x, 'w', 0, 0, 16, 16); px(x, 'k', 2, 2, 12, 6); px(x, 'z', 3, 3, 10, 4); px(x, 'L', 0, 10, 16, 2); px(x, 'W', 0, 14, 16, 2); }),
+  grille: tex(16, 8, x => { px(x, 'w', 0, 0, 16, 8); px(x, 'L', 0, 0, 16, 1); px(x, 'k', 4, 2, 8, 3); px(x, 'S', 5, 3, 6, 1);
+    px(x, 'o', 1, 2, 3, 2); px(x, 'o', 12, 2, 3, 2); px(x, 'S', 0, 6, 16, 2); px(x, 'k', 6, 6, 4, 1); }),
+  tailgate: tex(16, 8, x => { px(x, 'w', 0, 0, 16, 8); px(x, 'W', 0, 0, 16, 1); px(x, 'q', 0, 2, 2, 3); px(x, 'q', 14, 2, 2, 3);
+    px(x, 'Z', 6, 3, 4, 2); px(x, 'k', 7, 4, 2, 1); px(x, 'S', 0, 6, 16, 2); }),
+  trailer: tex(16, 12, x => { px(x, 'S', 0, 0, 16, 12); px(x, 'm', 0, 0, 16, 1); px(x, 's', 1, 1, 14, 8); px(x, 'q', 1, 9, 3, 2); px(x, 'q', 12, 9, 3, 2); px(x, 'o', 6, 9, 4, 2); }),
+  mulch: tex(8, 8, x => { for (let i = 0; i < 64; i++) px(x, ['d', 'D', 'b', 'R'][(i * 7 + (i >> 3) * 3) % 4], i % 8, i >> 3); }),
+  gold: tex(4, 4, x => { px(x, 'y', 0, 0, 4, 4); px(x, 'Z', 0, 0, 2, 1); px(x, 'Z', 0, 1, 1, 1); px(x, 'Y', 3, 1, 1, 3); px(x, 'Y', 1, 3, 3, 1); }),
+  bin: tex(8, 10, x => { px(x, 'e', 0, 0, 8, 10); px(x, 'E', 0, 0, 1, 10); px(x, 'E', 7, 0, 1, 10); px(x, 'E', 2, 2, 4, 1); px(x, 'w', 3, 5, 2, 2); px(x, 'k', 1, 9, 2, 1); px(x, 'k', 5, 9, 2, 1); }),
+  wood: tex(8, 2, x => { px(x, 'b', 0, 0, 8, 2); px(x, 'B', 0, 1, 8, 1); px(x, 'B', 3, 0, 1, 1); }),
+};
+const COL = {
+  wood: { front: 'b', top: '#c8955a', side: 'B' }, metal: { front: 'S', top: 's', side: 'k' },
+  ute: { front: 'w', top: '#e8e8e8', side: '#d8d8d8' }, cab: { front: 'w', top: '#f0f0f0', side: '#cfcfcf' }, tray: { front: 'w', top: '#9a9a9a', side: '#d8d8d8' },
+  trailer: { front: 'S', top: '#8a5a32', side: '#7a7a7a' }, wheel: { front: 'k', top: 'S', side: 'k' }, beacon: { front: 'L', top: 'o', side: 'L' },
+  mulch: { front: 'd', top: '#8a5a32', side: 'D' },
+  gold: { front: 'y', top: 'Z', side: 'Y' }, bin: { front: 'e', top: 'q', side: 'E' }, lid: { front: 'q', top: '#e05040', side: 'Q' },
+  red: { front: 'q', top: '#e85a48', side: 'Q' }, blue: { front: 'j', top: '#5a8ae0', side: 'J' },
+};
+
+// ---------- the runner seen from behind (14 x 34 sprite pixels) ----------
+function runnerBack(frame, pose) {
+  const [c, x] = makeCanvas(14, 34);
+  if (pose === 'roll') {          // curled up in a ball, hat on top
+    px(x, 'c', 2, 18, 10, 10); px(x, 'C', 2, 25, 10, 3); px(x, 'p', 3, 27, 8, 4); px(x, 'S', 3, 31, 3, 2); px(x, 'S', 8, 31, 3, 2);
+    px(x, 'h', 4, 15, 6, 4); px(x, 'a', 1, 14, 12, 1); px(x, 'A', 1, 15, 12, 1); px(x, 'a', 4, 11, 6, 3);
+    px(x, 'n', 1, 20, 2, 5); px(x, 'n', 11, 20, 2, 5);
+    return c;
+  }
+  if (pose === 'jump') {          // knees up, arms out
+    px(x, 'p', 3, 22, 4, 6); px(x, 'S', 3, 28, 4, 2); px(x, 'p', 7, 22, 4, 6); px(x, 'S', 7, 28, 4, 2); px(x, 'P', 6, 22, 2, 4);
+    px(x, 'c', 3, 12, 8, 10); px(x, 'C', 3, 20, 8, 2); px(x, 'C', 6, 13, 2, 7);
+    px(x, 'c', 0, 11, 3, 2); px(x, 'n', 0, 7, 2, 5); px(x, 'c', 11, 11, 3, 2); px(x, 'n', 12, 7, 2, 5);
+    px(x, 'h', 3, 4, 8, 7); px(x, 'n', 3, 11, 8, 1); px(x, 'N', 2, 7, 1, 2); px(x, 'N', 11, 7, 1, 2);
+    px(x, 'a', 0, 3, 14, 1); px(x, 'A', 0, 4, 14, 1); px(x, 'a', 4, 0, 6, 3); px(x, 'A', 4, 2, 6, 1);
+    return c;
+  }
+  const lift = frame ? 3 : 0;
+  px(x, 'p', 3, 22, 4, 10 - lift); px(x, 'S', 3, 32 - lift, 4, 2);          // left leg (lifted)
+  px(x, 'p', 7, 22, 4, 10 - (3 - lift)); px(x, 'S', 7, 32 - (3 - lift), 4, 2);
+  px(x, 'P', 6, 22, 2, 6);
+  px(x, 'c', 3, 12, 8, 10); px(x, 'C', 3, 20, 8, 2); px(x, 'C', 6, 13, 2, 7);  // shirt
+  px(x, 'c', 1, 12, 2, 2); px(x, 'n', 1, 14 + (frame ? 0 : 2), 2, 6); px(x, 'c', 11, 12, 2, 2); px(x, 'n', 11, 14 + (frame ? 2 : 0), 2, 6); // arms
+  px(x, 'h', 3, 4, 8, 7); px(x, 'n', 3, 11, 8, 1); px(x, 'N', 2, 7, 1, 2); px(x, 'N', 11, 7, 1, 2);   // back of head, ears
+  px(x, 'a', 0, 3, 14, 1); px(x, 'A', 0, 4, 14, 1); px(x, 'a', 4, 0, 6, 3); px(x, 'A', 4, 2, 6, 1);   // bush hat
+  return c;
+}
+const RUNNER = { run: [runnerBack(0), runnerBack(1)], jump: runnerBack(0, 'jump'), roll: runnerBack(0, 'roll') };
+// swooping magpie, wings spread (frame 0) or down (frame 1), red eyes, coming at you
+function magpieBig(f) {
+  const [c, x] = makeCanvas(26, 14);
+  px(x, 'k', 10, 3, 6, 7); px(x, 'w', 10, 3, 6, 2); px(x, 'k', 11, 0, 4, 4); px(x, 'W', 12, 4, 2, 2); px(x, 'q', 11, 1, 1, 1); px(x, 'q', 14, 1, 1, 1);
+  if (!f) { px(x, 'k', 0, 2, 10, 3); px(x, 'w', 3, 3, 5, 1); px(x, 'k', 16, 2, 10, 3); px(x, 'w', 18, 3, 5, 1); px(x, 'k', 0, 1, 3, 1); px(x, 'k', 23, 1, 3, 1); }
+  else { for (let i = 0; i < 9; i++) { px(x, 'k', 9 - i, 4 + (i >> 1), 2, 2); px(x, 'k', 15 + i, 4 + (i >> 1), 2, 2); } px(x, 'w', 4, 6, 3, 1); px(x, 'w', 19, 6, 3, 1); }
+  px(x, 'k', 11, 10, 4, 2); px(x, 'k', 12, 12, 2, 2);
+  return c;
+}
+const MAGPIE = [magpieBig(0), magpieBig(1)];
+// emu walking (two frames) for the park
+function emuSprite(s) {
+  const [c, x] = makeCanvas(16, 26);
+  px(x, 'F', 1, 8, 12, 8); px(x, 'T', 2, 9, 10, 5); px(x, 'F', 0, 10, 3, 4);
+  px(x, 'T', 11, 1, 2, 8); px(x, 'J', 11, 0, 3, 3); px(x, 'k', 14, 1, 2, 1);
+  px(x, 'S', 5 + s * 2, 16, 1, 10); px(x, 'S', 9 - s * 2, 16, 1, 10);
+  return c;
+}
+const EMU = [emuSprite(0), emuSprite(1)], EMU_L = EMU.map(mirror);
+const FLOWER_BIG = SPR.flower;
+
+// The field guide: every animal you can spot
+const ANIMALS = {
+  magpie: 'MAGPIE', kangaroo: 'KANGAROO', koala: 'KOALA', kookaburra: 'KOOKABURRA', lorikeet: 'LORIKEET',
+  emu: 'EMU', wombat: 'WOMBAT', echidna: 'ECHIDNA', possum: 'POSSUM',
+};
+
+// =====================================================================
+// OBSTACLES. Each has parts (for hitting and standing on), z0/z1 measured from its near end.
+// walk = you can land and run on its top. Everything else you jump over or roll under.
+// =====================================================================
+const KINDS = {
+  bench: { len: 0.5, parts: [{ z0: 0, z1: 0.5, yb: 0, yt: 0.85 }] },
+  bin:   { len: 0.55, parts: [{ z0: 0, z1: 0.55, yb: 0, yt: 0.93 }] },
+  bar:   { len: 0.75, parts: [{ z0: 0, z1: 0.15, yb: 0.8, yt: 1.65 }] },
+  // council ute facing you: bonnet, cab, tray, then the mulch trailer behind it. Dodge it (or jump up onto the bonnet).
+  uteA:  { len: 10.2, ute: true, parts: [{ z0: 0, z1: 2.1, yb: 0, yt: 0.75, walk: 1 }, { z0: 2.1, z1: 3.6, yb: 0, yt: 1.35, walk: 1 },
+    { z0: 3.6, z1: 6.2, yb: 0, yt: 0.7, walk: 1 }, { z0: 6.2, z1: 10.2, yb: 0, yt: 1.15, walk: 1 }] },
+  // council ute driving away from you, mulch trailer first: jump onto the mulch and run over the whole thing
+  uteB:  { len: 10.1, ute: true, parts: [{ z0: 0, z1: 4.1, yb: 0, yt: 1.15, walk: 1 }, { z0: 4.1, z1: 6.5, yb: 0, yt: 1.15, walk: 1 },
+    { z0: 6.5, z1: 8.0, yb: 0, yt: 1.4, walk: 1 }, { z0: 8.0, z1: 10.1, yb: 0, yt: 0.75, walk: 1 }] },
+};
+function drawObstacle(o, z) {
+  const cx = o.lane;
+  switch (o.kind) {
+    case 'bench':
+      box(cx - 0.4, cx + 0.4, 0.42, 0.85, z + 0.42, z + 0.5, COL.wood, TEX.wood);
+      [cx - 0.36, cx + 0.31].forEach(x => box(x, x + 0.05, 0, 0.32, z + 0.05, z + 0.4, COL.metal));
+      box(cx - 0.42, cx + 0.42, 0.32, 0.42, z, z + 0.42, COL.wood, TEX.wood);
+      break;
+    case 'bin':
+      box(cx - 0.3, cx + 0.3, 0, 0.85, z, z + 0.55, COL.bin, TEX.bin);
+      box(cx - 0.33, cx + 0.33, 0.85, 0.93, z - 0.03, z + 0.55, COL.lid);
+      break;
+    case 'bar':
+      for (let k = 2; k >= 0; k--) box(cx - 0.5, cx + 0.5, 1.55, 1.65, z + 0.05 + k * 0.3, z + 0.15 + k * 0.3, COL.red);
+      box(cx - 0.5, cx - 0.42, 0, 1.65, z, z + 0.1, COL.blue); box(cx + 0.42, cx + 0.5, 0, 1.65, z, z + 0.1, COL.blue);
+      box(cx - 0.42, cx + 0.42, 0.8, 0.95, z, z + 0.1, COL.red);
+      break;
+    case 'uteA': {
+      box(cx - 0.4, cx + 0.4, 0.15, 0.95, z + 6.2, z + 10.2, COL.trailer, TEX.trailer); box(cx - 0.32, cx + 0.32, 0.95, 1.15, z + 6.3, z + 10.1, COL.mulch, TEX.mulch);
+      [6.6, 9.4].forEach(w => [cx - 0.42, cx + 0.34].forEach(x => box(x, x + 0.08, 0, 0.3, z + w, z + w + 0.4, COL.wheel)));
+      box(cx - 0.05, cx + 0.05, 0.2, 0.3, z + 5.9, z + 6.2, COL.metal);
+      [0.2, 3.9].forEach(w => [cx - 0.38, cx + 0.28].forEach(x => box(x, x + 0.1, 0, 0.3, z + w, z + w + 0.4, COL.wheel)));
+      box(cx - 0.45, cx + 0.45, 0.2, 0.7, z + 3.4, z + 5.9, COL.tray);
+      box(cx - 0.4, cx + 0.4, 0.75, 1.35, z + 1.9, z + 3.4, COL.cab, TEX.ute);
+      box(cx - 0.08, cx + 0.08, 1.35, 1.47, z + 2.4, z + 2.6, COL.beacon);
+      box(cx - 0.45, cx + 0.45, 0.2, 0.75, z, z + 2.1, COL.ute, TEX.grille);
+      break; }
+    case 'uteB': {
+      box(cx - 0.45, cx + 0.45, 0.2, 0.75, z + 8.0, z + 10.1, COL.ute);
+      [6.6, 9.4].forEach(w => [cx - 0.38, cx + 0.28].forEach(x => box(x, x + 0.1, 0, 0.3, z + w, z + w + 0.4, COL.wheel)));
+      box(cx - 0.4, cx + 0.4, 0.75, 1.4, z + 6.5, z + 8.0, COL.cab, TEX.cabBack);
+      box(cx - 0.08, cx + 0.08, 1.4, 1.52, z + 7.0, z + 7.2, COL.beacon);
+      box(cx - 0.45, cx + 0.45, 0.2, 0.7, z + 4.1, z + 6.5, COL.tray, TEX.tailgate);
+      box(cx - 0.4, cx + 0.4, 0.7, 1.15, z + 4.2, z + 6.4, COL.mulch, TEX.mulch);
+      box(cx - 0.05, cx + 0.05, 0.2, 0.3, z + 3.8, z + 4.1, COL.metal);
+      [0.4, 3.0].forEach(w => [cx - 0.42, cx + 0.34].forEach(x => box(x, x + 0.08, 0, 0.3, z + w, z + w + 0.4, COL.wheel)));
+      box(cx - 0.4, cx + 0.4, 0.15, 0.95, z, z + 3.9, COL.trailer, TEX.trailer);
+      box(cx - 0.32, cx + 0.32, 0.95, 1.15, z + 0.1, z + 3.8, COL.mulch, TEX.mulch);
+      break; }
+  }
+}
+
+// =====================================================================
+// SAVED RECORDS (localStorage). Every read and write is wrapped in
+// try/catch, so a private window or broken data never stops the game.
+// =====================================================================
+const STORE = { best: 'magpie_best_score', top: 'magpie_top_scores', seen: 'magpie_animals_seen', sound: 'magpie_sound' };
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; } catch (e) { return fallback; }
+}
+function saveJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+let best = +loadJSON(STORE.best, 0) || 0;
+let topScores = loadJSON(STORE.top, []);              // [{s: score, t: time}], highest first
+if (!Array.isArray(topScores)) topScores = [];
+topScores = topScores.filter(e => e && typeof e.s === 'number' && typeof e.t === 'number').slice(0, 5);
+let seen = loadJSON(STORE.seen, []);                  // field guide: animal ids ever spotted
+if (!Array.isArray(seen)) seen = [];
+seen = seen.filter(id => ANIMALS[id]);
+let soundOn = loadJSON(STORE.sound, true) !== false;
+
+// add this run to the Top 5. Equal scores keep the older one first, so the list never jumps around.
+function recordRun(score) {
+  const entry = { s: score, t: Date.now() };
+  topScores.push(entry);
+  topScores.sort((a, b) => b.s - a.s || a.t - b.t);
+  topScores = topScores.slice(0, 5);
+  saveJSON(STORE.top, topScores);
+  const rank = topScores.indexOf(entry);              // -1 when it did not make the list
+  let newBest = false;
+  if (score > best) { best = score; newBest = true; saveJSON(STORE.best, best); }
+  return { rank, newBest };
+}
+function clearRecords() {
+  best = 0; topScores = []; seen = [];
+  try { [STORE.best, STORE.top, STORE.seen].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+}
+// spot an animal: counts for this run, and for the field guide forever
+function markSeen(id) {
+  if (!G || state !== 'play' || G.seenRun.has(id)) return;
+  G.seenRun.add(id);
+  if (!seen.includes(id)) { seen.push(id); saveJSON(STORE.seen, seen); G.newAnimals.push(id); banner('NEW ANIMAL: ' + ANIMALS[id] + '!'); SFX.newAnimal(); }
+}
+
+// =====================================================================
+// 8-BIT SOUND (Web Audio, made on the fly, no sound files)
+// =====================================================================
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function beep(f1, f2, dur, vol = 0.12, type = 'square', delay = 0) {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(30, f2), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const SFX = {
+  jump() { beep(330, 660, 0.12); },
+  roll() { beep(500, 160, 0.16, 0.09, 'triangle'); },
+  lane() { beep(240, 300, 0.05, 0.05); },
+  bonk() { beep(140, 90, 0.08, 0.08); },
+  land() { beep(120, 80, 0.05, 0.05, 'triangle'); },
+  coin() { beep(990, 990, 0.05, 0.07); beep(1320, 1320, 0.1, 0.07, 'square', 0.05); },
+  flower() { [660, 880, 1175, 1568].forEach((f, i) => beep(f, f, 0.08, 0.07, 'square', i * 0.06)); },
+  mult() { beep(784, 1568, 0.2, 0.07, 'triangle'); },
+  // magpie: a warbling carol, then a sharp beak clack
+  magpie() { [880, 1175, 990, 1320, 1047].forEach((f, i) => beep(f, f * 1.08, 0.07, 0.05, 'triangle', i * 0.07)); },
+  clack() { beep(2200, 1800, 0.03, 0.08); beep(2200, 1800, 0.03, 0.08, 'square', 0.06); },
+  kooka() { for (let i = 0; i < 7; i++) beep(700 + (i % 2) * 300 + i * 40, 500 + i * 30, 0.07, 0.05, 'sawtooth', i * 0.08); },
+  hit() { beep(300, 60, 0.35, 0.15, 'sawtooth'); },
+  over() { [523, 392, 330, 262].forEach((f, i) => beep(f, f * 0.98, 0.18, 0.09, 'square', 0.3 + i * 0.16)); },
+  newAnimal() { [523, 659, 784, 1047].forEach((f, i) => beep(f, f, 0.08, 0.06, 'square', i * 0.07)); },
+};
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let state = 'title';               // 'title' | 'play' | 'pause' | 'dead'
+let G;                             // the current run
+function newRun() {
+  G = {
+    z: 0, speed: CONFIG.baseSpeed, time: 0, coins: 0, pts: 0, score: 0, mult: 1, cleanDist: 0,
+    p: { lane: 0, prevLane: 0, x: 0, y: 0, vy: 0, onGround: true, ground: 0, roll: 0, airRoll: false, buffer: 0, invuln: 0, anim: 0, laneT: 9 },
+    hits: 0, forget: 0, deadT: 0, magT: 1, magX: 0, magY: 0, shake: 0, magnet: 0,
+    objs: [], coinsList: [], flowers: [], nextRow: CONFIG.firstRow, uteEnd: [-99, -99, -99],
+    scen: [], nextScen: -4, nextLamp: 6, critters: [], loris: [], nextLori: rnd(6, 12), clouds: [],
+    banners: [], particles: [], seenRun: new Set(), newAnimals: [], result: null, endShown: false,
+  };
+  for (let i = 0; i < 5; i++) G.clouds.push({ x: rnd(-40, 260), y: rnd(10, 90), c: pick(CLOUDS), s: rnd(0.6, 1.6) });
+  while (G.nextScen < CONFIG.spawnAhead) spawnScenery();
+}
+const metres = () => Math.floor(G.z);
+const diff = () => Math.min(1, G.z / CONFIG.hardAt);
+function banner(s, col = '#f2c230') { G.banners.push({ s, t: 0, col }); }
+
+// ---------- building the park ahead ----------
+function weighted(list) { let sum = 0; for (const [, w] of list) sum += w; let r = Math.random() * sum;
+  for (const [v, w] of list) { if ((r -= w) < 0) return v; } return list[0][0]; }
+const SCEN_TYPES = [['gum', 6], ['wattle', 3], ['bbq', 1], ['slide', 1], ['climb', 1], ['swings', 1], ['roosign', 0.5], ['parksign', 0.4], ['paw', 3], ['fern', 3]];
+const propCache = {};
+function getProp(type) { // trees and flowers get a few variations, the rest are made once
+  const varied = ['gum', 'wattle', 'paw', 'fern'].includes(type), v = varied ? irnd(0, 5) : 0, key = type + v;
+  return propCache[key] || (propCache[key] = PROPS[type](v * 131 + type.length * 17 + 3));
+}
+function spawnScenery() {
+  const z = G.nextScen;
+  for (const side of [-1, 1]) {
+    if (Math.random() < 0.25) continue;
+    const type = weighted(SCEN_TYPES), img = getProp(type);
+    const small = type === 'paw' || type === 'fern', big = ['bbq', 'slide', 'climb', 'swings'].includes(type);
+    const x = side * (small ? rnd(1.9, 2.5) : big ? rnd(3.4, 5.2) : rnd(2.3, 5));
+    G.scen.push({ img, x, z: z + rnd(0, 1.5), animal: img.animal || null });
+  }
+  if (z >= G.nextLamp) {   // street lamps along the path, sometimes with a kookaburra on top
+    const side = Math.random() < 0.5 ? -1 : 1;
+    G.scen.push({ img: PROPS.lamp(), x: side * 1.95, z, kooka: Math.random() < 0.3, animal: null });
+    G.nextLamp = z + rnd(10, 16);
+  }
+  // animals out on the grass
+  if (z > 20 && Math.random() < 0.09) {
+    const kind = weighted([['kangaroo', 3], ['emu', 2], ['wombat', 2], ['echidna', 2]]), side = Math.random() < 0.5 ? -1 : 1;
+    const far = kind === 'kangaroo' || kind === 'emu';
+    G.critters.push({ kind, x: side * (far ? rnd(3.5, 6) : rnd(2.1, 2.8)), z: z + rnd(0, 2), dir: Math.random() < 0.5 ? -1 : 1, t: rnd(0, 3) });
+  }
+  G.nextScen += rnd(1.6, 3.0);
+}
+// how high the top of the things in a lane is at z (for laying gold on them)
+function surfaceAt(lane, z) {
+  let top = 0, jump = null;
+  for (const o of G.objs) { if (o.lane !== lane) continue;
+    for (const p of KINDS[o.kind].parts) if (z >= o.z + p.z0 - 0.15 && z <= o.z + p.z1 + 0.15) { if (p.walk) top = Math.max(top, p.yt); }
+    if (!KINDS[o.kind].ute && o.kind !== 'bar' && Math.abs(z - (o.z + 0.25)) < 2.6) jump = o; }
+  return { top, jump };
+}
+function spawnRow() {
+  const z = G.nextRow, d = diff(), m = z;
+  const free = [-1, 0, 1].filter(l => G.uteEnd[l + 1] < z - 0.5);
+  let n = 1;
+  if (m > 40 && Math.random() < 0.25 + d * 0.5) n = 2;
+  if (m > 500 && Math.random() < d * 0.45) n = 3;
+  n = Math.min(n, free.length);
+  free.sort(() => Math.random() - 0.5);
+  const chosen = free.slice(0, n);
+  for (const lane of chosen) {
+    const opts = [['bench', 3], ['bin', 2]];
+    if (m > CONFIG.barFrom) opts.push(['bar', 2.5]);
+    if (m > CONFIG.uteFrom) opts.push(['uteB', 1.6 + d]);
+    if (m > CONFIG.uteFacingFrom) opts.push(['uteA', 1 + d * 1.5]);
+    let kind = weighted(opts);
+    if (KINDS[kind].ute) {
+      // a lane with no ute must always be open to run along: one ute lane at a time,
+      // later two at once but only in the side lanes, so the middle lane is always reachable
+      const others = [-1, 0, 1].filter(l => l !== lane && (G.uteEnd[l + 1] > z - 0.5));
+      const ok = others.length === 0 || (m > CONFIG.twoUtesFrom && others.length === 1 && lane !== 0 && others[0] !== 0);
+      if (!ok) kind = Math.random() < 0.5 ? 'bench' : 'bar';
+    }
+    if (kind === 'bar' && m <= CONFIG.barFrom) kind = 'bin';
+    const o = { kind, lane, z, ghost: false };
+    G.objs.push(o);
+    if (KINDS[kind].ute) G.uteEnd[lane + 1] = z + KINDS[kind].len;
+  }
+  // next row: the gap (in seconds of running) shrinks as the run gets harder
+  const a = CONFIG.rowGapTime, b = CONFIG.rowGapTimeHard;
+  const gapT = rnd(a[0] + (b[0] - a[0]) * d, a[1] + (b[1] - a[1]) * d);
+  let next = z + Math.max(CONFIG.minRowGap, gapT * G.speed);
+  G.nextRow = next;
+  // gold blocks between this row and the next, in one lane: on top of utes, in arcs over benches and bins
+  if (Math.random() < CONFIG.coinChance) {
+    const utes = chosen.filter(l => G.objs.some(o => o.lane === l && o.z === z && o.kind === 'uteB'));
+    const lane = utes.length && Math.random() < 0.7 ? utes[0] : irnd(-1, 1);
+    for (let cz = z - 2; cz < next - 1.5; cz += CONFIG.coinSpacing) {
+      const s = surfaceAt(lane, cz);
+      let y = s.top + 0.45;
+      if (s.jump && !s.top) { const dz = (cz - (s.jump.z + 0.25)) / 2.6; y = Math.max(y, 0.45 + 1.0 * (1 - dz * dz)); }
+      if (G.objs.some(o => o.lane === lane && o.kind === 'bar' && Math.abs(cz - o.z) < 0.6)) y = 0.35;
+      G.coinsList.push({ lane, z: cz, y, taken: false, t: 0 });
+    }
+  } else if (z > CONFIG.magnetFrom && Math.random() < CONFIG.magnetChance / (1 - CONFIG.coinChance)) {
+    const lane = irnd(-1, 1), fz = (z + next) / 2, s = surfaceAt(lane, fz);
+    G.flowers.push({ lane, z: fz, y: s.top + 0.3, taken: false });
+  }
+}
+
+// =====================================================================
+// INPUT ACTIONS
+// =====================================================================
+function moveLane(dir) {
+  const p = G.p, to = p.lane + dir;
+  if (to < -1 || to > 1) { SFX.bonk(); G.shake = 0.12; return; }
+  p.prevLane = p.lane; p.lane = to; p.laneT = 0; SFX.lane();
+}
+function jump() {
+  const p = G.p;
+  if (p.onGround) { p.vy = CONFIG.jumpVelocity; p.onGround = false; p.roll = 0; p.airRoll = false; p.buffer = 0; SFX.jump(); }
+  else p.buffer = CONFIG.jumpBuffer;
+}
+function roll() {
+  const p = G.p;
+  if (p.onGround) { p.roll = CONFIG.rollTime; SFX.roll(); }
+  else { p.vy = Math.min(p.vy, -CONFIG.fastDrop); p.airRoll = true; p.buffer = 0; SFX.roll(); }
+}
+function act(a) {
+  if (state === 'title') { start(); return; }
+  if (state === 'pause') { resume(); return; }
+  if (state !== 'play') return;
+  if (a === 'left') moveLane(-1); else if (a === 'right') moveLane(1); else if (a === 'up') jump(); else if (a === 'down') roll();
+}
+function start() { audio(); newRun(); state = 'play'; showEnd(false); setPlaying(true); SFX.magpie(); markSeenSoon = 0.4; }
+let markSeenSoon = 0;
+function pause() { if (state !== 'play') return; state = 'pause'; setPlaying(false); }
+function resume() { if (state !== 'pause') return; state = 'play'; setPlaying(true); last = 0; }
+
+// =====================================================================
+// UPDATE
+// =====================================================================
+function update(dt) {
+  for (const c of G.clouds) { c.x -= c.s * dt; if (c.x < -60) { c.x = W + rnd(0, 40); c.y = rnd(10, 90); c.c = pick(CLOUDS); } }
+  updateLoris(dt);
+  if (state === 'title') { G.z += 2.5 * dt; scrollWorld(); G.p.anim += dt * 5; return; }
+  if (state === 'pause') return;
+  if (state === 'dead') {
+    G.deadT += dt; G.speed = Math.max(0, G.speed - 30 * dt); G.z += G.speed * dt; G.shake = Math.max(0, G.shake - dt);
+    G.magT = 1; scrollWorld(); updateFx(dt); return;
+  }
+  const p = G.p;
+  G.time += dt;
+  if (markSeenSoon > 0 && (markSeenSoon -= dt) <= 0) markSeen('magpie');
+  G.speed = Math.min(CONFIG.maxSpeed, CONFIG.baseSpeed + G.z * CONFIG.speedRamp);
+  const dz = G.speed * dt;
+  G.z += dz; G.cleanDist += dz;
+  // score: distance times the multiplier, which grows the longer you go without a hit
+  const mult = 1 + Math.min(CONFIG.multMax - 1, Math.floor(G.cleanDist / CONFIG.multEvery));
+  if (mult > G.mult) { banner('X' + mult + ' MULTIPLIER!', '#ff9a3c'); SFX.mult(); }
+  G.mult = mult;
+  G.pts += dz * G.mult; G.score = Math.floor(G.pts);
+
+  // sliding between lanes
+  p.laneT += dt;
+  const step = dt / CONFIG.laneTime;
+  if (Math.abs(p.lane - p.x) <= step) p.x = p.lane; else p.x += Math.sign(p.lane - p.x) * step;
+  p.anim += dt * G.speed * 0.9;
+  if (p.roll > 0) p.roll -= dt;
+  if (p.invuln > 0) p.invuln -= dt;
+  if (p.buffer > 0) p.buffer -= dt;
+  G.shake = Math.max(0, G.shake - dt);
+  if (G.magnet > 0) G.magnet -= dt;
+
+  // up and down: gravity, then stand on whatever is under you (ground, mulch, ute roofs)
+  if (!p.onGround) { p.vy -= CONFIG.gravity * dt; p.y += p.vy * dt; }
+  const res = probe();
+  if (p.onGround) {
+    if (res.ground > p.y) p.y = res.ground;                       // a small step up
+    else if (res.ground < p.y - 0.01) { p.onGround = false; p.vy = 0; } // ran off the end of a ute
+  } else if (p.y <= res.ground && p.vy <= 0) {
+    p.y = res.ground; p.vy = 0; p.onGround = true; SFX.land();
+    if (p.airRoll) { p.airRoll = false; p.roll = CONFIG.rollTime; }
+    if (p.buffer > 0) jump();
+  }
+  p.ground = res.ground;
+  if (res.hit) hitThing(res.hit);
+
+  // the magpie forgets you after a while
+  if (G.hits > 0 && G.hits < CONFIG.hitsToCatch) { G.forget -= dt; if (G.forget <= 0) G.hits = 0; }
+  const magWant = G.time < 2.2 || G.hits > 0 ? 1 : 0;
+  G.magT += (magWant - G.magT) * Math.min(1, dt * (magWant ? 4 : 1.5));
+
+  // gold
+  const pz = G.z + RUNNER_Z, ph = (p.roll > 0 || p.airRoll) ? CONFIG.rollHeight : CONFIG.standHeight;
+  for (const c of G.coinsList) {
+    if (c.taken) { c.t += dt; continue; }
+    const near = Math.abs(c.lane - p.x) < 0.55 && Math.abs(c.z - pz) < 0.45 && c.y > p.y - 0.25 && c.y < p.y + ph + 0.35;
+    const pulled = G.magnet > 0 && c.z - pz < CONFIG.magnetReach && c.z - pz > -0.5;
+    if (near || pulled) { c.taken = true; c.t = 0; G.coins++; G.pts += CONFIG.coinPoints * G.mult; SFX.coin(); }
+  }
+  for (const f of G.flowers) {
+    if (f.taken) continue;
+    if (Math.abs(f.lane - p.x) < 0.55 && Math.abs(f.z - pz) < 0.5 && f.y > p.y - 0.3 && f.y < p.y + ph + 0.3) {
+      f.taken = true; G.magnet = CONFIG.magnetTime; SFX.flower(); banner('GOLD MAGNET!', '#ff8080');
+      if (Math.random() < 0.5) SFX.kooka();
+    }
+  }
+  scrollWorld();
+  // animals you run past go in the field guide
+  for (const s of G.scen) { const rz = s.z - CAMZ;
+    if (rz > 2 && rz < 12) { if (s.animal) markSeen(s.animal); if (s.kooka) markSeen('kookaburra'); } }
+  for (const c of G.critters) { const rz = c.z - CAMZ; if (rz > 2 && rz < 14) markSeen(c.kind); }
+  updateCritters(dt);
+  updateFx(dt);
+}
+// what is under and around the runner: the ground height, and anything they run into
+function probe() {
+  const p = G.p, pz = G.z + RUNNER_Z, L = Math.round(p.x);
+  const ph = (p.roll > 0 || p.airRoll) ? CONFIG.rollHeight : CONFIG.standHeight;
+  let ground = 0, hit = null;
+  for (const o of G.objs) {
+    if (o.lane !== L || o.ghost) continue;
+    for (const part of KINDS[o.kind].parts) {
+      const z0 = o.z + part.z0, z1 = o.z + part.z1;
+      if (z1 < pz - 0.15 || z0 > pz + 0.15) continue;
+      if (part.walk && p.y >= part.yt - CONFIG.stepUp) { ground = Math.max(ground, part.yt); continue; }
+      if (p.y >= part.yt - CONFIG.graceY) continue;          // over it
+      if (p.y + ph <= part.yb + CONFIG.graceY) continue;     // under it
+      hit = { o, side: z0 < pz - 0.3 };
+    }
+  }
+  return { ground, hit };
+}
+function hitThing(h) {
+  const p = G.p;
+  if (h.side) { p.lane = p.prevLane; }                     // bumped the side of a ute: back to your lane
+  else h.o.ghost = true;                                   // ran into it: you stumble through
+  if (p.invuln > 0) return;
+  G.hits++; G.forget = CONFIG.magpieForget; p.invuln = CONFIG.invulnTime; G.cleanDist = 0; G.mult = 1;
+  G.shake = 0.3; SFX.hit();
+  for (let i = 0; i < 10; i++) G.particles.push({ x: W / 2 + rnd(-10, 10), y: H * 0.72 + rnd(-20, 10), vx: rnd(-60, 60), vy: rnd(-90, -20), life: 0.6, col: pick(['#ffffff', '#f2c230', '#c9b48a']) });
+  if (G.hits >= CONFIG.hitsToCatch) caught();
+  else { banner('WATCH OUT! THE MAGPIE!', '#ff6a5a'); setTimeout(() => state === 'play' && SFX.magpie(), 150); }
+}
+function caught() {
+  state = 'dead'; G.deadT = 0; G.result = recordRun(G.score); setPlaying(false);
+  SFX.clack(); SFX.over();
+}
+function scrollWorld() {
+  CAMZ = G.z;
+  const pz = G.z;
+  if (state !== 'title') while (G.nextRow < G.z + CONFIG.spawnAhead) spawnRow();
+  while (G.nextScen < G.z + CONFIG.spawnAhead) spawnScenery();
+  G.objs = G.objs.filter(o => o.z + KINDS[o.kind].len > pz - 2);
+  G.coinsList = G.coinsList.filter(c => c.z > pz - 1 && !(c.taken && c.t > 0.4));
+  G.flowers = G.flowers.filter(f => f.z > pz - 1 && !f.taken);
+  G.scen = G.scen.filter(s => s.z > pz - 1);
+  G.critters = G.critters.filter(c => c.z > pz - 1);
+  // camera follows the runner across and gently up onto utes
+  const p = G.p;
+  CAMX += (p.x * 0.75 - CAMX) * 0.18;
+  CAMY += (2.3 + p.ground * 0.7 - CAMY) * 0.08;
+}
+function updateCritters(dt) {
+  for (const c of G.critters) {
+    c.t += dt;
+    if (c.kind === 'kangaroo') c.x += c.dir * 1.6 * dt;
+    else if (c.kind === 'emu') c.x += c.dir * 0.8 * dt;
+    else c.x += c.dir * 0.15 * dt;
+  }
+}
+function updateLoris(dt) {   // rainbow lorikeets flying across the sky now and then
+  if (!G) return;
+  if ((G.nextLori -= dt) <= 0 && state !== 'title') {
+    const dir = Math.random() < 0.5 ? -1 : 1, y = rnd(30, 90);
+    for (let i = 0; i < irnd(3, 6); i++) G.loris.push({ x: dir > 0 ? -10 - i * 9 : W + 10 + i * 9, y: y + rnd(-8, 8), dir, t: rnd(0, 1) });
+    G.nextLori = rnd(14, 24);
+  }
+  for (const l of G.loris) { l.x += l.dir * 38 * dt; l.t += dt; if (l.x > 10 && l.x < W - 10) markSeen('lorikeet'); }
+  G.loris = G.loris.filter(l => l.x > -80 && l.x < W + 80);
+}
+function updateFx(dt) {
+  for (const q of G.particles) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 200 * dt; q.life -= dt; }
+  G.particles = G.particles.filter(q => q.life > 0);
+  for (const b of G.banners) b.t += dt;
+  G.banners = G.banners.filter(b => b.t < 2);
+}
+
+// =====================================================================
+// DRAWING
+// =====================================================================
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, HY); g.addColorStop(0, '#5ea8ec'); g.addColorStop(1, '#c4e6ff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, HY + 1);
+  px(ctx, '#fff3a0', W - 56, 16, 16, 16); px(ctx, '#ffe066', W - 54, 18, 12, 12);
+  for (const c of G.clouds) ctx.drawImage(c.c, Math.round(c.x), Math.round(c.y));
+  const hx = -Math.round(CAMX * 6);
+  ctx.drawImage(HILLS_FAR, hx - 210, HY - 70); ctx.drawImage(HILLS_NEAR, hx - 150, HY - 66);
+  for (const l of G.loris) ctx.drawImage(Math.floor(l.t * 8) % 2 ? SPR.lori1 : SPR.lori2, Math.round(l.x), Math.round(l.y));
+}
+// the ground pixel by pixel: three lanes of stone blocks, wooden kerbs, grass blocks either side
+let groundImg = null, rowZ = null, rowT = null;
+const STONE = ['#b0a897', '#a39b8a', '#978f7e'].map(hex), GRASS = ['g', '#57a035', 'G'].map(hex), KERB = ['b', 'B'].map(hex), LINE = hex('#7d7666');
+function drawGround() {
+  const rows = H - HY;
+  if (!groundImg || groundImg.width !== W || groundImg.height !== rows) { groundImg = ctx.createImageData(W, rows); rowZ = new Float32Array(rows); rowT = new Float32Array(rows); }
+  const d = groundImg.data, scroll = CAMZ;
+  for (let r = 0; r < rows; r++) {
+    const z = FOC * CAMY / (r + 0.5), t = Math.max(0, Math.min(0.8, (z - 16) / 26)), bz = Math.floor((z + scroll) * 2), kz = Math.floor((z + scroll) * 3) & 1;
+    const lineW = 0.025 + z * 0.002, k = z / FOC;
+    let i = r * W * 4;
+    for (let sx = 0; sx < W; sx++, i += 4) {
+      const x = (sx - W / 2) * k + CAMX, ax = x < 0 ? -x : x, bx = Math.floor(x * 2), h = hash(bx, bz);
+      let c;
+      if (ax < 1.5) { c = Math.abs(ax - 0.5) < lineW ? LINE : STONE[(bx + bz & 1) + (h % 5 === 0 ? 1 : 0)]; }
+      else if (ax < 1.68) c = KERB[kz];
+      else c = GRASS[(bx + bz & 1) + (h % 7 === 0 ? 1 : 0)];
+      d[i] = c[0] + (FOG[0] - c[0]) * t; d[i + 1] = c[1] + (FOG[1] - c[1]) * t; d[i + 2] = c[2] + (FOG[2] - c[2]) * t; d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(groundImg, 0, HY);
+}
+function drawWorld() {
+  const list = [];
+  const pzRel = RUNNER_Z;
+  for (const s of G.scen) { const z = s.z - CAMZ; if (z > 0.8 && z < 48) list.push({ k: z, f: () => {
+    bill(s.img, s.x, z); if (s.kooka) bill(SPR.kooka, s.x, z - 0.02, 1.85); } }); }
+  for (const c of G.critters) { const z = c.z - CAMZ; if (z > 0.8 && z < 48) list.push({ k: z, f: () => {
+    let img, y = 0;
+    if (c.kind === 'kangaroo') { const ph = (c.t * 1.6) % 1, up = ph < 0.6; y = up ? Math.sin(ph / 0.6 * Math.PI) * 0.5 : 0; img = up ? (c.dir > 0 ? SPR.roo2 : SPR.roo2L) : (c.dir > 0 ? SPR.roo1 : SPR.roo1L); }
+    else if (c.kind === 'emu') { const f = Math.floor(c.t * 4) % 2; img = c.dir > 0 ? EMU[f] : EMU_L[f]; }
+    else img = c.dir > 0 ? SPR[c.kind] : mirrorOnce(SPR[c.kind]);
+    bill(img, c.x, z, y); } }); }
+  for (const o of G.objs) {
+    const z = o.z - CAMZ, len = KINDS[o.kind].len;
+    if (z + len < NEAR || z > 48) continue;
+    const key = z < pzRel && z + len > pzRel ? pzRel + 0.01 : z;    // a ute you are next to or on is drawn before you
+    o.key = key;
+    list.push({ k: key, f: () => { if (o.ghost && Math.floor(G.time * 12) % 2) mx.globalAlpha = 0.45; drawObstacle(o, z); mx.globalAlpha = 1; } });
+  }
+  for (const c of G.coinsList) {
+    const z = c.z - CAMZ; if (z < 0.5 || z > 46) continue;
+    // gold lying on a ute is drawn right after that ute, so it is never hidden under it
+    const on = c.y > 0.9 ? G.objs.find(o => o.lane === c.lane && KINDS[o.kind].ute && c.z >= o.z - 0.2 && c.z <= o.z + KINDS[o.kind].len + 0.2) : null;
+    const key = on && on.key !== undefined ? on.key - 0.001 : z;
+    list.push({ k: key, f: () => {
+      let y = c.y, zz = z, x = c.lane;
+      if (c.taken) { const t = c.t / 0.4; y += t * 1.2; zz = RUNNER_Z + (z - RUNNER_Z) * (1 - t); x = c.lane + (G.p.x - c.lane) * t; }
+      const w = 0.12 * Math.max(0.25, Math.abs(Math.cos(G.time * 4 + c.z))), b = Math.sin(G.time * 5 + c.z) * 0.04;
+      box(x - w, x + w, y + b, y + 0.24 + b, zz, zz + 0.2, COL.gold, TEX.gold); } });
+  }
+  for (const f of G.flowers) { const z = f.z - CAMZ; if (z < 0.8 || z > 46) continue;
+    list.push({ k: z, f: () => bill(FLOWER_BIG, f.lane, z, f.y + Math.sin(G.time * 4) * 0.05, 2.2) }); }
+  list.push({ k: pzRel, f: drawRunner });
+  list.sort((a, b) => b.k - a.k);
+  for (const t of list) t.f();
+}
+const MIRRORED = new Map();
+function mirrorOnce(img) { let m = MIRRORED.get(img); if (!m) MIRRORED.set(img, m = mirror(img)); return m; }
+function drawRunner() {
+  const p = G.p, dead = state === 'dead';
+  if (p.invuln > 0 && !dead && Math.floor(p.invuln * 14) % 2) return;     // blink while safe after a hit
+  let img = RUNNER.run[Math.floor(p.anim) % 2];
+  if (state === 'title') img = RUNNER.run[Math.floor(p.anim) % 2];
+  if (!p.onGround && state !== 'title') img = RUNNER.jump;
+  if (p.roll > 0 || p.airRoll) img = RUNNER.roll;
+  if (dead) img = RUNNER.jump;
+  const s = FOC / RUNNER_Z / 24 * 0.95;
+  const [sx, sy] = proj(p.x, p.y, RUNNER_Z), [gx, gy] = proj(p.x, p.ground, RUNNER_Z);
+  ctx.globalAlpha = 0.3; ctx.fillStyle = '#000'; const shw = Math.round(14 * s / 2.4 * Math.max(0.5, 1 - (p.y - p.ground) * 0.3));
+  ctx.fillRect(Math.round(gx - shw / 2), Math.round(gy - 2), shw, 3); ctx.globalAlpha = 1;
+  const w = Math.round(img.width * s), h = Math.round(img.height * s);
+  const lean = (p.lane - p.x) * 6;
+  ctx.drawImage(img, Math.round(sx - w / 2 + lean), Math.round(sy - h), w, h);
+}
+// the magpie: right behind you after a hit (and at the start), dropping back when it forgets you
+function drawMagpie() {
+  if (G.magT < 0.02) return;
+  const p = G.p, [rx, ry] = proj(p.x, p.y, RUNNER_Z), s = Math.max(2, Math.round(FOC / RUNNER_Z / 24));
+  const img = MAGPIE[Math.floor(G.time * 7 + (state === 'dead' ? G.deadT * 8 : 0)) % 2];
+  let x, y;
+  if (state === 'dead') {   // swoops onto your hat
+    const t = Math.min(1, G.deadT / 0.5);
+    x = rx - img.width * s / 2 + (1 - t) * -60; y = ry - 34 * s * 0.95 - img.height * s * 0.6 + (1 - t) * 40;
+  } else {
+    const k = G.magT, bob = Math.sin(G.time * 6) * 6;
+    x = rx - 46 - img.width * s / 2 - (1 - k) * 120; y = ry - 70 + bob + (1 - k) * 160;
+  }
+  ctx.drawImage(img, Math.round(x), Math.round(y), img.width * s, img.height * s);
+}
+function panel(x, y, w, h, alpha = 0.9) {
+  ctx.globalAlpha = alpha;
+  px(ctx, '#1b1b20', x - 1, y - 1, w + 2, h + 2); px(ctx, '#c6c6c6', x, y, w, h);
+  px(ctx, '#ffffff', x, y, w, 1); px(ctx, '#ffffff', x, y, 1, h); px(ctx, '#555555', x, y + h - 1, w, 1); px(ctx, '#555555', x + w - 1, y, 1, h);
+  ctx.globalAlpha = 1;
+}
+const pad0 = (n, k) => String(n).padStart(k, '0'), pad = (n, k) => String(n).padStart(k, ' ');
+const isTouch = matchMedia('(pointer: coarse)').matches;
+const PAUSE_BTN = { x: 6, y: 25, w: 15, h: 15 };
+function drawHud() {
+  if (state === 'title') { drawTitle(); return; }
+  if (state === 'dead' && G.deadT > 0.9) { drawGameOver(); return; }
+  // gold and pause (top left), score and multiplier (top right)
+  panel(6, 6, 50, 14); ctx.drawImage(SPR.coin, 9, 9); drawText(ctx, G.coins, 21, 10, '#1b1b20', 1, 'left', null);
+  panel(PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h); px(ctx, '#1b1b20', 10, 29, 2, 7); px(ctx, '#1b1b20', 15, 29, 2, 7);
+  panel(W - 62, 6, 56, 25); drawText(ctx, pad0(G.score, 6), W - 34, 9, '#1b1b20', 1, 'center', null);
+  drawText(ctx, 'X' + G.mult, W - 34, 20, G.mult > 1 ? '#c05a12' : '#8a8a8a', 1, 'center', null);
+  drawText(ctx, metres() + 'M', W - 34, 36, '#ffffff', 1, 'center');
+  if (G.magnet > 0) { panel(6, 45, 50, 9); px(ctx, '#d23a2a', 8, 47, Math.round(46 * G.magnet / CONFIG.magnetTime), 5); }
+  if (G.hits > 0 && G.hits < CONFIG.hitsToCatch && state === 'play' && !G.banners.length) {
+    const blink = G.forget < 2 ? Math.floor(G.time * 6) % 2 : 1;
+    if (blink) drawText(ctx, 'MAGPIE!', W / 2, 46, '#ff5a4a', 1, 'center', '#3a0a00');
+  }
+  if (state === 'play' && G.time < 3.2) {
+    drawText(ctx, 'RUN!', W / 2, 70, '#ffffff', 3, 'center');
+    drawText(ctx, isTouch ? 'SWIPE TO DODGE' : 'ARROWS OR WASD', W / 2, 96, '#ffffff', 1, 'center');
+  }
+  G.banners.forEach((b, i) => drawText(ctx, b.s, W / 2, 58 + i * 11 - Math.min(4, b.t * 20), b.col, 1, 'center', '#3a2a00'));
+  for (const q of G.particles) px(ctx, q.col, Math.round(q.x), Math.round(q.y), 2, 2);
+  if (state === 'pause') {
+    ctx.globalAlpha = 0.55; px(ctx, '#000000', 0, 0, W, H); ctx.globalAlpha = 1;
+    drawText(ctx, 'PAUSED', W / 2, H * 0.36, '#ffffff', 3, 'center');
+    if (Math.floor(performance.now() / 500) % 2) drawText(ctx, isTouch ? 'TAP TO KEEP RUNNING' : 'TAP OR PRESS P TO GO ON', W / 2, H * 0.36 + 32, '#fff3a0', 1, 'center');
+  }
+  if (CONFIG.DEBUG) drawDebug();
+}
+function drawTitle() {
+  const y0 = Math.round(H * 0.17);
+  ctx.globalAlpha = 0.45; px(ctx, '#000000', 0, y0 + 66, W, 112); ctx.globalAlpha = 1;
+  drawText(ctx, 'MAGPIE', W / 2, y0, '#ffffff', 4, 'center', '#1b1b20');
+  drawText(ctx, 'DASH', W / 2, y0 + 32, '#f2c230', 4, 'center', '#4a2f1c');
+  const L = isTouch
+    ? ['SWIPE LEFT / RIGHT = CHANGE LANE', 'SWIPE UP = JUMP   DOWN = ROLL']
+    : ['ARROWS OR WASD TO MOVE', 'UP = JUMP   DOWN = ROLL'];
+  const lines = [...L, '', 'JUMP BENCHES AND BINS', 'ROLL UNDER THE RED BARS', 'DODGE UTES OR RUN ON THE MULCH', '2 HITS AND THE MAGPIE GETS YOU!'];
+  lines.forEach((s, i) => drawText(ctx, s, W / 2, y0 + 72 + i * 11, i >= 3 ? '#d8ffd0' : '#ffffff', 1, 'center'));
+  if (Math.floor(performance.now() / 500) % 2) drawText(ctx, isTouch ? 'TAP TO START' : 'PRESS SPACE OR CLICK', W / 2, y0 + 72 + 8 * 11, '#fff3a0', 1, 'center');
+  drawText(ctx, (best ? 'BEST ' + best + '   ' : '') + 'ANIMALS ' + seen.length + '/' + Object.keys(ANIMALS).length, W / 2, y0 + 72 + 9 * 11 + 4, '#ffffff', 1, 'center');
+}
+function drawGameOver() {
+  const r = G.result || { rank: -1, newBest: false }, total = Object.keys(ANIMALS).length;
+  const pw = Math.min(180, W - 20), x = Math.round(W / 2 - pw / 2);
+  let y = Math.round(H * 0.15);
+  panel(x, y, pw, 92);
+  drawText(ctx, 'THE MAGPIE GOT YOU!', W / 2, y + 6, '#d23a2a', 1, 'center', '#5a1a14');
+  drawText(ctx, 'SCORE', W / 2, y + 19, '#555555', 1, 'center', null);
+  drawText(ctx, G.score, W / 2, y + 30, '#1b1b20', 2, 'center', null);
+  if (r.newBest && Math.floor(G.deadT * 3) % 2 === 0) drawText(ctx, 'NEW RECORD!', W / 2, y + 49, '#c08a12', 1, 'center', '#6e4e28');
+  else drawText(ctx, 'BEST ' + best, W / 2, y + 49, '#555555', 1, 'center', null);
+  const line = metres() + 'M   ' + G.coins;
+  drawText(ctx, line, W / 2 - 5, y + 62, '#555555', 1, 'center', null);
+  ctx.drawImage(SPR.coin, Math.round(W / 2 - 5 + textWidth(line) / 2 + 2), y + 61);
+  drawText(ctx, 'ANIMALS ' + seen.length + '/' + total, W / 2, y + 76, '#2f7a3a', 1, 'center', null);
+  y += 100;
+  panel(x, y, pw, 74);
+  drawText(ctx, 'TOP 5', W / 2, y + 5, '#1b1b20', 1, 'center', null);
+  for (let i = 0; i < 5; i++) {
+    const e = topScores[i], yy = y + 18 + i * 11, mine = i === r.rank;
+    if (mine) { ctx.globalAlpha = 0.9; px(ctx, '#f2c230', x + 3, yy - 2, pw - 6, 11); ctx.globalAlpha = 1; }
+    drawText(ctx, (i + 1) + '.', x + 12, yy, mine ? '#1b1b20' : '#555555', 1, 'left', null);
+    drawText(ctx, e ? pad(e.s, 7) : '      -', x + pw - 12, yy, mine ? '#1b1b20' : '#555555', 1, 'right', null);
+  }
+  if (G.newAnimals.length) drawText(ctx, G.newAnimals.length === 1 ? 'NEW ANIMAL: ' + ANIMALS[G.newAnimals[0]] : 'NEW ANIMALS +' + G.newAnimals.length, W / 2, y + 82, '#d8ffd0', 1, 'center');
+  if (G.deadT > 1.2 && !isTouch) drawText(ctx, 'SPACE TO RUN AGAIN', W / 2, y + 96, '#ffffff', 1, 'center');
+}
+let fps = 60;
+function drawDebug() {
+  const p = G.p, ph = (p.roll > 0 || p.airRoll) ? CONFIG.rollHeight : CONFIG.standHeight;
+  ctx.strokeStyle = '#ff00ff'; ctx.lineWidth = 1;
+  const [ax, ay] = proj(p.x - 0.25, p.y + ph, RUNNER_Z), [bx, by] = proj(p.x + 0.25, p.y, RUNNER_Z);
+  ctx.strokeRect(Math.round(ax) + 0.5, Math.round(ay) + 0.5, Math.round(bx - ax), Math.round(by - ay));
+  drawText(ctx, 'FPS ' + Math.round(fps) + ' SPD ' + G.speed.toFixed(1) + ' Y ' + p.y.toFixed(2), 4, H - 10, '#ff00ff', 1, 'left', '#000');
+}
+function draw() {
+  ctx.imageSmoothingEnabled = false; mx = ctx;
+  ctx.save();
+  if (G.shake > 0) ctx.translate(Math.round(rnd(-2, 2)), Math.round(rnd(-2, 2)));
+  drawSky(); drawGround(); drawWorld(); drawMagpie();
+  ctx.restore();
+  if (!window.__noHud) drawHud();
+}
+
+// =====================================================================
+// LOOP: fixed physics steps, so jumps are the same on every screen
+// =====================================================================
+let last = 0, acc = 0;
+function frame(now) {
+  if (!last) last = now;
+  const dt = Math.max(0, Math.min(CONFIG.maxDelta, (now - last) / 1000)); last = now;
+  if (dt > 0) fps += (1 / dt - fps) * 0.05;
+  acc += dt;
+  while (acc >= CONFIG.fixedStep) { update(CONFIG.fixedStep); acc -= CONFIG.fixedStep; }
+  draw();
+  if (state === 'dead' && G.deadT > 1 && !G.endShown) { G.endShown = true; showEnd(true); }
+  requestAnimationFrame(frame);
+}
+
+// =====================================================================
+// SCREEN SIZE: a tall picture. Phones upright fill the screen; wide screens get the park in the middle.
+// =====================================================================
+function resize() {
+  const vw = window.innerWidth, vh = window.innerHeight, a = vw / vh;
+  if (a < 216 / 384) { W = 216; H = Math.min(468, Math.round(216 / a)); }
+  else { H = 384; W = Math.min(288, Math.round(384 * a)); }
+  HY = Math.round(H * 0.365); FOC = 230;
+  cv.width = W; cv.height = H;
+  const s = Math.min(vw / W, vh / H);
+  cv.style.width = Math.floor(W * s) + 'px'; cv.style.height = Math.floor(H * s) + 'px';
+  ctx.imageSmoothingEnabled = false;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+// the bars around the game on wide screens are grass blocks instead of plain black
+(function borderPattern() {
+  const [c, x] = makeCanvas(32, 32);
+  x.drawImage(TILES.grass[0], 0, 0); x.drawImage(TILES.grass[1], 16, 0); x.drawImage(TILES.dirt[2], 0, 16); x.drawImage(TILES.dirt[0], 16, 16);
+  x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, 0, 32, 32);
+  const [b] = makeCanvas(128, 128); const bx = b.getContext('2d'); bx.imageSmoothingEnabled = false; bx.drawImage(c, 0, 0, 128, 128);
+  document.body.style.background = `#2b1d12 url(${b.toDataURL()}) repeat`;
+})();
+function setPlaying(on) { document.body.classList.toggle('playing', on); }
+
+// =====================================================================
+// INPUT: keyboard, swipes (touch and mouse drag)
+// =====================================================================
+const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down' };
+window.addEventListener('keydown', e => {
+  if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); if (state === 'play') pause(); else if (state === 'pause') resume(); return; }
+  if ((e.code === 'Space' || e.code === 'Enter') && state === 'dead' && G.deadT > 1.2) { e.preventDefault(); start(); return; }
+  const a = KEYMAP[e.code] || (e.code === 'Enter' ? 'up' : null);
+  if (a) { e.preventDefault(); if (!e.repeat) { audio(); act(a); } }
+});
+let triedFs = false, swipe = null;
+const SWIPE_PX = 22;
+function toCanvas(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+// MOBILE: swipe anywhere on the screen. preventDefault stops scrolling, zooming and the long-press menu.
+function onDown(e) {
+  if (e.target.closest && e.target.closest('.mc, #fsHelp, #emilyShare')) return;
+  e.preventDefault(); audio();
+  if (isTouch && !triedFs) { triedFs = true; goFull(); }
+  if (state === 'title') { start(); return; }
+  if (state === 'pause') { resume(); return; }
+  if (state !== 'play') return;
+  const [cx, cy] = toCanvas(e), b = PAUSE_BTN;
+  if (cx > b.x - 6 && cx < b.x + b.w + 10 && cy > b.y - 6 && cy < b.y + b.h + 10) { pause(); return; }
+  swipe = { x: e.clientX, y: e.clientY, done: false };
+}
+function onMove(e) {
+  if (!swipe || swipe.done) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
+  swipe.done = true;
+  act(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+}
+document.addEventListener('pointerdown', onDown, { passive: false });
+document.addEventListener('pointermove', onMove);
+document.addEventListener('pointerup', () => { swipe = null; });
+document.addEventListener('pointercancel', () => { swipe = null; });
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+// ---------- full screen (Android, iPad, computers); iPhone gets Add to Home Screen steps ----------
+const fsHelp = document.getElementById('fsHelp');
+function goFull() {
+  const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return false;
+  try { const r = req.call(el); if (r && r.then) r.then(() => { try { screen.orientation.lock('portrait').catch(() => {}); } catch (e) {} }).catch(() => {}); } catch (e) {}
+  return true;
+}
+document.getElementById('fsBtn').addEventListener('click', () => {
+  if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  if (!goFull()) fsHelp.classList.remove('hidden');
+});
+document.getElementById('fsHelpClose').addEventListener('click', () => fsHelp.classList.add('hidden'));
+if (navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) document.getElementById('fsBtn').classList.add('hidden');
+
+// ---------- sound on/off ----------
+const soundBtn = document.getElementById('soundBtn');
+function showSound() { soundBtn.textContent = soundOn ? 'SOUND ON' : 'SOUND OFF'; }
+soundBtn.addEventListener('click', () => { soundOn = !soundOn; saveJSON(STORE.sound, soundOn); audio(); showSound(); if (soundOn) SFX.coin(); });
+showSound();
+
+// ---------- game over buttons: run again, share, clear records ----------
+const endBtns = document.getElementById('endBtns'), clearBtn = document.getElementById('clearBtn');
+function showEnd(on) {
+  endBtns.classList.toggle('hidden', !on);
+  clearBtn.textContent = 'CLEAR RECORDS'; clearBtn.dataset.sure = '';
+  if (on && window.EmilyShare) {
+    // a sharp, bigger copy of the screen for the share picture
+    const k = 3, [big, bx] = makeCanvas(W * k, H * k); bx.drawImage(cv, 0, 0, W * k, H * k);
+    EmilyShare.snap({ canvas: big, game: 'Magpie Dash', text: `I scored ${G.score} and ran ${metres()} m before the magpie got me in Magpie Dash!`, path: 'magpie-dash/' });
+  }
+  document.getElementById('shareBtn').classList.toggle('hidden', !window.EmilyShare);
+}
+document.getElementById('againBtn').addEventListener('click', () => { audio(); start(); });
+document.getElementById('shareBtn').addEventListener('click', () => window.EmilyShare && EmilyShare.open());
+clearBtn.addEventListener('click', () => {   // asks once more before wiping
+  if (!clearBtn.dataset.sure) { clearBtn.dataset.sure = '1'; clearBtn.textContent = 'TAP AGAIN TO CLEAR'; return; }
+  clearRecords(); if (G.result) G.result = { rank: -1, newBest: false };
+  clearBtn.textContent = 'CLEARED'; clearBtn.dataset.sure = '';
+});
+
+// =====================================================================
+// PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
+// =====================================================================
+const EASY_PRESET = { baseSpeed: 7.5, maxSpeed: 14, speedRamp: 0.003, rowGapTime: [1.4, 2], rowGapTimeHard: [0.95, 1.4], magpieForget: 6, uteFacingFrom: 500, twoUtesFrom: 1200 };
+const HARD_PRESET = { baseSpeed: 11, maxSpeed: 22, speedRamp: 0.006, rowGapTime: [1, 1.4], rowGapTimeHard: [0.6, 0.95], magpieForget: 12, barFrom: 30, uteFrom: 60, uteFacingFrom: 120, twoUtesFrom: 300, hardAt: 1800 };
+{
+  const q = location.search;
+  if (/[?&]easy\b/.test(q)) Object.assign(CONFIG, EASY_PRESET);
+  if (/[?&]hard\b/.test(q)) Object.assign(CONFIG, HARD_PRESET);
+  if (/[?&]debug\b/.test(q)) CONFIG.DEBUG = true;
+}
+
+// test hooks
+window.__md = { get G() { return G; }, get state() { return state; }, set state(s) { state = s; }, start, act, update, draw, probe, CONFIG, KINDS, caught,
+  get seen() { return seen; }, get W() { return W; }, get H() { return H; },
+  setView(w, h, hy, foc) { W = w; H = h; HY = hy; FOC = foc; cv.width = W; cv.height = H; }, MAGPIE, SPR, drawText, makeCanvas, px, resize };
+
+newRun(); resize(); requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
