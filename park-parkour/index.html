@@ -2961,17 +2961,18 @@ Object.assign(PORTRAIT, {
     L('#8a8a92', 46, 32, 50, 30, 2); L('#8a8a92', 46, 44, 50, 46, 2);                   // paws on the trunk
     k.outline(); return k.c;
   },
-  flyingFox() {   // hanging upside down from a branch, one wing open
+  flyingFox() {   // hanging upside down from a branch, both wings open
     const k = portraitKit(80, 64), { P, E, L, F } = k;
     L('#6a4a30', 0, 6, 80, 9, 4);
     L('#2a2020', 37, 8, 38, 16, 1); L('#2a2020', 43, 8, 42, 16, 1);                    // feet hooked on
-    F('#2a2020', [[34, 18], [10, 26], [16, 34], [12, 42], [22, 40], [34, 44]]); for (const t of [[10, 26], [16, 34], [12, 42]]) L('#4a3a32', 34, 20, t[0], t[1], 1);   // open wing
+    for (const s of [-1, 1]) { const m = ([x, y]) => [40 + s * (40 - x), y];   // both wings open, one each side
+      F('#2a2020', [[34, 18], [10, 26], [16, 34], [12, 42], [22, 40], [34, 44]].map(m)); for (const t of [[10, 26], [16, 34], [12, 42]]) L('#4a3a32', ...m([34, 20]), ...m(t), 1); }
     E('#3a2a24', 40, 28, 7, 13); E('#d08a3a', 40, 41, 7, 4);                            // body, golden collar
     E('#6a5a50', 40, 48, 6, 5); F('#6a5a50', [[37, 51], [43, 51], [40, 58]]);          // fox face (upside down)
     F('#3a2a24', [[35, 46], [33, 42], [37, 44]]); F('#3a2a24', [[45, 46], [47, 42], [43, 44]]);   // ears
     P('#1b1b20', 37, 49, 2, 2); P('#1b1b20', 42, 49, 2, 2); P('#ffffff', 37, 49, 1, 1); P('#ffffff', 42, 49, 1, 1); P('#1b1b20', 39, 57, 2, 1);
     k.outline('#0c0c10');
-    E('#f0f0e0', 68, 22, 5, 5);                                                         // the moon
+    E('#f0f0e0', 73, 18, 3.5, 3.5);                                                         // the moon
     return k.c;
   },
   devil() {   // Tasmanian devil screeching, white chest band, pink ears
