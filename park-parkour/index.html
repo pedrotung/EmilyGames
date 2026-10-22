@@ -2126,7 +2126,8 @@ function showButtons() {
   mapBtn.classList.toggle('hidden', !(state === 'play' && G.tour));       // leave a level for the map
 }
 const mapBtn = document.getElementById('mapBtn');
-mapBtn.addEventListener('click', () => { if (state === 'play' && G.tour) { audio(); goMap(G.tour.city.id); } });
+// a phone sends a click after the finger lifts; when GO! sits under where MAP appears, that click must not end the level it just started
+mapBtn.addEventListener('click', () => { if (state === 'play' && G.tour && G.time > 0.8) { audio(); goMap(G.tour.city.id); } });
 
 // =====================================================================
 // PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
