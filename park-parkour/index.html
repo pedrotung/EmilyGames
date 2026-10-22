@@ -2788,6 +2788,16 @@ Object.assign(PORTRAIT, {
     L(DARK, 13, 16, 17, 16, 1);                                                                  // mouth
     k.outline(); return k.c;
   },
+  bogong() {   // a moth resting on the cave wall, wings open
+    const k = portraitKit(80, 64), { P, E, L, F } = k;
+    F('#7a5a3a', [[40, 22], [8, 14], [12, 34], [40, 38]]); F('#7a5a3a', [[40, 22], [72, 14], [68, 34], [40, 38]]);   // fore wings
+    F('#9a7a52', [[40, 36], [16, 36], [22, 50], [40, 44]]); F('#9a7a52', [[40, 36], [64, 36], [58, 50], [40, 44]]);  // hind wings
+    for (const s of [-1, 1]) { E('#3a2a1e', 40 + s * 18, 26, 4, 3); E('#e8d8b0', 40 + s * 18, 26, 2, 1.5); E('#3a2a1e', 40 + s * 26, 22, 2.5, 2);
+      L('#5e4228', 40 + s * 6, 30, 40 + s * 28, 18, 1); }                                                       // the two spots on each wing
+    E('#4a3424', 40, 32, 3, 12); E('#6a4a30', 40, 22, 4, 3);                           // body and head
+    L('#4a3424', 38, 20, 30, 8, 1); L('#4a3424', 42, 20, 50, 8, 1);                    // feelers
+    k.outline(); return k.c;
+  },
   kookaburra() {   // perched, big beak, brown eye stripe, blue on the wing
     const k = portraitKit(80, 64), { P, E, L, F } = k;
     L('#8a6a48', 0, 52, 80, 54, 4);
