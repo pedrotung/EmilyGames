@@ -728,12 +728,17 @@ function fillTiles() {
     if (i < 20) { G.tiles[i] = main; G.nextTile++; continue; }
     const r = Math.random(), prevCreek = (G.tiles[i - 1] || '').startsWith('creek');
     let type = r < 0.6 ? 'grass' : r < 0.85 || prevCreek ? 'red' : 'creek';   // never two creeks in a row
-    if (gr) {   // tour: the city's own ground, no creek next to a waiting animal or at the flag
+    let len = type === 'creek' ? irnd(4, 6) : irnd(4, 12), sp = null;
+    if (gr) {   // tour: the city's own ground, no creek next to a waiting animal, the city's special or the flag
+      const T = G.tour, z = inZone(i * 16 + 8); sp = SPECIAL[T.city.id];
+      if (z) { G.tiles[i] = z.kind; G.nextTile++; continue; }             // harbour or croc river: no ground at all
       type = r < 0.72 ? main : r < 1 - gr.creek || prevCreek ? gr.alt : 'creek';
-      if (type === 'creek' && (nearAnimal(i * 16, 6 * 16, 40) || Math.abs(i * 16 - G.tour.finishX) < 200)) type = main;
+      len = type === 'creek' ? irnd(4, 6) : irnd(4, 12);
+      const next = T.zones.find(z => z.x0 >= i * 16 && z.x0 < (i + len) * 16);
+      if (next) len = Math.max(1, Math.floor(next.x0 / 16) - i);
+      if (type === 'creek' && (len < 4 || nearAnimal(i * 16, len * 16, 40) || blocked(i * 16, len * 16) || Math.abs(i * 16 - T.finishX) < 200)) type = main;
     }
-    const len = type === 'creek' ? irnd(4, 6) : irnd(4, 12);
-    for (let k = 0; k < len; k++) G.tiles[i + k] = type === 'creek' ? (k === 0 ? 'creekL' : k === len - 1 ? 'creekR' : 'creek') : type;
+    for (let k = 0; k < len; k++) G.tiles[i + k] = type === 'creek' ? (k === 0 ? 'creekL' : k === len - 1 ? 'creekR' : 'creek') : (sp && sp.ground && sp.ground(G.tour, (i + k) * 16)) || type;
     if (type === 'creek') // butterflies and dragonflies play over the water
       for (let k = 0; k < 3; k++) G.bugs.push({ ax: (i + rnd(0.5, len - 0.5)) * 16, ay: GROUND_Y - rnd(14, 34), t: rnd(0, 9), kind: k === 1 ? 'dragonfly' : 'butterfly', col: pick(['o', 'q', 'L', 'w']) });
     G.nextTile += len;
@@ -757,7 +762,8 @@ function spawnThings() {
     let ob;
     if (T) {   // tour: no animals as obstacles, the city's own things instead
       if (!T.obst) T.obst = tourObstacles(T.city);
-      const o = weighted(T.obst.filter(o => o.spr.height <= C.maxObstacleHeight && !(G.lastTall && o.spr.height >= C.tallHeight)));
+      const sp = SPECIAL[T.city.id], own = sp && sp.obstacle && sp.obstacle(T, G.nextObs);   // the city's special obstacle (dune, snow)
+      const o = own ? { id: own, spr: SPR[own], inset: CITY_OBST[own] } : weighted(T.obst.filter(o => o.spr.height <= C.maxObstacleHeight && !(G.lastTall && o.spr.height >= C.tallHeight)));
       ob = { kind: o.id, spr: o.spr, w: o.spr.width, h: o.spr.height, inset: o.inset, walk: 0 };
     } else if (Math.random() < critterChance) {
       const c = weighted(CRITTERS.filter(c => !c.from || m >= c.from));
@@ -768,13 +774,13 @@ function spawnThings() {
       const o = weighted(list);
       ob = { kind: o.id, spr: o.spr, w: o.spr.width, h: o.spr.height, inset: o.inset, walk: 0 };
     }
-    let x = G.nextObs; while (onCreek(x - 16, ob.w + 32) || nearAnimal(x, ob.w)) x += 16;   // nothing on the bridge or next to a waiting animal
+    let x = G.nextObs; while (onCreek(x - 16, ob.w + 32) || nearAnimal(x, ob.w) || blocked(x, ob.w)) x += 16;   // nothing on the bridge or next to a waiting animal
     if (T && x > T.finishX - 120) { G.nextObs = Infinity; break; }
     ob.x = x; G.obstacles.push(ob);
     G.lastTall = ob.h >= C.tallHeight;
     // sometimes two small things side by side (one jump still clears both)
     let w = ob.w;
-    if ((T ? true : m > 80) && !ob.walk && ob.h <= 12 && ob.w <= 12 && Math.random() < (T ? T.st.pair : C.pairChance) && !onCreek(x + ob.w, ob.w + 4) && !nearAnimal(x + ob.w, ob.w + 4)) {
+    if ((T ? true : m > 80) && !ob.walk && ob.h <= 12 && ob.w <= 12 && Math.random() < (T ? T.st.pair : C.pairChance) && !onCreek(x + ob.w, ob.w + 4) && !nearAnimal(x + ob.w, ob.w + 4) && !blocked(x + ob.w, ob.w + 4)) {
       G.obstacles.push({ ...ob, x: x + ob.w + 2 }); w = ob.w * 2 + 2;
     }
     // gold arcs over some obstacles, inside the jump curve
@@ -789,7 +795,7 @@ function spawnThings() {
   while (G.nextPick < G.cam + W + 40) {
     const n = irnd(3, 6), high = Math.random() < 0.5, y = high ? GROUND_Y - 40 : GROUND_Y - 14;
     const x0 = G.nextPick, x1 = x0 + n * C.coinSpacing;
-    const clash = G.obstacles.some(ob => ob.x < x1 + 24 && ob.x + ob.w > x0 - 24);
+    const clash = G.obstacles.some(ob => ob.x < x1 + 24 && ob.x + ob.w > x0 - 24) || blocked(x0, x1 - x0, 24);
     if (!clash && !(T && x1 > T.finishX - 40)) for (let k = 0; k < n; k++) addPickup(x0 + k * C.coinSpacing, y);
     G.nextPick = x1 + rnd(C.coinRowGap[0], C.coinRowGap[1]);
   }
@@ -889,13 +895,16 @@ function dust(x, y, n, col = '#c9b48a') {
 function update(dt) {
   if (state === 'flight') { updateFlight(dt); return; }
   if (state === 'map' || state === 'complete') return;
-  const C = CONFIG, running = state === 'play', T = G.tour;
-  const speed = state === 'title' ? 60 : running ? G.speed : 0;
+  const C = CONFIG, running = state === 'play', T = G.tour, sp = T && SPECIAL[T.city.id];
+  let speed = state === 'title' ? 60 : running ? G.speed : 0;
   if (running) { G.time += dt; G.speed = T ? T.st.speed0 + (T.st.speed1 - T.st.speed0) * Math.min(1, G.cam / T.len) : Math.min(C.maxSpeed, C.baseSpeed + metres() * C.speedRampRate); }
+  // tour: riding the ferry, rain (faster) and wind (further or shorter jumps) change how fast the park goes by
+  if (running && T) speed = T.ride ? T.ride.vx : speed * T.runMul * (G.p.onGround ? 1 : T.airMul);
   G.cam += speed * dt;
   fillTiles();
   if (running) spawnThings();
   spawnBack(dt);
+  if (running && T) { if (sp && sp.update) sp.update(T, dt, Math.min(1, (G.cam + PLAYER_X) / T.finishX)); updateSpecialsWorld(T, dt); }
 
   // --- player physics ---
   const p = G.p;
@@ -903,13 +912,16 @@ function update(dt) {
   if (running) {
     p.buffer = Math.max(0, p.buffer - dt);
     if (!p.onGround) p.coyote = Math.max(0, p.coyote - dt);
-    p.vy = Math.min(C.maxFallSpeed, p.vy + C.gravity * dt); p.y += p.vy * dt;
-    if (p.y >= GROUND_Y) {
-      if (!p.onGround) { dust(PLAYER_X + 4, GROUND_Y, 3); p.squash = C.squash; }
-      p.y = GROUND_Y; p.vy = 0; p.onGround = true; p.jumps = 0; p.coyote = C.coyoteTime;
+    const y0 = p.y;
+    p.vy = Math.min(C.maxFallSpeed, p.vy + C.gravity * (T ? T.gravMul : 1) * dt); p.y += p.vy * dt;
+    const floor = T ? tourFloor(p, y0) : p.y >= GROUND_Y ? GROUND_Y : null;   // tour: platforms, and no floor over water
+    if (floor !== null) {
+      if (!p.onGround) { dust(PLAYER_X + 4, floor, 3); p.squash = C.squash; }
+      p.y = floor; p.vy = 0; p.onGround = true; p.jumps = 0; p.coyote = C.coyoteTime;
       if (p.buffer > 0) doJump(1);                     // jump buffer: the early press fires now
-    }
-    p.anim += dt * speed / 9;
+    } else if (T) p.onGround = false;                  // ran off the bank or a stone
+    if (T && p.y > GROUND_Y + 10) { const cx = G.cam + PLAYER_X + 4, z = T.zones.find(z => cx > z.x0 - 20 && cx < z.x1 + 20); if (z) tourSplash(z); }
+    p.anim += dt * (T && T.ride && p.onGround ? 0 : speed) / 9;
   } else if (state === 'title') p.anim += dt * 6;
   else if (state === 'dead') { G.deadT += dt; p.vy += C.gravity * dt; p.y = Math.min(GROUND_Y, p.y + p.vy * dt); }
   else { p.vy = Math.min(C.maxFallSpeed, p.vy + C.gravity * dt); p.y = Math.min(GROUND_Y, p.y + p.vy * dt); }   // level over: just land
@@ -917,6 +929,9 @@ function update(dt) {
   // --- walking animals move towards the player, but never into the obstacle ahead of them ---
   for (const ob of G.obstacles) if (ob.walk && running) {
     ob.t += dt;
+    if (ob.fly) {   // a swooping magpie dives down to its height as it comes close
+      ob.x -= ob.walk * dt; ob.liftNow = ob.lift + Math.min(50, Math.max(0, ob.x - (G.cam + PLAYER_X) - 70) * 0.3); continue;
+    }
     const ahead = G.obstacles.some(o => o !== ob && o.x < ob.x && o.x + o.w > ob.x - 30);
     if (!ahead) ob.x -= ob.walk * dt;
     if (ob.x - G.cam < W) markSeen(ob.kind);
@@ -926,7 +941,11 @@ function update(dt) {
   if (running) {
     const I = C.hitboxInset, box = { x: G.cam + PLAYER_X + I - 1, y: p.y - 24 + I, w: 9 - 2 * (I - 1), h: 24 - I };
     for (const ob of G.obstacles) {
-      const [l, t, r, b] = ob.inset, ox = ob.x + l + I, oy = GROUND_Y - ob.h + t + I, ow = ob.w - l - r - 2 * I, oh = ob.h - t - b - I;
+      if (ob.fall) {   // hail still falling: it only hurts if it lands on you
+        if (ob.fall.wait <= 0 && box.x < ob.x + ob.w && box.x + box.w > ob.x && box.y < ob.fall.y + ob.h && box.y + box.h > ob.fall.y) { ob.x = -1e9; tourHurt(); break; }
+        continue;
+      }
+      const [l, t, r, b] = ob.inset, ox = ob.x + l + I, oy = GROUND_Y - ob.h - (ob.liftNow || 0) + t + I, ow = ob.w - l - r - 2 * I, oh = ob.h - t - b - I;
       if (box.x < ox + ow && box.x + box.w > ox && box.y < oy + oh && box.y + box.h > oy) { if (T) tourHurt(); else die(); break; }
     }
     if (T && state === 'play') {
@@ -1017,11 +1036,14 @@ function die() {
 // =====================================================================
 // DRAW
 // =====================================================================
+const tourProg = () => Math.min(1, (G.cam + PLAYER_X) / G.tour.finishX);
 function drawSky() {
-  const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y), city = G.tour && G.tour.city;
-  g.addColorStop(0, city ? city.sky[0] : '#5ea8ec'); g.addColorStop(1, city ? city.sky[1] : '#c4e6ff');
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y), T = G.tour, city = T && T.city, sp = T && SPECIAL[city.id];
+  const sky = sp && sp.sky ? sp.sky(T, tourProg()) : city ? city.sky : ['#5ea8ec', '#c4e6ff'];   // a city special can change the sky
+  g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, GROUND_Y);
-  px(ctx, '#fff3a0', W - 46, 12, 16, 16); px(ctx, '#ffe066', W - 44, 14, 12, 12);   // block sun
+  if (sky[2] === 'moon') { px(ctx, '#f0f0e0', W - 46, 12, 14, 14); px(ctx, '#c8c8b8', W - 42, 16, 3, 3); px(ctx, '#c8c8b8', W - 38, 21, 2, 2); }
+  else if (sky[2] !== 'none') { px(ctx, '#fff3a0', W - 46, 12, 16, 16); px(ctx, '#ffe066', W - 44, 14, 12, 12); }   // block sun
   for (const c of G.clouds) ctx.drawImage(c.c, Math.round(c.x), Math.round(c.y));
   if (city) {   // the city skyline with its landmark, far away
     const far = cityFar(city), fwid = far.width;
@@ -1056,7 +1078,14 @@ function drawGround() {
   const t0 = Math.floor(G.cam / 16), off = -Math.floor(G.cam % 16);
   for (let i = 0; i <= Math.ceil(W / 16) + 1; i++) {
     const idx = t0 + i, type = G.tiles[idx] || 'grass', X = off + i * 16;
-    if (type.startsWith('creek')) {
+    if (type === 'harbour' || type === 'river') {   // open water: fall in and you lose a heart
+      const c = type === 'harbour' ? ['#1f4fa0', '#3d7fe0', '#8fc2ff'] : ['#2f6a6a', '#4a8a80', '#9ac8b0'];   // deep blue harbour, murky croc river
+      px(ctx, c[0], X, GROUND_Y, 16, H - GROUND_Y); px(ctx, c[1], X, GROUND_Y + 2, 16, 1);
+      for (let k = 0; k < 4; k++) px(ctx, (k + idx + Math.floor(G.time * 3)) % 3 ? c[1] : c[2], X + ((k * 5 + idx * 3 + Math.floor(G.time * 6)) % 14), GROUND_Y + 7 + k * 5, 3, 1);
+      const prev = G.tiles[idx - 1], next = G.tiles[idx + 1];
+      if (prev && prev !== type) px(ctx, 'D', X, GROUND_Y, 2, H - GROUND_Y);
+      if (next && next !== type) px(ctx, 'D', X + 14, GROUND_Y, 2, H - GROUND_Y);
+    } else if (type.startsWith('creek')) {
       // creek in a dip, with a wooden bridge on top that you run across
       px(ctx, '#2a5fb8', X, GROUND_Y, 16, 30);
       for (let k = 0; k < 4; k++) px(ctx, (k + idx + Math.floor(G.time * 4)) % 3 ? '#3d7fe0' : '#8fc2ff', X + ((k * 5 + idx * 3) % 14), GROUND_Y + 8 + k * 5, 3, 1);
@@ -1069,7 +1098,7 @@ function drawGround() {
       if (idx % 2 === 0) px(ctx, 'B', X + 1, GROUND_Y - 9, 2, 9);
     } else {
       const red = type === 'red', sand = type === 'sand';
-      const top = (sand ? TILES.sand : red ? TILES.red : TILES.grass)[idx % 3], low = (sand ? TILES.sanddirt : red ? TILES.reddirt : TILES.dirt)[idx % (red || sand ? 2 : 3)];
+      const top = (sand ? TILES.sand : red ? TILES.red : type === 'snow' ? TILES.snow : TILES.grass)[idx % 3], low = (sand ? TILES.sanddirt : red ? TILES.reddirt : TILES.dirt)[idx % (red || sand ? 2 : 3)];
       ctx.drawImage(top, X, GROUND_Y); ctx.drawImage(low, X, GROUND_Y + 16);
     }
   }
@@ -1142,8 +1171,14 @@ function shadow(X, w) { ctx.globalAlpha = 0.35; px(ctx, '#000000', X - 1, GROUND
 function drawThings() {
   for (const ob of G.obstacles) {
     const X = Math.round(ob.x - G.cam);
+    if (ob.fall) {   // falling hail: a shadow shows where it will land
+      ctx.globalAlpha = 0.2 + 0.3 * Math.min(1, Math.max(0, ob.fall.y) / GROUND_Y); px(ctx, '#000000', X - 1, GROUND_Y - 1, ob.w + 2, 2); ctx.globalAlpha = 1;
+      if (ob.fall.wait <= 0) ctx.drawImage(outlined(ob.spr), X - 1, Math.round(ob.fall.y) - 1);
+      continue;
+    }
     shadow(X, ob.w);
-    if (ob.spr) ctx.drawImage(outlined(ob.spr), X - 1, GROUND_Y - ob.h - 1);
+    if (ob.fly) ctx.drawImage(outlined(Math.floor(ob.t * 8) % 2 ? SPR.magFly1 : SPR.magFly2), X - 1, Math.round(GROUND_Y - ob.h - ob.liftNow) - 1);
+    else if (ob.spr) ctx.drawImage(outlined(ob.spr), X - 1, GROUND_Y - ob.h - 1);
     else if (ob.kind === 'snake') drawSnake(ob, X);
     else ctx.drawImage(outlined(SPR[ob.kind]), X - 1, GROUND_Y - ob.h - 1 - (Math.floor(ob.t * 6) % 2));   // waddle
   }
@@ -1223,12 +1258,17 @@ function draw() {
   if (state === 'flight') { drawFlight(); return; }
   if (state === 'map') { drawMapScreen(); return; }
   if (state === 'complete') { drawComplete(); snapIfNeeded(); return; }
+  const T = G.tour, sp = T && SPECIAL[T.city.id], prog = T && tourProg();
   drawSky(); drawSkyAnimals(); drawBackPark();
-  // light haze over the background park, so it reads as far away and never looks like something to jump
-  ctx.globalAlpha = 0.38; ctx.fillStyle = '#d8eeff'; ctx.fillRect(0, 0, W, GROUND_Y); ctx.globalAlpha = 1;
+  // light haze over the background park, so it reads as far away and never looks like something to jump (dark blue at night)
+  const haze = T && T.haze || ['#d8eeff', 0.38];
+  ctx.globalAlpha = haze[1]; ctx.fillStyle = haze[0]; ctx.fillRect(0, 0, W, GROUND_Y); ctx.globalAlpha = 1;
+  if (sp && sp.back) sp.back(T, prog);
   drawGround(); drawBugs();
-  if (G.tour) { drawFinish(); drawTourAnimals(); }
+  if (T) { drawSpecialsWorld(T); drawFinish(); drawTourAnimals(); }
+  if (sp && sp.front && sp.behindThings) sp.front(T, prog);
   drawThings(); drawPlayer(); drawFx();
+  if (sp && sp.front && !sp.behindThings) sp.front(T, prog);
   if (state === 'title') { drawTitle(); return; }
   drawHud();
   if (state === 'clear') { drawClear(); snapIfNeeded(); }
@@ -1762,16 +1802,25 @@ function startTour(i) {
 }
 function startLevel(id) {
   const city = CITY[id]; newRun(city); state = 'play'; showEnd(false); fillTiles(); showButtons();
+  for (const [x, y] of G.tour.extraCoins) addPickup(x, y);
 }
 // stage setup for one city level
 function setupTour(city) {
   const stage = stageOf(city.id), st = STAGES[stage - 1], len = st.len * 16;
   const T = { city, stage, st, len, finishX: len, hearts: TOUR_HEARTS, hurt: 0, lost: 0, got: [false, false, false],
     coinsMade: 0, spawns: [], animals: [], cards: [], ended: false,
-    back: Object.entries(city.props).map(([type, weight]) => ({ type, weight })) };
+    back: Object.entries(city.props).map(([type, weight]) => ({ type, weight })),
+    zones: [], plats: [], clear: [], extraCoins: [], crocs: [], winds: [], swoops: [], airMul: 1, gravMul: 1, runMul: 1, ride: null, haze: null };
   // each animal shows up 3 times, spread over the level, so a miss is not the end
   const order = [0, 1, 2, 1, 2, 0, 2, 0, 1];
   order.forEach((ai, n) => T.spawns.push({ x: Math.round(len * (0.1 + n * 0.1) + rnd(-40, 40)), ai }));
+  const sp = SPECIAL[city.id]; if (sp && sp.setup) sp.setup(T);
+  // animals never wait over water or where the city's special happens
+  for (const s of T.spawns) for (let k = 0; k < 4; k++) {
+    const z = T.zones.find(z => s.x > z.x0 - 70 && s.x < z.x1 + 50), c = T.clear.find(([a, b]) => s.x > a - 30 && s.x < b + 10);
+    if (z) s.x = z.x1 + 70; else if (c) s.x = Math.round(c[1] + 40); else break;
+  }
+  T.spawns.sort((a, b) => a.x - b.x);
   return T;
 }
 // where an animal stands: [top y] for its place
@@ -2128,6 +2177,278 @@ function showButtons() {
 const mapBtn = document.getElementById('mapBtn');
 // a phone sends a click after the finger lifts; when GO! sits under where MAP appears, that click must not end the level it just started
 mapBtn.addEventListener('click', () => { if (state === 'play' && G.tour && G.time > 0.8) { audio(); goMap(G.tour.city.id); } });
+
+// =====================================================================
+// CITY SPECIALS - each city has one thing of its own. It turns up once and
+// gently at stage 1 and several times, faster, at stage 8.
+//   zones: stretches of water with no ground (fall in = lose a heart)
+//   plats: things to stand on (ferry, stepping stones) or bounce on (balloons)
+//   clear: stretches where no normal obstacle, creek or animal is put
+// =====================================================================
+const many = (T, a, b) => Math.round(a + (b - a) * (T.stage - 1) / 7);          // a at stage 1 ... b at stage 8
+const at = (T, f) => Math.round(T.len * f / 16) * 16;                          // a spot at fraction f of the level, on a tile edge
+const speedAt = (T, f) => T.st.speed0 + (T.st.speed1 - T.st.speed0) * f;        // run speed at fraction f
+const spots = (n, a, b) => Array.from({ length: n }, (_, i) => n === 1 ? (a + b) / 2 : a + (b - a) * i / (n - 1));
+const inZone = wx => G.tour && G.tour.zones.find(z => wx >= z.x0 && wx < z.x1);
+// no normal obstacle, coin row or creek here: near water, in a clear stretch, or next to something that fell from the sky
+function blocked(x, w, pad = 56) {
+  const T = G.tour; if (!T) return false;
+  return T.zones.some(z => x < z.x1 + pad && x + w > z.x0 - pad) || T.clear.some(([a, b]) => x < b && x + w > a)
+    || G.obstacles.some(o => o.dyn && x < o.x + o.w + 50 && x + w > o.x - 50);
+}
+// room for a surprise obstacle (hail, a branch) at x?
+const freeSpot = (x, w) => x < G.tour.finishX - 150 && !blocked(x, w) && !nearAnimal(x, w) && !onCreek(x - 16, w + 32)
+  && !G.obstacles.some(o => x < o.x + o.w + 70 && x + w > o.x - 70);
+
+// ---------- sprites for the specials ----------
+SPR.balloon = sprite(['.....qqqqq.....', '...qqoqqqoqq...', '..qqooqqqooqq..', '.qqqooqqqooqqq.', 'qqqqooqqqooqqqq', 'qqqqooqqqooqqqq',
+  'qqqqooqqqooqqqq', '.qqqooqqqooqqq.', '..qqooqqqooqq..', '...qqoqqqoqq...', '....qqqqqqq....', '.....k...k.....', '.....k...k.....', '.....bbbbb.....', '.....bBBBb.....']);
+SPR.balloon2 = recolour(SPR.balloon, { q: '#3c6fd0', o: '#f4f4f4' });
+SPR.balloon3 = recolour(SPR.balloon, { q: '#2fa3a8', o: '#f2c230' });
+// a green and cream Manly ferry, 40 wide; the deck is row 5
+SPR.ferry = sprite(['.'.repeat(18) + 'kkkk' + '.'.repeat(18), '.'.repeat(18) + 'kook' + '.'.repeat(18),
+  '......' + 'k'.repeat(28) + '......', '......k' + 'tw'.repeat(13) + 'k......', '......k' + 't'.repeat(26) + 'k......',
+  'k'.repeat(40), 'k' + 'e'.repeat(38) + 'k', '.k' + 'e'.repeat(36) + 'k.', '..' + 'k'.repeat(36) + '..']);
+SPR.stone = sprite(['..iiiiiiiiiiiiiiiiii..', '.iiIiiiiiiiiiiiIiiiii.', 'iIiiiiiIiiiiiiiiiiIiii', 'IIiiiiiiiiiIiiiiiiiiII', '.IIIIIIIIIIIIIIIIIIII.']);
+SPR.snowpile = sprite(['....wwww....', '..wwwwwwww..', '.wwwWwwwwww.', 'wwwwwwwwWwww', 'WwwwwwwwwwwW', 'WWWWWWWWWWWW']);
+SPR.ice = sprite(['.zzzz.', 'zwwzzz', 'zwzzzz', 'zzzzwz', 'zzzzzz', '.zzzz.']);
+SPR.magFly1 = sprite(['.......kwk......', '......kwwk......', '..kk..kwk.......', 'Wkqkkkkkkkkkk...', '.kkwwwkkkkkkkkkk', '...kkkkkkkk..kk.', '................']);
+SPR.magFly2 = sprite(['................', '................', '..kk............', 'Wkqkkkkkkkkkk...', '.kkwwwkwwkkkkkkk', '...kkkkwwk...kk.', '.......kk.......']);
+// a long low sand dune (Perth): too long for a normal jump, easy with the sea breeze behind you
+SPR.dune = (() => { const w = 56, h = 9, [c, x] = makeCanvas(w, h);
+  for (let i = 0; i < w; i++) { const top = h - Math.max(1, Math.round(h * Math.pow(Math.sin(Math.PI * (i + 0.5) / w), 0.6)));
+    px(x, '#e2cf94', i, top, 1, h - top); px(x, '#f4e8c0', i, top, 1, 1); if (i % 7 === 3) px(x, '#c8b070', i, top + 3, 1, 1); }
+  return c; })();
+Object.assign(CITY_OBST, { dune: [3, 2, 3, 0], snowpile: [1, 1, 1, 0], ice: [0, 0, 0, 0], branch: [0, 1, 0, 0] });
+TILES.snow = [41, 42, 43].map(s => { const R = mulberry(s), [c, x] = makeCanvas(16, 16); x.drawImage(TILES.grass[s % 3], 0, 0);
+  for (let xx = 0; xx < 16; xx++) { const d = 3 + (R() < 0.4 ? 1 : 0); px(x, '#f4f4f4', xx, 0, 1, d); if (R() < 0.3) px(x, '#d8e4f0', xx, d - 1, 1, 1); } return c; });
+const fallingObstacle = (kind, spr, x, fall) => ({ kind, spr, w: spr.width, h: spr.height, inset: CITY_OBST[kind], walk: 0, x, dyn: true, fall });
+
+// ---------- each city's special ----------
+const SPECIAL = {
+  canberra: {   // hot-air balloons float low over the lawns: land on top to bounce up high to the gold
+    setup(T) {
+      for (const f of spots(many(T, 1, 4), 0.2, 0.8)) {
+        const x = at(T, f) + 40;
+        T.plats.push({ kind: 'balloon', x, y: GROUND_Y - 30, w: 15, spr: pick([SPR.balloon, SPR.balloon2, SPR.balloon3]), bounce: 380, t: Math.random() * 6, squish: 0 });
+        T.clear.push([x - 50, x + 90]);
+        for (let k = 0; k < 5; k++) T.extraCoins.push([x + 18 + k * 12, GROUND_Y - 100 + Math.abs(k - 2) * 6]);   // gold only a bounce reaches
+      }
+    },
+    update(T) { const P = G.cam + PLAYER_X; if (!T.toldBalloon && T.plats.some(b => b.x > P && b.x - P < W - 60)) { T.toldBalloon = true; banner('BALLOON! JUMP ON IT TO BOUNCE'); } },
+    sky(T, p) { return p < 0.5 ? ['#86b8e8', '#e6f2ff'] : ['#7a90c8', '#ffc890']; },   // frosty morning to warm evening
+  },
+  sydney: {     // the ferry wharf: hop on the ferry and ride it across the harbour; the second half is Bondi sand
+    setup(T) {
+      for (const f of spots(many(T, 1, 3), 0.25, 0.7)) {
+        const sp = speedAt(T, f), w = Math.max(112, Math.round(sp * 1.45 / 16) * 16), x0 = at(T, f);
+        T.zones.push({ x0, x1: x0 + w, kind: 'harbour' });
+        // at stage 1 the ferry waits for you; later it leaves just before you get there, so you jump on
+        T.plats.push({ kind: 'ferry', x: x0, y: GROUND_Y, w: 40, end: x0 + w, spr: SPR.ferry, state: 'dock', lead: sp * (T.stage - 1) * 0.12, vx: 20 + T.stage * 4 });
+      }
+    },
+    update(T, dt) {
+      const P = G.cam + PLAYER_X + 4, p = G.p;
+      if (!T.toldHarbour && T.zones.some(z => z.x0 > P && z.x0 - P < W - 60)) { T.toldHarbour = true; banner('HARBOUR! HOP ON THE FERRY'); }
+      for (const f of T.plats) {
+        if (f.state === 'dock' && P >= f.x - f.lead) f.state = 'go';
+        if ((f.state === 'go' || f.state === 'dock') && p.plat === f && p.onGround) {
+          f.state = 'ride'; f.vx = G.speed * 0.8; T.ride = f; SFX.combo();
+          if (!T.toldFerry) { T.toldFerry = true; banner('ALL ABOARD THE FERRY!'); }
+        }
+        if (f.state === 'go' || f.state === 'ride') f.x += f.vx * dt;
+        if (f.state !== 'done' && f.x + f.w >= f.end) { f.x = f.end - f.w; if (T.ride === f) T.ride = null; f.state = 'done'; }
+      }
+    },
+    ground(T, x) { return x > T.len * 0.55 ? 'sand' : null; },
+  },
+  brisbane: {   // an afternoon thunderstorm rolls in: rain, dark sky, and lightning knocks branches onto the path
+    setup(T) { T.storm = { from: 0.5 - T.stage * 0.03, next: 2.5, flash: 0, bolt: null }; },
+    update(T, dt, prog) {
+      const s = T.storm; if (prog < s.from) return;
+      if (!s.on) { s.on = true; banner('THUNDERSTORM! WATCH FOR BRANCHES'); }
+      s.flash = Math.max(0, s.flash - dt);
+      if ((s.next -= dt) > 0 || prog > 0.95) return;
+      s.next = rnd(3.2, 5.5) - T.stage * 0.25;
+      const P = G.cam + PLAYER_X, x = Math.round(Math.max(P + G.speed * 1.2, Math.min(P + G.speed * rnd(1.4, 1.8), G.cam + W - 24))), free = freeSpot(x, 16);
+      s.flash = 0.3; s.bolt = { x: free ? x + 8 : G.cam + rnd(W * 0.5, W), pts: [] };
+      for (let y = 0, bx = 0; y < GROUND_Y; y += irnd(8, 14)) { s.bolt.pts.push([bx, Math.min(GROUND_Y, y)]); bx += irnd(-6, 6); }
+      s.bolt.pts.push([0, GROUND_Y]);
+      beep(70, 35, 0.6, 0.2, 'sawtooth'); beep(110, 40, 0.4, 0.12, 'square', 0.05);
+      if (free) {
+        G.obstacles.push(fallingObstacle('branch', SPR.log, x, null));
+        for (let k = 0; k < 10; k++) particle(x - G.cam + 8, GROUND_Y - 6, rnd(-30, 30), rnd(-90, -30), rnd(0.4, 0.9), pick(['#f2c230', '#ffffff', '#8d8d8d']), 2);
+      }
+    },
+    front(T, prog) {
+      const s = T.storm; if (!s.on) return;
+      const k = Math.min(1, (prog - s.from) / 0.08), dark = (0.22 + T.stage * 0.03) * k;
+      ctx.globalAlpha = s.flash > 0 ? 0 : dark; px(ctx, '#101830', 0, 0, W, H); ctx.globalAlpha = 1;
+      if (s.flash > 0.12) {
+        ctx.globalAlpha = 0.35; px(ctx, '#ffffff', 0, 0, W, H); ctx.globalAlpha = 1;
+        const X = Math.round(s.bolt.x - G.cam), pts = s.bolt.pts;
+        for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i], n = Math.max(1, by - ay);
+          for (let j = 0; j < n; j++) px(ctx, '#fffbe0', X + Math.round(ax + (bx - ax) * j / n) - 1, ay + j, 3, 1); }
+      }
+      rain(k, '#9ab8e8');
+    },
+    behindThings: true,   // the storm darkens the park but the things to jump stay bright
+  },
+  darwin: {     // jump across croc rivers on stepping stones
+    setup(T) {
+      for (const f of spots(many(T, 1, 3), 0.22, 0.75)) {
+        const n = many(T, 1, 3), sp = speedAt(T, f), gap = Math.round(sp * 0.36), sw = Math.round(sp * 0.45), x0 = at(T, f);
+        const w = Math.ceil((gap * (n + 1) + sw * n) / 16) * 16, g2 = (w - sw * n) / (n + 1), z = { x0, x1: x0 + w, kind: 'river' };
+        T.zones.push(z);
+        for (let i = 0; i < n; i++) T.plats.push({ kind: 'stone', x: Math.round(x0 + g2 * (i + 1) + sw * i), y: GROUND_Y, w: sw });
+        T.crocs.push({ t: Math.random() * 9, zone: z });
+      }
+    },
+    update(T) { const z = inZone(G.cam + PLAYER_X + 60); if (z && !T.toldRiver) { T.toldRiver = true; banner('CROC RIVER! JUMP STONE TO STONE'); } },
+  },
+  perth: {      // the Fremantle Doctor: in the sea breeze you fly further, so you can clear the long dunes
+    setup(T) { for (const f of spots(many(T, 1, 3), 0.25, 0.75)) T.winds.push({ x0: at(T, f), x1: at(T, f) + Math.round(speedAt(T, f) * 4) }); },
+    update(T) {
+      const wx = G.cam + PLAYER_X, w = T.winds.find(z => wx >= z.x0 - 30 && wx < z.x1);
+      if (w && !w.told) { w.told = true; banner('SEA BREEZE! JUMP FURTHER'); beep(200, 400, 0.6, 0.05, 'triangle'); }
+      T.airMul = w ? 1.45 : 1; T.gravMul = w ? 0.85 : 1;
+    },
+    obstacle(T, x) { const z = T.winds.find(z => x > z.x0 + 40 && x < z.x1 - 90); if (z && !z.duned) { z.duned = true; return 'dune'; } return null; },
+    front(T) {
+      const wx = G.cam + PLAYER_X; if (!T.winds.some(z => wx >= z.x0 - 30 && wx < z.x1 + 60)) return;
+      for (let i = 0; i < 14; i++) { const x = W - ((G.time * 260 + i * 97) % (W + 60)), y = 20 + (i * 37) % 120; px(ctx, '#ffffff', Math.round(x), y, 10 + (i % 3) * 4, 1); }
+    },
+  },
+  adelaide: {   // magpie season: magpies swoop in low (jump over) or at head height (stay down!)
+    setup(T) {
+      spots(many(T, 2, 6), 0.15, 0.85).forEach((f, i) => {
+        const x = at(T, f) + irnd(-2, 2) * 16, sp = speedAt(T, f);
+        T.swoops.push({ x, high: T.stage >= 3 && i > 0 && Math.random() < 0.5 });
+        T.clear.push([x - sp * 0.8, x + sp * 0.6]);
+      });
+    },
+    update(T) {
+      const P = G.cam + PLAYER_X, walk = 55 + T.stage * 6;
+      while (T.swoops.length) {
+        const s = T.swoops[0], xs = s.x + walk * (s.x - P) / G.speed;   // start here and it meets you at s.x
+        if (xs - G.cam > W + 30) break;
+        T.swoops.shift();
+        G.obstacles.push({ kind: 'swoop', spr: SPR.magFly1, w: 16, h: 7, inset: [1, 2, 2, 1], walk, t: 0, x: Math.max(xs, G.cam + W + 4), lift: s.high ? 30 : 4, liftNow: 60, fly: true, dyn: true });
+        if (!s.high && !T.toldLow) { T.toldLow = true; banner('SWOOPING MAGPIE! JUMP OVER'); }
+        if (s.high && !T.toldHigh) { T.toldHigh = true; banner('HIGH MAGPIE! STAY DOWN'); }
+      }
+    },
+  },
+  melbourne: {  // four seasons in one day: sun, rain (run faster), wind (short jumps), hail (ice falls onto the path)
+    setup(T) {
+      const secs = T.len / ((T.st.speed0 + T.st.speed1) / 2);
+      T.season = { list: ['SUNNY', 'RAIN', 'WIND', 'HAIL'], i: 0, t: 0, len: secs / (4.3 + (T.stage - 1) * 0.35), hailT: 0.5 };
+    },
+    update(T, dt, prog) {
+      const s = T.season; s.t += dt;
+      if (s.t > s.len) { s.t = 0; s.i = (s.i + 1) % 4; banner({ SUNNY: 'SUNNY AGAIN!', RAIN: 'RAIN! SLIPPERY AND FAST', WIND: 'WINDY! SHORT JUMPS', HAIL: 'HAIL! JUMP THE ICE' }[s.list[s.i]]); }
+      const now = s.list[s.i];
+      T.runMul = now === 'RAIN' ? 1.1 : 1; T.airMul = now === 'WIND' ? 0.82 : 1;
+      if (now === 'HAIL' && prog < 0.93 && (s.hailT -= dt) <= 0) {
+        s.hailT = Math.max(0.9, 2.4 - T.stage * 0.18);
+        const x = Math.round(G.cam + PLAYER_X + G.speed * rnd(1.6, 2.0));
+        if (freeSpot(x, 6)) G.obstacles.push(fallingObstacle('ice', SPR.ice, x, { y: -10, vy: 0, wait: 0.6 }));
+      }
+    },
+    sky(T) { const n = T.season.list[T.season.i]; return n === 'SUNNY' ? ['#58a4e8', '#d4ecff'] : n === 'WIND' ? ['#9cb4cc', '#e0e8f0', 'none'] : ['#7a8a9c', '#c4ccd6', 'none']; },
+    front(T) { const n = T.season.list[T.season.i];
+      if (n === 'RAIN') rain(1, '#c0d0ec');
+      if (n === 'HAIL') for (let i = 0; i < 24; i++) px(ctx, '#f4f8ff', Math.round((i * 67 - G.time * 40) % W + W) % W, Math.round((i * 41 + G.time * 200) % H), 2, 2);
+      if (n === 'WIND') for (let i = 0; i < 10; i++) { const x = W - ((G.time * 220 + i * 83) % (W + 40)), y = 30 + (i * 29) % 110 + Math.sin(G.time * 5 + i) * 6; px(ctx, i % 2 ? '#c08a12' : '#8a5a32', Math.round(x), Math.round(y), 3, 2); }
+    },
+  },
+  hobart: {     // up the mountain: fog, then snow, then night with the southern lights
+    setup(T) {
+      T.fog = [0.3, 0.55]; T.snowAt = 0.55; T.nightAt = 0.8;
+      // the devil only comes out after dark
+      T.spawns.forEach(s => { if (T.city.animals[s.ai].k === 'devil') s.x = Math.round(T.len * rnd(0.82, 0.95)); });
+    },
+    update(T, dt, prog) {
+      for (const [at, s] of [[T.fog[0], 'FOG ON THE MOUNTAIN!'], [T.snowAt, 'SNOW!'], [T.nightAt, 'NIGHT! SOUTHERN LIGHTS']])
+        if (prog > at && !T['told' + s]) { T['told' + s] = true; banner(s); }
+      T.haze = prog > T.nightAt ? ['#0c1430', 0.45] : null;
+    },
+    ground(T, x) { return x > T.len * T.snowAt ? 'snow' : null; },
+    sky(T, p) { return p > T.nightAt ? ['#0c1430', '#283a6a', 'moon'] : p > T.snowAt ? ['#8a9ab8', '#dfe6f0', 'none'] : ['#6a8ab8', '#ccd8ea']; },
+    obstacle(T, x) { return x > T.len * T.snowAt && Math.random() < 0.5 ? 'snowpile' : null; },
+    back(T, p) {   // stars and the southern lights after dark
+      if (p <= T.nightAt) return;
+      const k = Math.min(1, (p - T.nightAt) / 0.04);
+      for (let i = 0; i < 40; i++) px(ctx, '#ffffff', (i * 89) % W, (i * 53) % 70, 1, 1);
+      for (let x = 0; x < W; x += 3) { const y = 30 + Math.sin(x / 30 + G.time) * 10; ctx.globalAlpha = 0.35 * k; px(ctx, '#5ff0a0', x, Math.round(y), 3, 18); px(ctx, '#d080f0', x, Math.round(y) - 8, 3, 8); }
+      ctx.globalAlpha = 1;
+    },
+    front(T, p) {
+      if (p > T.fog[0] && p < T.fog[1]) {   // fog: you only see the stretch just ahead
+        const k = Math.min(1, (p - T.fog[0]) / 0.03, (T.fog[1] - p) / 0.03), x0 = Math.round(W * 0.62);
+        for (let x = x0; x < W; x += 2) { ctx.globalAlpha = k * Math.min(0.85, (x - x0) / (W - x0) * 1.4); px(ctx, '#e8ecf0', x, 0, 2, H); }
+        ctx.globalAlpha = 1;
+      }
+      if (p > T.snowAt) for (let i = 0; i < 40; i++) px(ctx, '#ffffff', Math.round((i * 71 - G.time * (20 + i % 5 * 6)) % W + W) % W, Math.round((i * 43 + G.time * (30 + i % 4 * 8)) % H), 1 + (i % 3 === 0), 1 + (i % 3 === 0));
+    },
+  },
+};
+function rain(k, col) {
+  ctx.globalAlpha = 0.6 * k;
+  for (let i = 0; i < 70; i++) { const x = Math.round((i * 53 - G.time * 60) % W + W) % W, y = Math.round((i * 31 + G.time * 260) % (H + 10)) - 10; px(ctx, col, x, y, 1, 4); }
+  ctx.globalAlpha = 1;
+}
+// where the feet land this step: a platform, the ground, or nothing (over water / in the air)
+function tourFloor(p, y0) {
+  const T = G.tour, cx = G.cam + PLAYER_X + 4;
+  p.plat = null;
+  if (p.vy < 0) return null;
+  for (const pl of T.plats) if (cx >= pl.x - 1 && cx <= pl.x + pl.w + 1 && y0 <= pl.y + 1 && p.y >= pl.y) {
+    if (pl.bounce) {   // a balloon: boing!
+      p.y = pl.y; p.vy = -pl.bounce; p.jumps = 1; p.onGround = false; p.stretch = 0.2; pl.squish = 0.25;
+      beep(300, 700, 0.18, 0.1, 'triangle'); dust(PLAYER_X + 4, pl.y, 5, '#ffffff'); return null;
+    }
+    p.plat = pl; return pl.y;
+  }
+  if (!inZone(cx) && y0 <= GROUND_Y + 1 && p.y >= GROUND_Y) return GROUND_Y;
+  return null;
+}
+// fell into the water: lose a heart and climb out on the far bank
+function tourSplash(z) {
+  const T = G.tour;
+  for (let k = 0; k < 14; k++) particle(PLAYER_X + 4, GROUND_Y + 4, rnd(-60, 60), rnd(-160, -60), rnd(0.4, 0.8), pick(['#ffffff', '#8fc2ff', '#3d7fe0']), 2);
+  beep(400, 80, 0.4, 0.12, 'triangle');
+  T.hurt = 0; T.ride = null; tourHurt(); if (state !== 'play') return;
+  G.cam = z.x1 + 6 - PLAYER_X; G.p.y = GROUND_Y - 30; G.p.vy = 0; G.p.onGround = false; G.p.jumps = 1; G.p.plat = null;
+  G.obstacles = G.obstacles.filter(o => o.x > G.cam + PLAYER_X + 90 || o.x + o.w < G.cam);   // nothing right where you land
+  G.nextObs = Math.max(G.nextObs, G.cam + PLAYER_X + 140);
+}
+// things that move in the world: falling hail, croc eyes, balloon wobble
+function updateSpecialsWorld(T, dt) {
+  for (const ob of G.obstacles) {
+    const f = ob.fall; if (!f) continue;
+    if (f.wait > 0) { f.wait -= dt; continue; }
+    f.vy += 600 * dt; f.y += f.vy * dt;
+    if (f.y >= GROUND_Y - ob.h) { ob.fall = null; beep(900, 500, 0.06, 0.06, 'square');
+      for (let k = 0; k < 5; k++) particle(ob.x - G.cam + 3, GROUND_Y - 2, rnd(-40, 40), rnd(-60, -20), rnd(0.2, 0.4), '#e8f4ff', 1); }
+  }
+  for (const c of T.crocs) c.t += dt;
+  for (const pl of T.plats) { if (pl.t !== undefined) pl.t += dt; if (pl.squish) pl.squish = Math.max(0, pl.squish - dt); }
+}
+function drawSpecialsWorld(T) {
+  for (const c of T.crocs) {   // croc eyes drift across the river now and then
+    const z = c.zone, X = Math.round(z.x0 + (z.x1 - z.x0) * (0.5 + Math.sin(c.t * 0.5) * 0.4) - G.cam), up = Math.sin(c.t * 1.3) > 0.2;
+    if (up && X > -10 && X < W + 10) { px(ctx, '#4f6b2a', X, GROUND_Y + 8, 10, 2); px(ctx, '#4f6b2a', X + 1, GROUND_Y + 7, 2, 1); px(ctx, '#4f6b2a', X + 6, GROUND_Y + 7, 2, 1); px(ctx, '#f2c230', X + 1, GROUND_Y + 7, 1, 1); px(ctx, '#f2c230', X + 6, GROUND_Y + 7, 1, 1); }
+  }
+  for (const pl of T.plats) {
+    const X = Math.round(pl.x - G.cam); if (X < -60 || X > W + 60) continue;
+    if (pl.kind === 'balloon') { const bob = Math.round(Math.sin(pl.t * 2)), sq = pl.squish > 0 ? 2 : 0;
+      ctx.drawImage(outlined(pl.spr), X - 1, pl.y - 1 + bob + sq, pl.spr.width + 2, pl.spr.height + 2 - sq);
+      ctx.globalAlpha = 0.25; px(ctx, '#000000', X + 2, GROUND_Y, 11, 2); ctx.globalAlpha = 1; }
+    else if (pl.kind === 'ferry') { ctx.drawImage(outlined(pl.spr), X - 1, pl.y - 6); if (pl.state === 'go' || pl.state === 'ride') px(ctx, '#ffffff', X - 4 - Math.floor(G.time * 8) % 3, GROUND_Y + 3, 4, 1); }
+    else if (pl.kind === 'stone') { for (let x = 0; x < pl.w; x += SPR.stone.width - 2) ctx.drawImage(SPR.stone, X + Math.min(x, pl.w - SPR.stone.width), pl.y, Math.min(SPR.stone.width, pl.w), SPR.stone.height); px(ctx, '#5a5a64', X + 1, pl.y + 5, pl.w - 2, 6); }
+  }
+}
 
 // =====================================================================
 // PRESETS - open the page with ?easy or ?hard (or copy the numbers into CONFIG)
